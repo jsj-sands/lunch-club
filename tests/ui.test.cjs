@@ -12,8 +12,11 @@ const monday = '2026-10-19';
 const fixedTime = '2026-10-19T03:26:00.000Z';
 const localKey = 'sandsLunch.local.v1';
 const imageKey = 'sandsLunch.menuImages.v1';
+const kakaoKey = 'sandsLunch.kakaoProfile.v1';
+const kakaoChannel = 'https://pf.kakao.com/_xbbMPn';
+const kakaoImage = 'https://k.kakaocdn.net/dn/lunch-profile/fixture/img_m.jpg';
 const connection = { url: 'https://script.google.com/macros/s/test_deployment/exec', key: 'a'.repeat(64) };
-const sharedFeatures = { menuImages: true, explicitAttendance: true, lunchPairs: true };
+const sharedFeatures = { menuImages: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNQAAAABJRU5ErkJggg==';
 // A valid 2 x 2 JPEG returned by the canvas fixture. Pixel rendering is not tested.
 const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7CooorID/2Q==';
@@ -35,6 +38,14 @@ const visibleText = html => String(html)
 function stateDaysFor(date, stored = {}) {
   return Object.fromEntries([...new Set([...C.weekDates(date), date])].map(d => [d, C.clone(stored[d] || C.emptyDay())]));
 }
+
+function basicSharedState(request, extra = {}) {
+  assert.equal(request.action, 'state');
+  return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date),
+    settings: C.settings(), configRevision: 0, menuImages: {}, ...extra };
+}
+
+const profileData = (imageUrl = kakaoImage, checkedAt = fixedTime) => ({ ok: true, sourceUrl: kakaoChannel, imageUrl, checkedAt });
 
 const orderedTeams = [
   ['경영지원팀', ['yunchul', 'seongeun', 'yunseok']],
@@ -88,9 +99,10 @@ function assertDailyBoard(ui, date, expected) {
 async function boot(options = {}) {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const elements = new Map(), handlers = new Map(), storage = new Map();
-  const requests = [], publicRequests = [], errors = [], posted = [];
+  const requests = [], publicRequests = [], kakaoRequests = [], errors = [], posted = [];
   const imageWork = { created: [], revoked: [], draws: [], encoded: [] };
-  let context, timerId = 0;
+  let context, timerId = 0, now = Date.parse(fixedTime);
+  const intervals = new Map();
   for (const [key, value] of Object.entries(options.storage || {})) storage.set(key, JSON.stringify(value));
   if (options.identity !== null) storage.set('sandsLunch.identity.v1', JSON.stringify(options.identity || 'jingi'));
   if (options.connected) storage.set('sandsLunch.connection.v1', JSON.stringify(connection));
@@ -108,7 +120,7 @@ async function boot(options = {}) {
       }
       this.value = attributes.value || ''; this.checked = 'checked' in attributes;
       this.hidden = 'hidden' in attributes; this.disabled = 'disabled' in attributes;
-      this.className = attributes.class || ''; this.style = {}; this.open = false;
+      this.className = attributes.class || ''; this.style = {}; this.open = 'open' in attributes;
       this.children = []; this.events = new Map(); this._html = ''; this._text = '';
       this.classList = { toggle() {}, add() {}, remove() {} };
     }
@@ -201,8 +213,16 @@ async function boot(options = {}) {
         const request = Object.fromEntries(new URL(script.src).searchParams);
         requests.push(request);
         Promise.resolve().then(async () => {
-          if (!options.server) throw new Error('Unexpected shared-server request: ' + request.action);
-          const result = await options.server(request);
+          let result;
+          if (request.action === 'kakaoProfile') {
+            kakaoRequests.push(request);
+            result = options.kakaoRequest ? await options.kakaoRequest(request)
+              : options.kakaoError ? { ok: false, error: 'Fixture channel unavailable' }
+              : options.kakaoResponse || { ok: true, profile: { ok: true, sourceUrl: kakaoChannel, imageUrl: kakaoImage, checkedAt: new Date(now).toISOString() } };
+          } else {
+            if (!options.server) throw new Error('Unexpected shared-server request: ' + request.action);
+            result = await options.server(request);
+          }
           const callback = context[request.callback];
           if (typeof callback !== 'function') throw new Error('JSONP callback was not registered');
           callback(result);
@@ -211,8 +231,8 @@ async function boot(options = {}) {
     }
   };
   class FixedDate extends Date {
-    constructor(...args) { super(...(args.length ? args : [fixedTime])); }
-    static now() { return Date.parse(fixedTime); }
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return now; }
   }
   context = vm.createContext({
     document, Date: FixedDate, console, URL: FixtureURL, URLSearchParams, TextEncoder, TextDecoder, AbortController,
@@ -226,7 +246,9 @@ async function boot(options = {}) {
       setItem: (key, value) => storage.set(key, String(value)),
       removeItem: key => storage.delete(key)
     },
-    setTimeout: () => ++timerId, clearTimeout() {}, setInterval: () => ++timerId, clearInterval() {},
+    setTimeout: () => ++timerId, clearTimeout() {},
+    setInterval(fn, delay) { const id = ++timerId; intervals.set(id, { fn, delay }); return id; },
+    clearInterval(id) { intervals.delete(id); },
     confirm: () => true,
     fetch: async (url, init) => {
       posted.push({ url, init });
@@ -243,6 +265,11 @@ async function boot(options = {}) {
   context.window = context;
   vm.runInContext(fs.readFileSync(path.join(root, 'core.js'), 'utf8'), context, { filename: 'core.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'restaurant-guide.js'), 'utf8'), context, { filename: 'restaurant-guide.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'lunchtime-source.js'), 'utf8'), context, { filename: 'lunchtime-source.js' });
+  if (options.omitKakaoSource) {
+    context.LunchKakaoSource = undefined;
+    assert.equal(vm.runInContext('window.LunchKakaoSource', context), undefined);
+  }
   vm.runInContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), context, { filename: 'app.js' });
 
   const element = id => { assert.ok(elements.has(id), `Missing rendered element #${id}`); return elements.get(id); };
@@ -292,8 +319,15 @@ async function boot(options = {}) {
     assert.equal(element('uploadMenuImageButton').disabled, false);
   }
   await settle();
-  return { html, element, action, press, dispatch, settle, selectImage, findControl, chooseDate, selectIdentity, toggleCancelled, requests, publicRequests, posted, imageWork,
-    visibilityChange: () => dispatch('visibilitychange', document),
+  return { html, element, action, press, dispatch, settle, selectImage, findControl, chooseDate, selectIdentity, toggleCancelled, requests, publicRequests, kakaoRequests, posted, imageWork,
+    visibilityChange: (hidden = false) => { document.hidden = hidden; return dispatch('visibilitychange', document); },
+    advanceTime: ms => { now += ms; },
+    async runIntervals(delay) {
+      const selected = [...intervals.values()].filter(interval => interval.delay === delay);
+      assert.ok(selected.length, 'No interval registered for ' + delay + ' ms');
+      for (const interval of selected) await interval.fn();
+      await settle();
+    },
     saved: key => storage.has(key) ? JSON.parse(storage.get(key)) : undefined };
 }
 
@@ -747,7 +781,7 @@ test('저장한 맛집 33곳을 종류·검색·더보기로 찾고 지도와 �
   assert.equal(ui.element('guideMore').hidden, false);
   await ui.press('guideMore');
   assert.equal(cardCount(), 12);
-  for (const [category, count] of [['한식', 11], ['중식', 3], ['일식', 8], ['양식', 2], ['분식', 5], ['아시안', 4]]) {
+  for (const [category, count] of [['한식', 10], ['중식', 3], ['일식', 7], ['양식', 3], ['분식', 5], ['아시안', 5]]) {
     await ui.action('guideFilter', category);
     assert.equal(ui.element('guideResultCount').textContent, `${category} · ${count}곳`);
     assert.equal(cardCount(), Math.min(6, count));
@@ -803,14 +837,257 @@ test('공유 연결 전에도 메가존 주간 식단 다섯 날짜를 조회하
   assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /월요일 곰탕/);
 });
 
-test('런치타임 카카오 채널 링크와 사진 업로드 대화상자를 제공한다', async () => {
+test('공유 연결 전에는 카카오 자동 조회 연결 안내와 원문 링크·사진 업로드를 제공한다', async () => {
   const ui = await boot();
   assert.match(ui.element('restaurantCards').innerHTML, /href="https:\/\/pf\.kakao\.com\/_xbbMPn"/);
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /자동 조회는 팀 공유 연결 후 사용할 수 있어요/);
+  assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
+  assert.equal(ui.findControl({ 'data-action': 'refreshKakaoProfile' }).disabled, true);
+  assert.equal(ui.kakaoRequests.length, 0);
   await ui.action('menuImageUpload');
   assert.equal(ui.element('appDialog').open, true);
   for (const id of ['menuImageForm','menuImageFile','menuImageScope','menuImagePreview','menuImageStatus']) ui.element(id);
   assert.match(ui.element('dialogContent').innerHTML, /기기/);
   assert.equal(ui.posted.length, 0);
+});
+
+test('공유 상태 확인 후 이름 선택 없이도 카카오 최신 사진을 조회하고 마지막 확인 시각을 표시한다', async () => {
+  let releaseState;
+  const gate = new Promise(resolve => { releaseState = resolve; });
+  const ui = await boot({ connected: true, identity: null, server: async request => { await gate; return basicSharedState(request); } });
+  try {
+    assert.equal(ui.kakaoRequests.length, 0, 'Automatic lookup must wait for the server feature response');
+    assert.match(visibleText(ui.element('restaurantCards').innerHTML), /공유 연결을 확인하고 있어요/);
+    assert.equal(ui.findControl({ 'data-action': 'refreshKakaoProfile' }).disabled, true);
+  } finally { releaseState(); }
+  await ui.settle();
+  assert.equal(ui.kakaoRequests.length, 1);
+  const request = ui.kakaoRequests[0];
+  assert.equal(request.action, 'kakaoProfile');
+  assert.equal(request.force, '1');
+  assert.equal(request.key, connection.key);
+  assert.equal(request.date, undefined, 'The channel profile must not be requested as a dated menu');
+  assert.equal(ui.element('identitySelect').value, '');
+  const photo = ui.element('kakaoProfilePhoto');
+  assert.equal(photo.getAttribute('src'), kakaoImage);
+  assert.equal(photo.getAttribute('referrerpolicy'), 'no-referrer');
+  assert.match(photo.getAttribute('alt'), /날짜/);
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /마지막 확인.*확인 시각과 식단 날짜는 달라요/);
+  assert.deepEqual(ui.saved(kakaoKey), profileData());
+  assert.equal(ui.posted.length, 0);
+});
+
+test('페이지를 열면 신선한 카카오 캐시도 새로 확인하고 사진·전체 식단 새로고침은 강제로 조회한다', async () => {
+  const cached = profileData('https://k.kakaocdn.net/dn/previous/fixture/img_m.jpg', '2026-10-19T03:25:30.000Z');
+  let releaseFirst, reads = 0;
+  const firstGate = new Promise(resolve => { releaseFirst = resolve; });
+  const ui = await boot({ connected: true, server: basicSharedState, storage: { [kakaoKey]: cached },
+    kakaoRequest: async () => {
+      const n = ++reads;
+      if (n === 1) await firstGate;
+      return { ok: true, profile: profileData(`https://k.kakaocdn.net/dn/refresh-${n}/fixture/img_m.jpg`) };
+    } });
+  try {
+    assert.equal(ui.kakaoRequests.length, 1, 'Fresh cache must not suppress the page-open request');
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), cached.imageUrl);
+    assert.equal(ui.findControl({ 'data-action': 'refreshKakaoProfile' }).disabled, true);
+    assert.match(visibleText(ui.element('restaurantCards').innerHTML), /최신 사진 확인 중/);
+  } finally { releaseFirst(); }
+  await ui.settle();
+  assert.match(ui.element('kakaoProfilePhoto').getAttribute('src'), /refresh-1/);
+  await ui.action('refreshKakaoProfile');
+  assert.match(ui.element('kakaoProfilePhoto').getAttribute('src'), /refresh-2/);
+  const previousMenuReads = ui.publicRequests.length;
+  await ui.press('refreshMenu');
+  assert.match(ui.element('kakaoProfilePhoto').getAttribute('src'), /refresh-3/);
+  assert.ok(ui.publicRequests.length > previousMenuReads);
+  assert.deepEqual(ui.kakaoRequests.map(request => request.force), ['1', '1', '1']);
+  assert.match(ui.saved(kakaoKey).imageUrl, /refresh-3/);
+});
+
+test('다른 날짜에서는 카카오 현재 사진을 식단으로 붙이지 않고 별도의 최신 사진 보기로 안내한다', async () => {
+  const ui = await boot({ connected: true, server: basicSharedState });
+  for (const date of ['2026-10-20', '2026-10-18']) {
+    await ui.chooseDate(date);
+    assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
+    assert.match(visibleText(ui.element('restaurantCards').innerHTML), /선택한 날짜의 식단이 아니에요/);
+    assert.match(visibleText(ui.element('restaurantCards').innerHTML), /카카오 최신 사진 보기/);
+    await ui.action('viewKakaoProfile');
+    assert.equal(ui.element('appDialog').open, true);
+    assert.equal(ui.element('kakaoProfileFull').getAttribute('src'), kakaoImage);
+    assert.equal(ui.element('kakaoProfileFull').getAttribute('referrerpolicy'), 'no-referrer');
+    assert.match(visibleText(ui.element('dialogContent').innerHTML), /선택한 날짜의 식단이 아니에요/);
+    assert.equal(ui.element('dateInput').value, date);
+    await ui.press('closeDialog');
+  }
+  await ui.press('todayBtn');
+  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+  assert.equal(ui.kakaoRequests.length, 1, 'Date navigation must not refetch or assign the current channel image to each date');
+  assert.equal(ui.saved(imageKey), undefined);
+});
+
+test('카카오 조회 실패 시 브라우저·서버의 마지막 사진을 유지하고 동료가 올린 식단도 펼쳐 준다', async () => {
+  const cached = profileData('https://k.kakaocdn.net/dn/cached-menu/fixture/img_m.jpg', '2026-10-19T03:10:00.000Z');
+  const meta = { id: 'fallback-menu', scope: 'day', date: monday, startDate: monday, endDate: monday,
+    name: '직접 올린 식단.png', mimeType: 'image/png', size: 67, uploadedBy: 'jingi', uploadedAt: fixedTime };
+  for (const fromServer of [false, true]) {
+    const ui = await boot({ connected: true, storage: fromServer ? {} : { [kakaoKey]: cached },
+      kakaoResponse: fromServer ? { ok: true, profile: { ...cached, error: true } } : { ok: false, error: '채널 조회 실패' },
+      server: request => request.action === 'menuImage' ? { ok: true, image: { ...meta, dataUrl: png } }
+        : basicSharedState(request, { menuImages: { ['day:' + monday]: meta } }) });
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), cached.imageUrl);
+    assert.match(visibleText(ui.element('restaurantCards').innerHTML), /다시 확인하지 못했어요.*마지막으로 가져온 사진/);
+    assert.equal(ui.element('manualMenuDetails').open, true);
+    assert.match(ui.element('restaurantCards').innerHTML, /data:image\/png;base64,/);
+    assert.deepEqual(ui.saved(kakaoKey), cached);
+    assert.doesNotMatch(ui.element('connectionBanner').className, /error/);
+    assert.equal(ui.element('choiceIn').disabled, false);
+  }
+});
+
+test('카카오 자동 조회 미지원·조회 실패는 연결 안내만 표시하고 기존 참석 저장을 막지 않는다', async () => {
+  for (const supported of [false, true]) {
+    const days = {}, receipts = {}, features = { ...sharedFeatures, kakaoProfile: supported };
+    const ui = await boot({ connected: true, kakaoError: true,
+      server: request => basicSharedState(request, { features, days: stateDaysFor(request.date, days), receipt: receipts[request.receipt] }),
+      post: async (url, init) => {
+        const body = JSON.parse(init.body);
+        days[body.date] = C.applyOperation(days[body.date], body.date, C.settings(), body.op);
+        receipts[body.op.id] = { ok: true }; return { type: 'opaque', status: 0 };
+      } });
+    assert.equal(ui.kakaoRequests.length, supported ? 1 : 0);
+    if (supported) assert.match(visibleText(ui.element('restaurantCards').innerHTML), /자동으로 가져오지 못했어요/);
+    else assert.match(ui.element('restaurantCards').innerHTML, /공유 서버를 한 번 업데이트해 주세요.*setup\.html#update|setup\.html#update.*공유 서버를 한 번 업데이트해 주세요/);
+    assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
+    assert.equal(ui.findControl({ 'data-action': 'refreshKakaoProfile' }).disabled, !supported);
+    assert.doesNotMatch(ui.element('connectionBanner').className, /error/);
+    for (const id of ['choiceIn', 'choiceSeparate', 'choiceOut', 'ceoCancelled']) assert.equal(ui.element(id).disabled, false);
+    await ui.press('choiceIn');
+    assert.equal(ui.posted.length, 1);
+    assert.equal(days[monday].overrides.jingi, 'in');
+    assert.deepEqual(dailyMembers(ui, 'in'), ['jingi']);
+  }
+});
+
+test('카카오 자동 조회는 보이는 화면에서 5분 간격으로만 갱신하고 돌아오면 지난 시간을 확인한다', async () => {
+  const ui = await boot({ connected: true, server: basicSharedState });
+  assert.equal(ui.kakaoRequests.length, 1);
+  ui.advanceTime(30000);
+  await ui.runIntervals(30000);
+  await ui.visibilityChange();
+  assert.equal(ui.kakaoRequests.length, 1, 'Routine shared sync and visibility must respect the profile TTL');
+  ui.advanceTime(4 * 60000 + 29999);
+  await ui.visibilityChange();
+  assert.equal(ui.kakaoRequests.length, 1);
+  ui.advanceTime(1);
+  await ui.visibilityChange();
+  assert.equal(ui.kakaoRequests.length, 2);
+  assert.equal(ui.kakaoRequests[1].force, '0');
+  await ui.visibilityChange(true);
+  ui.advanceTime(5 * 60000);
+  const sharedReads = ui.requests.length;
+  await ui.runIntervals(5 * 60000);
+  await ui.runIntervals(30000);
+  assert.equal(ui.requests.length, sharedReads, 'Hidden pages must not start background shared or profile requests');
+  await ui.visibilityChange(false);
+  assert.equal(ui.kakaoRequests.length, 3);
+  ui.advanceTime(5 * 60000);
+  await ui.runIntervals(5 * 60000);
+  assert.equal(ui.kakaoRequests.length, 4);
+  assert.deepEqual(ui.kakaoRequests.map(request => request.force), ['1', '0', '0', '0']);
+});
+
+test('첫 동시 접속에서 진행 중인 프로필 조회는 오류로 표시하지 않고 다음 동기화 때 다시 확인한다', async () => {
+  let reads = 0;
+  const ui = await boot({ connected: true, server: basicSharedState,
+    kakaoRequest: () => ++reads === 1
+      ? { ok: false, pending: true, retryAfter: 2, error: '먼저 시작한 조회가 진행 중입니다.' }
+      : { ok: true, profile: profileData() } });
+  const text = visibleText(ui.element('restaurantCards').innerHTML);
+  assert.match(text, /먼저 시작한 식단 조회가 진행 중/);
+  assert.doesNotMatch(text, /자동으로 가져오지 못했어요/);
+  assert.equal(ui.element('choiceIn').disabled, false);
+  assert.equal(ui.kakaoRequests.length, 1);
+  ui.advanceTime(30000);
+  await ui.runIntervals(30000);
+  assert.equal(ui.kakaoRequests.length, 2);
+  assert.equal(ui.kakaoRequests[1].force, '0');
+  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+  assert.doesNotMatch(visibleText(ui.element('restaurantCards').innerHTML), /먼저 시작한 식단 조회가 진행 중/);
+});
+
+test('다른 공유 연결로 바꾼 뒤 도착한 이전 연결의 카카오 응답은 화면과 캐시를 덮지 않는다', async () => {
+  const next = { url: 'https://script.google.com/macros/s/second_deployment/exec', key: 'b'.repeat(64) };
+  const current = profileData('https://k.kakaocdn.net/dn/current-team/fixture/img_m.jpg');
+  const old = profileData('https://k.kakaocdn.net/dn/old-team/fixture/img_m.jpg', '2026-10-19T03:26:30.000Z');
+  let releaseOld;
+  const oldGate = new Promise(resolve => { releaseOld = resolve; });
+  const ui = await boot({ connected: true, server: basicSharedState, kakaoRequest: async request => {
+    if (request.key === connection.key) { await oldGate; return { ok: true, profile: old }; }
+    assert.equal(request.key, next.key); return { ok: true, profile: current };
+  } });
+  try {
+    assert.equal(ui.kakaoRequests.length, 1);
+    await ui.press('settingsBtn');
+    const form = ui.element('connectionForm');
+    form.querySelector('input[name="url"]').value = next.url;
+    form.querySelector('input[name="key"]').value = next.key;
+    await ui.dispatch('submit', form);
+    assert.equal(ui.element('appDialog').open, false);
+    assert.deepEqual(ui.saved('sandsLunch.connection.v1'), next);
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), current.imageUrl);
+    assert.deepEqual(ui.saved(kakaoKey), current);
+  } finally { releaseOld(); }
+  await ui.settle();
+  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), current.imageUrl);
+  assert.deepEqual(ui.saved(kakaoKey), current, 'A later timestamp from the old target must still be ignored');
+  assert.deepEqual(ui.kakaoRequests.map(request => request.key), [connection.key, next.key]);
+  assert.equal(ui.findControl({ 'data-action': 'refreshKakaoProfile' }).disabled, false);
+  assert.equal(ui.element('choiceIn').disabled, false);
+});
+
+test('카카오 사진 자체가 표시되지 않으면 원문과 다시 불러오기를 제공하고 오래된 이미지 오류는 무시한다', async () => {
+  let reads = 0;
+  const ui = await boot({ connected: true, server: basicSharedState, kakaoRequest: () => ({ ok: true,
+    profile: profileData(`https://k.kakaocdn.net/dn/photo-${++reads}/fixture/img_m.jpg`) }) });
+  await ui.action('viewKakaoProfile');
+  const full = ui.element('kakaoProfileFull');
+  await ui.dispatch('error', full);
+  assert.equal(full.hidden, true);
+  assert.equal(ui.element('kakaoFullError').hidden, false);
+  assert.match(ui.element('dialogContent').innerHTML, /href="https:\/\/pf\.kakao\.com\/_xbbMPn"/);
+  await ui.press('closeDialog');
+  const failedPhoto = ui.element('kakaoProfilePhoto');
+  await ui.dispatch('error', failedPhoto);
+  assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /사진을 표시하지 못했어요/);
+  assert.equal(ui.element('choiceIn').disabled, false);
+  await ui.action('refreshKakaoProfile');
+  const recovered = ui.element('kakaoProfilePhoto').getAttribute('src');
+  assert.match(recovered, /photo-2/);
+  await ui.dispatch('error', failedPhoto);
+  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), recovered);
+  assert.doesNotMatch(visibleText(ui.element('restaurantCards').innerHTML), /사진을 표시하지 못했어요/);
+});
+
+test('잘못된 채널·이미지 주소·미래 시각과 source 파일 누락은 사진 표시만 막고 첫 화면을 유지한다', async () => {
+  const cases = [
+    { profile: { ...profileData(), sourceUrl: 'https://pf.kakao.com/another_channel' } },
+    { profile: profileData('https://example.invalid/untrusted.jpg') },
+    { profile: profileData(kakaoImage, '2026-10-19T03:28:00.000Z') },
+    { profile: profileData(), omitKakaoSource: true }
+  ];
+  for (const { profile, omitKakaoSource } of cases) {
+    const ui = await boot({ connected: true, server: basicSharedState, omitKakaoSource,
+      storage: { [kakaoKey]: profile }, kakaoResponse: { ok: true, profile } });
+    assert.equal(ui.kakaoRequests.length, 1);
+    assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
+    assert.match(visibleText(ui.element('restaurantCards').innerHTML), /자동으로 가져오지 못했어요/);
+    assert.equal(ui.element('dateInput').value, monday);
+    assert.equal(dailyMembers(ui, 'pending').length, 6);
+    assert.equal(ui.element('choiceIn').disabled, false);
+    assert.doesNotMatch(ui.element('connectionBanner').className, /error/);
+  }
 });
 
 test('독립된 두 공유 세션에서 같은 주간 사진을 불러오고 다음 주에 잘못 재사용하지 않는다', async () => {
@@ -826,12 +1103,17 @@ test('독립된 두 공유 세션에서 같은 주간 사진을 불러오고 다
   const second = await boot({ connected: true, server, identity: 'yunchul' });
   for (const ui of [first, second]) {
     assert.match(ui.element('restaurantCards').innerHTML, /data:image\/png;base64,/);
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+    assert.equal(ui.element('manualMenuDetails').open, false);
+    assert.match(ui.element('restaurantCards').innerHTML, /<summary>동료가 올린 식단 · 2026-10-19 – 2026-10-25<\/summary>/);
     assert.match(ui.element('restaurantCards').innerHTML, /천진기/);
     assert.ok(ui.requests.some(r => r.action === 'menuImage' && r.imageId === meta.id));
     assert.equal(ui.saved(imageKey), undefined, 'Shared image bodies should not be copied into local image storage');
   }
   await second.chooseDate('2026-10-20');
   assert.match(second.element('restaurantCards').innerHTML, /data:image\/png;base64,/);
+  assert.equal(second.element('manualMenuDetails').open, true);
+  assert.doesNotMatch(second.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
   second.element('dateInput').value = '2026-10-26';
   for (const listener of second.element('dateInput').events.get('change') || []) await listener({ target: second.element('dateInput') });
   await second.settle();

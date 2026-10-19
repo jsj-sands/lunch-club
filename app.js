@@ -4,7 +4,9 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v1', images: 'sandsLunch.menuImages.v1' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v1', images: 'sandsLunch.menuImages.v1', kakao: 'sandsLunch.kakaoProfile.v1' };
+  const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
+  const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
   const esc = text => String(text == null ? '' : text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch (_) { return fallback; } };
@@ -29,6 +31,9 @@
   if (!localImages || typeof localImages !== 'object' || Array.isArray(localImages)) localImages = {};
   const imageCache = new Map(), imageErrors = new Map(), imageLoading = new Set();
   let imageDraft = null, imageReadToken = 0, imageSaving = false;
+  let kakaoProfile = cleanKakaoProfile(read(KEYS.kakao, null));
+  let kakaoLoading = false, kakaoWaiting = false, kakaoError = '', kakaoPhotoError = '', kakaoRequest = null, lastKakaoAttempt = 0;
+  let manualMenuOpen = false;
   let connectedReady = false, dialogReturnFocus = null, selectedDecision = '', draftTime = '';
   const state = () => connection ? shared : local;
   const config = () => C.settings(state().settings);
@@ -153,16 +158,44 @@
   }
   function validImageData(url) { return typeof url === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(url) && url.length < 1500000; }
   function imageData(meta) { return meta && (connection ? imageCache.get(meta.id) : meta.dataUrl); }
+  function cleanKakaoProfile(value) {
+    if (!value || value.sourceUrl !== KAKAO_CHANNEL || typeof window.LunchKakaoSource?.validImageURL !== 'function' || !window.LunchKakaoSource.validImageURL(value.imageUrl)) return null;
+    const checked = Date.parse(value.checkedAt);
+    if (!Number.isFinite(checked) || checked > Date.now() + 60000) return null;
+    return { ok: true, sourceUrl: KAKAO_CHANNEL, imageUrl: value.imageUrl, checkedAt: new Date(checked).toISOString() };
+  }
+  function renderKakaoProfile() {
+    const profile = kakaoProfile, isToday = date === C.today();
+    const available = !!connection && connectedReady && !!shared.features.kakaoProfile;
+    let content = '<div class="kakao-auto-heading"><strong>카카오 프로필 식단</strong><span class="auto-menu-badge">자동</span></div>';
+    if (!isToday) {
+      content += '<p class="kakao-auto-meta">선택한 날짜의 식단이 아니에요. 카카오 프로필은 현재 올라온 사진만 확인할 수 있어요.</p>';
+    } else if (profile && !kakaoPhotoError) {
+      content += `<button class="menu-photo-button" data-action="viewKakaoProfile" aria-label="카카오 프로필 식단 사진 크게 보기"><img id="kakaoProfilePhoto" class="menu-photo" src="${esc(profile.imageUrl)}" alt="런치타임 카카오 채널의 현재 프로필 사진. 사진에 적힌 식단 날짜를 확인해 주세요." loading="lazy" referrerpolicy="no-referrer"><span>식단 사진 크게 보기 ↗</span></button>`;
+    } else {
+      content += `<div class="image-empty"><strong>${kakaoPhotoError ? '사진을 표시하지 못했어요' : !connection ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요' : !connectedReady ? '공유 연결을 확인하고 있어요…' : !shared.features.kakaoProfile ? '자동 식단 조회를 준비해 주세요' : kakaoLoading || kakaoWaiting || !lastKakaoAttempt ? '카카오에서 식단 사진을 가져오고 있어요…' : '자동으로 가져오지 못했어요'}</strong><p>${kakaoPhotoError ? '카카오 원문에서 확인하거나 다시 불러와 주세요.' : '카카오 채널 원문을 열거나 식단 이미지를 직접 올릴 수 있어요.'}</p></div>`;
+    }
+    if (!connection) content += `<p class="kakao-auto-meta">${profile ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요. 현재는 마지막으로 가져온 사진입니다.<br>' : ''}<a href="setup.html">팀 공유 연결 안내 ↗</a></p>`;
+    else if (connectedReady && !shared.features.kakaoProfile) content += '<p class="inline-warning">식단 사진을 자동으로 보려면 <a href="setup.html#update">공유 서버를 한 번 업데이트해 주세요 ↗</a></p>';
+    if (kakaoLoading) content += '<p class="kakao-auto-meta" role="status">채널에서 최신 사진 확인 중…</p>';
+    else if (kakaoWaiting) content += '<p class="kakao-auto-meta" role="status">먼저 시작한 식단 조회가 진행 중이에요. 잠시 후 자동으로 다시 확인합니다.</p>';
+    if (kakaoError) content += `<p class="inline-warning" role="status">${profile ? '다시 확인하지 못했어요. 마지막으로 가져온 사진이므로 날짜를 확인해 주세요.' : '채널 연결을 확인하지 못했어요. 잠시 후 다시 불러와 주세요.'}</p>`;
+    if (profile) content += `<p class="kakao-auto-meta">마지막 확인 ${esc(timeText(profile.checkedAt))}<br>확인 시각과 식단 날짜는 달라요. 사진에 적힌 날짜를 확인해 주세요.</p>`;
+    content += `<div class="kakao-auto-actions">${!isToday && profile ? '<button class="secondary-button" data-action="viewKakaoProfile">카카오 최신 사진 보기 ↗</button>' : ''}<button class="text-button" data-action="refreshKakaoProfile" ${kakaoLoading || !available ? 'disabled' : ''}>${kakaoLoading ? '사진 확인 중…' : '사진 다시 불러오기 ↻'}</button><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 원문 ↗</a></div>`;
+    return `<div class="kakao-auto-panel" aria-label="런치타임 카카오 프로필 자동 조회">${content}</div>`;
+  }
   function renderLunchImage() {
     const meta = selectedMenuImage(), dataUrl = imageData(meta);
-    let content;
-    if (!meta) content = `<div class="image-empty"><span aria-hidden="true">▧</span><strong>함께 볼 식단 이미지를 올려 주세요</strong><p>카카오 채널 프로필에서 저장하거나 캡처한 식단을<br>한 사람이 올리면 동료들도 볼 수 있어요.</p></div>`;
-    else {
-      content = dataUrl && validImageData(dataUrl) ? `<button class="menu-photo-button" data-action="viewMenuImage" aria-label="런치타임 식단 이미지 크게 보기"><img class="menu-photo" src="${dataUrl}" alt="런치타임 ${esc(meta.startDate)}부터 ${esc(meta.endDate)}까지의 식단" loading="lazy"><span>이미지 크게 보기 ↗</span></button>` : `<div class="image-empty"><strong>${imageErrors.has(meta.id) ? '이미지를 불러오지 못했어요' : '식단 이미지를 불러오고 있어요…'}</strong>${imageErrors.has(meta.id) ? '<button class="text-button" data-action="retryMenuImage">다시 불러오기 ↻</button>' : ''}</div>`;
-      content += `<div class="image-caption"><strong>${meta.scope === 'week' ? '주간 식단' : '하루 식단'} · ${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''}</strong><span>${esc(nameOf(meta.uploadedBy) || '멤버')}님이 올림 · ${esc(timeText(meta.uploadedAt))}</span></div>`;
-      if (connection && meta.scope === 'day' && shared.menuImages?.[imageSlot('week')]) content += '<p class="tiny-note">이 날짜에 따로 올린 식단을 우선 표시해요.</p>';
+    let content = renderKakaoProfile();
+    if (meta) {
+      let manual = dataUrl && validImageData(dataUrl) ? `<button class="menu-photo-button" data-action="viewMenuImage" aria-label="런치타임 식단 이미지 크게 보기"><img class="menu-photo" src="${dataUrl}" alt="런치타임 ${esc(meta.startDate)}부터 ${esc(meta.endDate)}까지의 식단" loading="lazy"><span>이미지 크게 보기 ↗</span></button>` : `<div class="image-empty"><strong>${imageErrors.has(meta.id) ? '이미지를 불러오지 못했어요' : '식단 이미지를 불러오고 있어요…'}</strong>${imageErrors.has(meta.id) ? '<button class="text-button" data-action="retryMenuImage">다시 불러오기 ↻</button>' : ''}</div>`;
+      manual += `<div class="image-caption"><strong>${meta.scope === 'week' ? '주간 식단' : '하루 식단'} · ${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''}</strong><span>${esc(nameOf(meta.uploadedBy) || '멤버')}님이 올림 · ${esc(timeText(meta.uploadedAt))}</span></div>`;
+      if (connection && meta.scope === 'day' && shared.menuImages?.[imageSlot('week')]) manual += '<p class="tiny-note">이 날짜에 따로 올린 식단을 우선 표시해요.</p>';
+      content += `<details id="manualMenuDetails" class="manual-menu-details" ${manualMenuOpen || date !== C.today() || !connection || !kakaoProfile || kakaoError || kakaoPhotoError ? 'open' : ''}><summary>${connection ? '동료가 올린 식단' : '이 기기에 올린 식단'} · ${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''}</summary>${manual}</details>`;
+    } else if (date !== C.today()) {
+      content += '<p class="tiny-note">이날에 해당하는 식단 이미지는 아직 올라오지 않았어요.</p>';
     }
-    content += `<div class="image-share-row"><button class="secondary-button" data-action="menuImageUpload" ${busy ? 'disabled' : ''}>${meta ? '식단 이미지 교체' : '식단 이미지 올리기'}</button><span>${connection ? '팀 멤버 모두 보기' : '연결 전에는 이 기기에서만 미리보기'}</span></div>`;
+    content += `<div class="image-share-row"><button class="secondary-button" data-action="menuImageUpload" ${busy ? 'disabled' : ''}>${meta ? '올린 이미지 교체' : '식단 이미지 직접 올리기'}</button><span>${connection ? '직접 올린 이미지도 팀 모두 보기' : '연결 전에는 이 기기에서만 미리보기'}</span></div>`;
     if (connection && connectedReady && !shared.features?.menuImages) content += '<p class="inline-warning">공유 이미지 기능을 사용하려면 <a href="setup.html#update">공유 서버를 한 번 업데이트해 주세요 ↗</a></p>';
     return `<div class="lunch-image-panel">${content}</div>`;
   }
@@ -171,13 +204,13 @@
     $('menuTitle').textContent = date === C.today() ? '오늘은 어디로 갈까요?' : '이날은 어디로 갈까요?';
     const activeDates = menuView === 'week' ? C.weekDates(date) : [date];
     menuLoading = activeDates.some(d => menuLoadingDates.has(d));
-    $('refreshMenu').disabled = menuLoading; $('refreshMenu').textContent = menuLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
+    $('refreshMenu').disabled = menuLoading || kakaoLoading; $('refreshMenu').textContent = menuLoading || kakaoLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
     $('restaurantCards').innerHTML = C.places(d).map((p, i) => {
       const chosen = d.votes[identity] === p.id, note = d.notes[p.id]; let content = '';
       if (p.id === 'megazone') {
         content = `<div class="menu-tabs" role="group" aria-label="메가존 식단 보기"><button data-action="menuView" data-id="day" aria-pressed="${menuView === 'day'}">${date === C.today() ? '오늘 식단' : '선택한 날 식단'}</button><button data-action="menuView" data-id="week" aria-pressed="${menuView === 'week'}">${C.weekDates(date)[0] === C.weekDates(C.today())[0] ? '이번 주' : '선택한 주'} 식단</button></div>${menuView === 'week' ? renderMegaWeek() : renderMegaDay()}`;
       } else if (p.id === 'lunchtime') {
-        content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>런치타임 카카오 채널 열기</strong><p>친구 추가 후 프로필의 식단 이미지를 확인해 주세요</p></div><span class="arrow">↗</span></a>${renderLunchImage()}`;
+        content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>런치타임 카카오 채널</strong><p>점심판을 열 때 자동 조회 · 열어 두면 5분마다 확인</p></div><span class="arrow">↗</span></a>${renderLunchImage()}`;
       } else content = `<p class="channel-info">${esc(p.subtitle || '동료가 제안한 오늘의 다른 식당이에요.')}</p>`;
       if (note) content += `<div class="menu-note"><strong>${esc(dateText(date))} · 함께 적은 메뉴 메모</strong>${esc(note)}</div>`;
       return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.id === 'megazone' ? `<button data-action="source">실시간 식단 ↗</button>` : p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">지도 ↗</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button>${i > 1 ? `<button data-action="remove" data-id="${esc(p.id)}">삭제</button>` : ''}</div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 내 선택' : '여기로 갈래요'}</button></div></article>`;
@@ -202,7 +235,7 @@
     const data = guideData(), all = Array.isArray(data.restaurants) ? data.restaurants : [];
     const query = guideQuery.trim().toLocaleLowerCase('ko');
     const filtered = all.filter(item => (guideCategory === '전체' || item.category === guideCategory) && (!query || [item.name, item.category, item.menu, item.area].filter(Boolean).join(' ').toLocaleLowerCase('ko').includes(query)));
-    $('guideIntro').textContent = all.length ? `저장한 ‘${data.title || '과천 맛집'}’ ${all.length}곳을 음식 종류별로 모았어요.` : '저장한 과천 맛집을 음식 종류별로 골라보세요.';
+    $('guideIntro').textContent = '오늘 먹고 싶은 메뉴에 맞춰, 가까운 식당을 골라보세요.';
     $('guideFilters').innerHTML = ['전체', ...GUIDE_CATEGORIES].map((category, i) => `<button id="guideFilter-${i}" data-action="guideFilter" data-id="${category}" aria-pressed="${guideCategory === category}">${category}<small>${category === '전체' ? all.length : all.filter(item => item.category === category).length}</small></button>`).join('');
     $('guideResultCount').textContent = `${guideCategory} · ${filtered.length}곳`;
     const choices = C.places(day()), blocked = busy || !dayReady() || needsServerUpdate();
@@ -211,7 +244,7 @@
       return `<article class="guide-card"><span class="guide-category">${esc(item.category)}</span><h4>${esc(item.name)}</h4><p class="guide-menu">${esc(item.menu || item.rawCategory || item.category)}</p>${item.area ? `<p class="guide-area">${esc(item.area)}</p>` : ''}<div class="guide-card-actions">${safeUrl ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">네이버 지도 ↗</a>` : ''}<button data-action="guideAdd" data-id="${esc(item.id)}" ${added || blocked ? 'disabled' : ''}>${added ? '후보에 있어요' : '+ 점심 후보'}</button></div></article>`;
     }).join('');
     $('guideEmpty').hidden = !!filtered.length;
-    $('guideEmpty').textContent = all.length ? '조건에 맞는 식당이 없어요. 다른 종류나 검색어를 골라 주세요.' : '목록을 준비 중이에요. 위의 저장한 지도에서 식당을 확인할 수 있어요.';
+    $('guideEmpty').textContent = all.length ? '조건에 맞는 식당이 없어요. 다른 종류나 검색어를 골라 주세요.' : '목록을 준비 중이에요. 위의 주변 식당 지도에서 식당을 확인할 수 있어요.';
     $('guideMore').hidden = filtered.length <= guideLimit;
     $('guideMore').textContent = `맛집 더 보기 · ${Math.max(0, filtered.length - guideLimit)}곳 남음`;
   }
@@ -296,6 +329,7 @@
       const before = JSON.stringify(shared);
       const res = await jsonp({ action: 'state', date: requestDate }, target); if (target !== connection) return;
       mergeResponse(res); if (before !== JSON.stringify(shared)) render(); else renderConnection();
+      loadKakaoProfile(!lastKakaoAttempt);
     }
     catch (e) { if (target === connection) { syncError = e.message; renderConnection(); } }
     finally { syncing = false; renderConnection(); if (requestDate !== date && target === connection) sync(); }
@@ -334,6 +368,42 @@
     let index = 0;
     const worker = async () => { while (index < dates.length) { const d = dates[index++]; await fetchMenuDate(d, force); } };
     await Promise.all([worker(), worker()]);
+  }
+  function loadKakaoProfile(force = false) {
+    const target = connection;
+    if (!target || !connectedReady || !shared.features.kakaoProfile) return Promise.resolve();
+    if (kakaoRequest?.target === target) return kakaoRequest.promise;
+    if (!force && lastKakaoAttempt && Date.now() - lastKakaoAttempt < KAKAO_REFRESH_MS) return Promise.resolve();
+    lastKakaoAttempt = Date.now(); kakaoLoading = true; kakaoWaiting = false;
+    const request = { target, promise: null }; kakaoRequest = request;
+    renderMenuCards();
+    request.promise = Promise.resolve().then(async () => {
+      try {
+        const result = await jsonp({ action: 'kakaoProfile', force: force ? '1' : '0' }, target);
+        if (target !== connection || kakaoRequest !== request) return;
+        if (result?.pending === true) {
+          kakaoWaiting = true; kakaoError = '';
+          // Another member started the shared fetch. Retry on the next normal
+          // sync after ten seconds, instead of waiting a full five minutes.
+          lastKakaoAttempt = Date.now() - KAKAO_REFRESH_MS + 10000;
+          return;
+        }
+        const profile = result?.ok && cleanKakaoProfile(result.profile);
+        if (!profile) throw new Error('카카오 프로필 사진을 확인하지 못했어요.');
+        // Fetch time belongs to the channel metadata, never to a menu date.
+        if (!kakaoProfile || Date.parse(profile.checkedAt) >= Date.parse(kakaoProfile.checkedAt)) {
+          kakaoProfile = profile;
+          try { write(KEYS.kakao, profile); } catch (_) { /* A full cache must not block the menu. */ }
+        }
+        kakaoError = result.profile.error ? '최근 조회 실패' : '';
+        if (!result.profile.error) kakaoPhotoError = '';
+      } catch (_) {
+        if (target === connection && kakaoRequest === request) kakaoError = '최근 조회 실패';
+      } finally {
+        if (kakaoRequest === request) { kakaoLoading = false; kakaoRequest = null; renderMenuCards(); }
+      }
+    });
+    return request.promise;
   }
   async function ensureMenuImage(force = false) {
     const meta = selectedMenuImage(), target = connection;
@@ -420,6 +490,10 @@
     const meta = selectedMenuImage(), dataUrl = imageData(meta); if (!meta || !validImageData(dataUrl)) return;
     openDialog('런치타임 · ' + (meta.scope === 'week' ? '주간 식단' : dateText(meta.date)), `<p class="dialog-copy">${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''} · ${esc(nameOf(meta.uploadedBy))}님이 올린 식단</p><div class="full-menu-image"><img src="${dataUrl}" alt="런치타임 식단 이미지"></div>`, true);
   }
+  function viewKakaoProfile() {
+    if (!kakaoProfile) return;
+    openDialog('런치타임 · 카카오 최신 프로필 사진', `<p class="dialog-copy">마지막 확인 ${esc(timeText(kakaoProfile.checkedAt))}<br>${date !== C.today() ? '선택한 날짜의 식단이 아니에요. ' : ''}사진에 적힌 식단 날짜를 확인해 주세요.${kakaoError ? '<br>다시 확인하지 못해 마지막으로 가져온 사진입니다.' : ''}</p><div class="full-menu-image"><img id="kakaoProfileFull" src="${esc(kakaoProfile.imageUrl)}" alt="런치타임 카카오 프로필 식단. 이미지 속 날짜 확인이 필요합니다." referrerpolicy="no-referrer"></div><p id="kakaoFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 아래 카카오 원문에서 확인해 주세요.</p><p class="dialog-copy"><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 채널 원문 열기 ↗</a></p>`, true);
+  }
   async function mutate(type, payload, requestedDate = date) {
     if (busy) return false;
     if (!identity) { showIdentity(); return false; }
@@ -492,7 +566,7 @@
   }
   function showSettings() {
     const s = config();
-    openDialog('우리 점심판 설정', `<section class="settings-block"><h3>동료와 함께 쓰기</h3><p class="dialog-copy">${connection ? '초대 링크를 받은 동료는 같은 선택과 일정을 볼 수 있어요. 이름 선택 방식이며, 팀 링크를 가진 사람은 이 점심판을 수정할 수 있습니다.' : '처음 한 번만 공유 서버를 연결하면, 우리 멤버들의 선택이 같은 점심판에 저장돼요.'}</p><div class="button-row"><a class="secondary-button" href="setup.html">코딩 없이 연결하는 안내 ↗</a>${connection ? '<button class="secondary-button" data-action="invite">동료 초대 링크</button>' : ''}</div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer">${connection ? '공유 연결 정보 변경' : '이미 공유 주소가 있어요'}</summary><form id="connectionForm" class="dialog-form" style="margin-top:13px"><label>Apps Script 웹 앱 URL<input name="url" type="url" required value="${esc(connection?.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label>팀 키<input name="key" type="password" required autocomplete="off" value="${esc(connection?.key || read(KEYS.pending, '') || '')}"></label><button class="primary-button">연결 확인하고 저장</button></form></details>${connection ? '<button data-action="disconnect" class="text-button" style="margin-top:13px">이 기기에서 공유 연결 해제</button>' : ''}</section><section class="settings-block"><h3>요일별 대표님과 점심</h3><p class="dialog-copy">체크한 요일에는 대표님과 점심으로 자동 표시돼요. 나머지 날은 미선택으로 시작합니다. 공유 연결 시 이 기본 일정도 팀 전체에 적용됩니다.</p><form id="scheduleForm" class="dialog-form" data-config-revision="${connection ? shared.configRevision : -1}">${MEMBERS.map(m => `<div><span style="font-size:12px;font-weight:650">${m.name} <small style="font-weight:400;color:#858e7a">${m.team}</small></span><div class="checkbox-grid">${[1,2,3,4,5].map(n => `<label><input type="checkbox" name="${m.id}" value="${n}" ${s.ceoDays[m.id].includes(n) ? 'checked' : ''}>${'일월화수목금토'[n]}</label>`).join('')}</div></div>`).join('')}<label>기본 일정 적용 마지막 날<input name="scheduleEnd" type="date" required min="2020-01-01" max="2099-12-31" value="${s.scheduleEnd}"></label><label>기본 만남 시간 · 수정 가능<input name="meetingTime" type="time" required value="${s.meetingTime}"></label><button class="primary-button">기본 일정 저장</button></form></section>`);
+    openDialog('우리 점심판 설정', `<section class="settings-block"><h3>동료와 함께 쓰기</h3><p class="dialog-copy">${connection ? '초대 링크를 받은 동료는 같은 선택과 일정을 볼 수 있어요. 이름 선택 방식이며, 팀 링크를 가진 사람은 이 점심판을 수정할 수 있습니다.' : '처음 한 번만 공유 서버를 연결하면, 우리 멤버들의 선택이 같은 점심판에 저장돼요.'}</p><div class="button-row"><a class="secondary-button" href="setup.html">코딩 없이 연결하는 안내 ↗</a>${connection ? '<button class="secondary-button" data-action="invite">동료 초대 링크</button>' : ''}</div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer">${connection ? '공유 연결 정보 변경' : '이미 공유 주소가 있어요'}</summary><form id="connectionForm" class="dialog-form" style="margin-top:13px"><label>Apps Script 웹 앱 URL<input name="url" type="url" required value="${esc(connection?.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label>팀 키<input name="key" type="password" required autocomplete="off" value="${esc(connection?.key || read(KEYS.pending, '') || '')}"></label><button class="primary-button">연결 확인하고 저장</button></form></details>${connection ? '<button data-action="disconnect" class="text-button" style="margin-top:13px">이 기기에서 공유 연결 해제</button>' : ''}</section><section class="settings-block"><h3>요일별 대표님과 점심</h3><p class="dialog-copy">체크한 요일에는 대표님과 점심으로 자동 표시돼요. 나머지 날은 미선택으로 시작합니다. 공유 연결 시 이 기본 일정도 팀 전체에 적용됩니다.</p><form id="scheduleForm" class="dialog-form" data-config-revision="${connection ? shared.configRevision : -1}">${MEMBERS.map(m => `<div><span style="font-size:12px;font-weight:650">${m.name} <small style="font-weight:400;color:var(--muted)">${m.team}</small></span><div class="checkbox-grid">${[1,2,3,4,5].map(n => `<label><input type="checkbox" name="${m.id}" value="${n}" ${s.ceoDays[m.id].includes(n) ? 'checked' : ''}>${'일월화수목금토'[n]}</label>`).join('')}</div></div>`).join('')}<label>기본 일정 적용 마지막 날<input name="scheduleEnd" type="date" required min="2020-01-01" max="2099-12-31" value="${s.scheduleEnd}"></label><label>기본 만남 시간 · 수정 가능<input name="meetingTime" type="time" required value="${s.meetingTime}"></label><button class="primary-button">기본 일정 저장</button></form></section>`);
   }
   async function saveConnection(next) {
     if (!validConnection(next)) { toast('웹 앱 /exec 주소와 팀 키를 확인해 주세요.'); return false; }
@@ -500,14 +574,14 @@
       toast('공유 서버와 연결하고 있어요…'); const result = await jsonp({ action: 'state', date }, next);
       if (!result.ok) throw new Error(result.error || '팀 키를 확인해 주세요.');
       write(KEYS.connection, next); connection = next; imageCache.clear(); imageErrors.clear(); shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} }; mergeResponse(result);
-      render(); loadMenu(true); return true;
+      lastKakaoAttempt = 0; kakaoWaiting = false; render(); loadMenu(true); loadKakaoProfile(true); return true;
     } catch (e) { toast(e.message); return false; }
   }
   function shareEncode(value) { const bytes = new TextEncoder().encode(JSON.stringify(value)); let str = ''; bytes.forEach(b => { str += String.fromCharCode(b); }); return btoa(str).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, ''); }
   function shareDecode(str) { if (str.length > 18000) throw new Error('링크가 너무 길어요.'); const raw = atob(str.replaceAll('-', '+').replaceAll('_', '/')); return JSON.parse(new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0)))); }
   async function copy(text, success) {
     try { await navigator.clipboard.writeText(text); toast(success || '복사했어요.'); }
-    catch (_) { openDialog('아래 내용을 복사해 주세요', `<p class="dialog-copy">자동 복사가 차단되어 직접 복사할 수 있게 준비했어요.</p><textarea id="copyText" style="width:100%;height:160px;padding:12px;font:inherit;font-size:12px;border:1px solid #d8dfcf;border-radius:9px" readonly>${esc(text)}</textarea>`); $('copyText').select(); }
+    catch (_) { openDialog('아래 내용을 복사해 주세요', `<p class="dialog-copy">자동 복사가 차단되어 직접 복사할 수 있게 준비했어요.</p><textarea id="copyText" style="width:100%;height:160px;padding:12px;font:inherit;font-size:12px;border:1px solid var(--line);border-radius:9px" readonly>${esc(text)}</textarea>`); $('copyText').select(); }
   }
   async function shareLink() {
     if (location.protocol === 'file:') { toast('GitHub Pages에 올린 뒤 링크를 공유해 주세요.'); return; }
@@ -579,6 +653,8 @@
     else if (action === 'menuDate') { menuView = 'day'; changeDate(id); }
     else if (action === 'menuImageUpload') showMenuImageUpload();
     else if (action === 'viewMenuImage') viewMenuImage();
+    else if (action === 'viewKakaoProfile') viewKakaoProfile();
+    else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
     else if (action === 'retryMenuImage') ensureMenuImage(true);
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }
@@ -591,7 +667,7 @@
     else if (action === 'unconfirm') { if (await mutate('unconfirm', {})) toast('확정을 취소했어요. 다시 골라주세요.'); }
     else if (action === 'disconnect') {
       if (busy) return toast('저장이 끝난 뒤 연결을 해제해 주세요.');
-      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; imageCache.clear(); imageErrors.clear(); try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
+      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; imageCache.clear(); imageErrors.clear(); try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
     }
     else if (action === 'random') {
       const counts = C.tally(date, day(), config()), max = Math.max(0, ...Object.values(counts).map(a => a.length));
@@ -637,7 +713,7 @@
   $('guideSearch').addEventListener('input', e => { guideQuery = e.target.value; guideLimit = 6; renderGuide(); });
   $('dateInput').addEventListener('change', e => changeDate(e.target.value));
   $('prevDate').onclick = () => changeDate(C.shiftDate(date, -1)); $('nextDate').onclick = () => changeDate(C.shiftDate(date, 1)); $('todayBtn').onclick = () => changeDate(C.today());
-  $('settingsBtn').onclick = showSettings; $('addPlaceBtn').onclick = showAddPlace; $('refreshMenu').onclick = () => loadMenu(true);
+  $('settingsBtn').onclick = showSettings; $('addPlaceBtn').onclick = showAddPlace; $('refreshMenu').onclick = () => { loadMenu(true); loadKakaoProfile(true); };
   $('ceoCancelled').onchange = async e => {
     const checked = e.target.checked, targetDate = date;
     if (e.target.disabled) return;
@@ -650,9 +726,15 @@
   $('appDialog').addEventListener('close', () => { imageReadToken++; imageDraft = null; });
   $('appDialog').addEventListener('cancel', e => { if (imageSaving) e.preventDefault(); });
   $('appDialog').addEventListener('click', e => { if (e.target === $('appDialog')) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeDialog(); } });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMenu(); } });
+  document.addEventListener('toggle', e => { if (e.target.id === 'manualMenuDetails') manualMenuOpen = e.target.open; }, true);
+  document.addEventListener('error', e => {
+    if (e.target.id === 'kakaoProfilePhoto' && kakaoProfile && e.target.getAttribute('src') === kakaoProfile.imageUrl) {
+      kakaoPhotoError = kakaoProfile.imageUrl; renderMenuCards();
+    } else if (e.target.id === 'kakaoProfileFull') { e.target.hidden = true; if ($('kakaoFullError')) $('kakaoFullError').hidden = false; }
+  }, true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMenu(); loadKakaoProfile(); } });
   function checkMidnight() { const now = C.today(); if (now !== lastToday) { lastToday = now; if (followsToday) changeDate(now); else renderMembers(); } }
   setInterval(() => { checkMidnight(); sync(); }, 30000);
-  setInterval(() => { if (!document.hidden) loadMenu(); }, 5 * 60000);
+  setInterval(() => { if (!document.hidden) { loadMenu(); loadKakaoProfile(); } }, 5 * 60000);
   render(); handleFragment(); sync(); loadMenu();
 })();

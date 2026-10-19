@@ -28,7 +28,7 @@
     "https://pages.map.naver.com/save-pages/api/maps-bookmark/v3/shares/400393b824394db09ed61c0a97fb560d/bookmarks?placeInfo=true&start=0&limit=20&sort=lastUseTime&createIdNo=false",
     "https://pages.map.naver.com/save-pages/api/maps-bookmark/v3/shares/400393b824394db09ed61c0a97fb560d/bookmarks?placeInfo=true&start=20&limit=20&sort=lastUseTime&createIdNo=false"
   ],
-  "classificationBasis": "네이버 공유 목록에 표시된 원문 업종과 상위 업종 경로를 기준으로 앱의 여섯 분류에 매핑했습니다. menu에는 원문 업종을 표시하며 대표 메뉴·가격·영업시간을 추정하지 않았습니다.",
+  "classificationBasis": "네이버 공유 목록에 표시된 원문 업종과 상위 업종 경로를 기준으로 앱의 여섯 분류에 매핑하고, 일부 분류는 사용자 요청으로 보정했습니다. menu는 원문 업종을 기본으로 하되 보정한 분류와 충돌하는 일반 분류명은 보정값으로 표시합니다. rawCategory에는 원문 업종을 보존하며 대표 메뉴·가격·영업시간을 추정하지 않았습니다.",
   "restaurants": [
     {
       "id": "guide_1764937561",
@@ -103,7 +103,8 @@
     {
       "id": "guide_1881239990",
       "name": "스마트경양식",
-      "category": "일식",
+      // 사용자 요청으로 앱 분류만 보정. 네이버 원문 업종은 아래 그대로 보존한다.
+      "category": "양식",
       "menu": "돈가스",
       "area": "갈현동 554 A동 1층 119호",
       "url": "https://m.place.naver.com/place/1881239990/home",
@@ -117,7 +118,7 @@
       ],
       "sourceAddress": "경기도 과천시 갈현동 554 A동 1층 119호",
       "note": "",
-      "classificationNote": "네이버 돈가스 업종의 상위 분류가 일식당과 같은 220038이므로 일식으로 묶었습니다."
+      "classificationNote": "사용자 요청으로 양식으로 보정했습니다. 원문 업종은 돈가스입니다."
     },
     {
       "id": "guide_1837448970",
@@ -350,8 +351,9 @@
     {
       "id": "guide_1047125451",
       "name": "상월",
-      "category": "한식",
-      "menu": "한식",
+      // 사용자 요청으로 분류·화면 설명을 보정. 네이버 원문은 rawCategory에 보존한다.
+      "category": "일식",
+      "menu": "일식",
       "area": "갈현동 425-2 B동 지층 비153호",
       "url": "https://m.place.naver.com/place/1047125451/home",
       "sourceUrl": "https://naver.me/xSBAzufn",
@@ -529,7 +531,8 @@
     {
       "id": "guide_2007284302",
       "name": "샤브올데이 과천주차타워점",
-      "category": "일식",
+      // 사용자 요청으로 앱 분류만 보정. 네이버 원문 업종은 아래 그대로 보존한다.
+      "category": "아시안",
       "menu": "샤브샤브",
       "area": "갈현동 319-1 2층",
       "url": "https://m.place.naver.com/place/2007284302/home",
@@ -543,7 +546,7 @@
       ],
       "sourceAddress": "경기도 과천시 갈현동 319-1 2층",
       "note": "",
-      "classificationNote": "네이버 샤브샤브 업종의 상위 분류가 일식당과 같은 220038이므로 일식으로 묶었습니다."
+      "classificationNote": "사용자 요청으로 아시안으로 보정했습니다. 원문 업종은 샤브샤브입니다."
     },
     {
       "id": "guide_1765849141",

@@ -3,22 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f7f5ef">
+  <meta name="theme-color" content="#f7f5f0">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow">
   <meta name="description" content="우리 멤버들의 오늘 점심. 참석 확인부터 식단 비교, 식당 선택까지 한곳에서.">
-  <title>오늘 점심 · SANDS Lunch Club</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261019-choice">
-  <script src="core.js?v=20261019-choice" defer></script>
-  <script src="menu-source.js?v=20261019-choice" defer></script>
-  <script src="restaurant-guide.js?v=20261019-choice" defer></script>
-  <script src="app.js?v=20261019-choice" defer></script>
+  <title>오늘 점심 · SANDS Lab Lunch Club</title>
+  <link rel="icon" href="assets/favicon.svg?v=20261019-ci" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/red-hat-display-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/pretendard-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css?v=20261019-ci">
+  <script src="core.js?v=20261019-ci" defer></script>
+  <script src="menu-source.js?v=20261019-ci" defer></script>
+  <script src="lunchtime-source.js?v=20261019-ci" defer></script>
+  <script src="restaurant-guide.js?v=20261019-ci" defer></script>
+  <script src="app.js?v=20261019-ci" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문 바로가기</a>
   <header class="site-header">
-    <a class="brand" href="./"><img src="assets/favicon.svg" width="34" height="34" alt=""><span>SANDS <b>LUNCH CLUB</b></span></a>
+    <a class="brand" href="./" aria-label="SANDS Lab Lunch Club 홈"><img class="brand-symbol" src="assets/sands-symbol.svg?v=20261019-ci" width="34" height="34" alt=""><img class="brand-wordmark" src="assets/sands-wordmark.svg?v=20261019-ci" width="142" height="32" alt="SANDS Lab"><span class="brand-divider" aria-hidden="true"></span><span class="brand-product">Lunch Club</span></a>
     <nav aria-label="페이지 메뉴"><a href="#peopleSection">점심 현황</a><a href="#menuSection">식단 보기</a><button id="settingsBtn" class="icon-button" aria-label="공유 연결 및 기본 일정 설정"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/></svg></button></nav>
   </header>
   <main id="main" class="page">
@@ -48,7 +51,7 @@
         <div class="section-heading"><div><span class="section-kicker">02 / ON THE MENU</span><h2 id="menuTitle">오늘은 어디로 갈까요?</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
         <div id="restaurantCards" class="restaurant-cards"></div>
         <section id="guideSection" class="restaurant-guide" aria-labelledby="guideTitle">
-          <div class="guide-heading"><h3 id="guideTitle">과천 맛집 골라보기</h3><a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">저장한 지도 ↗</a></div>
+          <div class="guide-heading"><h3 id="guideTitle">과천 맛집 골라보기</h3><a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도 ↗</a></div>
           <p id="guideIntro" class="section-description"></p>
           <div class="guide-tools"><div id="guideFilters" class="guide-filters" role="group" aria-label="음식 종류"></div><label class="guide-search"><span class="sr-only">식당 또는 메뉴 검색</span><input id="guideSearch" type="search" placeholder="식당 또는 메뉴 검색" autocomplete="off"></label></div>
           <p id="guideResultCount" class="guide-result-count" role="status"></p>
@@ -66,7 +69,7 @@
         <p class="tiny-note">참석하는 멤버의 선택만 집계해요.<br>동률이면 함께 정하거나 가볍게 추첨하세요.</p>
       </aside>
     </div>
-    <footer><span>SANDS LUNCH CLUB <i>—</i> 작은 선택, 함께하는 점심.</span><a href="setup.html">처음 설정하는 분께 ↗</a></footer>
+    <footer><span><span class="brand-footer">SANDS Lab Lunch Club</span> <i>—</i> 작은 선택, 함께하는 점심.</span><a href="setup.html">처음 설정하는 분께 ↗</a></footer>
   </main>
   <div id="toast" role="status" class="toast" hidden></div>
   <dialog id="appDialog"><div class="dialog-heading"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-button" aria-label="닫기">×</button></div><div id="dialogContent"></div></dialog>

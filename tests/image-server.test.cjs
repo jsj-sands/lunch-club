@@ -29,7 +29,7 @@ function client(shared=sharedStorage()){
 function receipt(c,posted){return c.get({date:posted.body.date,receipt:posted.body.op.id}).receipt;}
 
 test('초기화는 비공개 식단 폴더 한 개를 만들고 새 서버 기능을 알린다',()=>{
- const c=client();assert.deepEqual(c.get().menuImages,{});assert.equal(c.get().serverVersion,3);assert.deepEqual(c.get().features,{menuImages:true,explicitAttendance:true,lunchPairs:true});
+ const c=client();assert.deepEqual(c.get().menuImages,{});assert.equal(c.get().serverVersion,3);assert.deepEqual(c.get().features,{menuImages:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true});
  c.context.initializeLunchClub();c.context.initializeLunchClub();assert.equal(c.shared.folders.size,1);
  const folder=[...c.shared.folders.values()][0];assert.equal(folder.name,'SANDS Lunch Club · 런치타임 식단');assert.equal(folder.access,'PRIVATE');assert.equal(c.shared.locked(),false);
 });
