@@ -53,6 +53,8 @@ test('주간 범위와 날짜 범위를 구분하며 선택한 주말의 하루 
 test('일반 멤버 모두 업로드할 수 있고 없는 멤버는 차단한다',()=>{
  const c=client();const members=c.context.LunchCore.MEMBERS;
  assert.ok(members.some(m=>m.id==='jingi'),'core.js must include the new member jingi');
+ assert.equal(members.length,10);
+ for(const id of ['minjun','seongeun','yunseok','jiwoo','hyunju'])assert.ok(members.some(m=>m.id===id),'missing new member '+id);
  for(const [i,member] of members.entries()){
    const op={type:'menuImageUpload',actor:member.id,id:crypto.randomBytes(12).toString('hex'),payload:{scope:'day',dataUrl:DATA,expectedImageId:'',name:member.name+'.png'}};
    const p=c.post({}, {date:'2026-10-'+String(19+i),op});assert.equal(receipt(c,p).ok,true);

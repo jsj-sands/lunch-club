@@ -38,10 +38,11 @@
   };
   function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false; toastTimer = setTimeout(() => { $('toast').hidden = true; }, 4300); }
   function openDialog(title, html, wide = false) {
-    dialogReturnFocus = document.activeElement; $('dialogTitle').textContent = title; $('dialogContent').innerHTML = html;
+    if (!$('appDialog').open) dialogReturnFocus = document.activeElement;
+    $('dialogTitle').textContent = title; $('dialogContent').innerHTML = html;
     $('appDialog').classList.toggle('wide', wide); if (!$('appDialog').open) $('appDialog').showModal();
   }
-  function closeDialog() { if (imageSaving) { toast('식단 이미지를 공유하고 있어요. 완료 후 닫아 주세요.'); return; } $('appDialog').close(); if (dialogReturnFocus && document.contains(dialogReturnFocus)) dialogReturnFocus.focus(); }
+  function closeDialog() { if (imageSaving) { toast('식단 이미지를 공유하고 있어요. 완료 후 닫아 주세요.'); return; } $('appDialog').close(); const focusTarget = dialogReturnFocus?.id ? $(dialogReturnFocus.id) : dialogReturnFocus; if (focusTarget && document.contains(focusTarget)) focusTarget.focus({ preventScroll: true }); }
   function persistLocal() {
     const cutoff = C.shiftDate(C.today(), -120);
     Object.keys(local.days).forEach(d => { if (!C.validDate(d) || d < cutoff) delete local.days[d]; });
@@ -139,18 +140,44 @@
       $('decisionContent').innerHTML = `<form id="decisionForm" class="decision-form"><label class="field-label" for="decisionPlace">함께 정한 식당</label><select id="decisionPlace" required><option value="">식당을 선택해 주세요</option>${list.map(p => `<option value="${esc(p.id)}" ${selectedDecision === p.id ? 'selected' : ''}>${esc(p.name)}${votes[p.id].length ? ` · ${votes[p.id].length}표` : ''}</option>`).join('')}</select><label class="time-row" for="meetingTime">만날 시간<input id="meetingTime" type="time" required value="${esc(draftTime || s.meetingTime)}"></label><button class="primary-button" type="submit" ${busy ? 'disabled' : ''}>오늘 점심 확정하기 <span>↗</span></button><button class="random-button" type="button" data-action="random">못 고르겠다면? 최다 득표 후보 추첨</button></form>`;
     }
   }
+  function weekStatus(member, targetDate) {
+    const record = day(targetDate), s = config(), status = C.memberStatus(member.id, targetDate, record, s);
+    const scheduled = targetDate <= s.scheduleEnd && s.ceoDays[member.id].includes(C.weekday(targetDate));
+    const kind = status.in ? 'in' : status.reason === '대표님과 점심' ? 'ceo' : 'out';
+    const label = kind === 'in' ? '함께 점심' : kind === 'ceo' ? '대표님과 점심' : '개인 일정';
+    const note = status.detail || (status.manual ? kind === 'in' ? '직접 참석으로 변경' : kind === 'ceo' ? '개별 대표님 일정' : '점심 불참' : record.ceoCancelled && scheduled ? '대표님 일정 취소' : kind === 'ceo' ? '요일별 기본 일정' : '참석 예정');
+    return { ...status, kind, label, note };
+  }
   function renderWeek() {
-    const days = C.weekDates(date), s = config();
-    $('scheduleBadge').textContent = `대표님과 점심 기본 일정 ~ ${s.scheduleEnd.replaceAll('-', '.')}`;
-    $('weekHead').innerHTML = `<tr><th scope="col">우리 멤버</th>${days.map(d => `<th scope="col" class="${d === date ? 'current' : ''}"><button data-action="date" data-id="${d}">${'일월화수목금토'[C.weekday(d)]} ${Number(d.slice(5, 7))}.${Number(d.slice(8))}${d === C.today() ? '<small>TODAY</small>' : ''}</button></th>`).join('')}</tr>`;
-    $('weekBody').innerHTML = C.MEMBERS.map(m => `<tr><th scope="row"><span class="avatar ${m.color}" aria-hidden="true">${m.name.slice(1)}</span>${m.name}</th>${days.map(d => { const status = C.memberStatus(m.id, d, day(d), s); return `<td class="${d === date ? 'current' : ''}"><span class="${status.in ? 'week-dot' : status.reason === '대표님과 점심' ? 'week-ceo' : 'week-out'}" aria-label="${esc(status.reason)}">${status.in ? '●' : status.reason === '대표님과 점심' ? '대표님과 점심' : '—'}${status.manual ? '*' : ''}</span></td>`; }).join('')}</tr>`).join('') + `<tr><th scope="row">함께하는 인원</th>${days.map(d => `<td class="week-count ${d === date ? 'current' : ''}">${C.participants(d, day(d), s).length}명</td>`).join('')}</tr>`;
+    const days = C.weekDates(date), s = config(), today = C.today(), currentWeek = days[0] === C.weekDates(today)[0];
+    const pending = busy || !!connection && !connectedReady;
+    $('weekTitle').textContent = currentWeek ? '이번 주, 함께할 점심' : '선택한 주, 함께할 점심';
+    $('weekRange').textContent = `${days[0].replaceAll('-', '.')} – ${days[4].slice(5).replace('-', '.')} · 총 ${C.MEMBERS.length}명`;
+    $('scheduleBadge').textContent = `기본 일정 ~ ${s.scheduleEnd.replaceAll('-', '.')}`;
+    $('weekHint').textContent = identity ? '내 날짜 칸을 눌러 참석을 바꿔요. 동료의 칸에서는 일정 상세를 볼 수 있어요.' : '모두의 일정을 확인하고, 상단에서 내 이름을 선택해 내 일정을 바꿔 보세요.';
+    $('weekSaveNote').textContent = connection ? !connectedReady ? '공유된 주간 일정을 불러오는 중이에요.' : busy ? '변경한 일정을 팀에 저장하고 있어요…' : '변경한 일정은 팀에 공유됩니다. 대표님과 점심 취소는 해당 날의 기본 일정에만 적용되며, 개인이 바꾼 일정은 유지돼요.' : '지금은 이 기기에만 저장됩니다. 팀 공유를 연결하면 서로의 일정이 함께 반영돼요. 대표님과 점심 취소 시에도 개인이 바꾼 일정은 유지돼요.';
+    ['prevWeek', 'thisWeek', 'nextWeek'].forEach(id => { $(id).disabled = busy; });
+    $('weekHead').innerHTML = `<tr class="week-days"><th scope="col">멤버 / 팀</th>${days.map(d => `<th scope="col" class="${d === date ? 'current ' : ''}${d === today ? 'is-today' : ''}"><button id="weekDate-${d}" class="week-date" data-action="date" data-id="${d}" aria-pressed="${d === date}" aria-label="${esc(dateText(d))} 점심 보기" ${busy ? 'disabled' : ''}><span class="week-weekday">${'일월화수목금토'[C.weekday(d)]}</span><strong class="week-date-number">${Number(d.slice(5, 7))}.${Number(d.slice(8))}</strong><small class="week-day-mark">${d === today ? '오늘' : d === date ? '선택' : ''}</small></button></th>`).join('')}</tr><tr class="week-cancel-row"><th scope="row">대표님과 점심<small>취소된 날만 체크</small></th>${days.map(d => {
+      const record = day(d), scheduled = d <= s.scheduleEnd ? C.MEMBERS.filter(m => s.ceoDays[m.id].includes(C.weekday(d))).length : 0;
+      return `<td class="${d === date ? 'current' : ''}"><label class="week-cancel-control${record.ceoCancelled ? ' is-cancelled' : ''}"><input id="weekCancel-${d}" type="checkbox" data-action="weekCancel" data-date="${d}" aria-label="${esc(dateText(d))} 기본 대표님과 점심 취소" ${record.ceoCancelled ? 'checked' : ''} ${pending || !scheduled && !record.ceoCancelled ? 'disabled' : ''}><span>${record.ceoCancelled ? '취소됨' : '취소'}</span></label><small class="week-cancel-caption">${record.ceoCancelled ? '기본 일정 해제' : scheduled ? `기본 ${scheduled}명` : '기본 일정 없음'}</small></td>`;
+    }).join('')}</tr>`;
+    $('weekBody').innerHTML = C.MEMBERS.map(m => `<tr class="week-member-row${m.id === identity ? ' is-me' : ''}"><th scope="row"><div class="week-member"><span class="avatar ${m.color}" aria-hidden="true">${m.name.slice(1)}</span><span class="week-member-info"><strong>${m.name}${m.id === identity ? '<span class="week-me">나</span>' : ''}</strong><small>${m.team}</small></span></div></th>${days.map(d => {
+      const status = weekStatus(m, d), mine = m.id === identity;
+      return `<td class="${d === date ? 'current' : ''}"><button id="weekCell-${m.id}-${d}" class="week-status is-${status.kind}${status.manual ? ' is-manual' : ''}${mine ? ' is-editable' : ''}" data-action="weekMember" data-id="${m.id}" data-date="${d}" aria-label="${esc(m.name + ', ' + dateText(d) + ', ' + status.label + ', ' + status.note + '. ' + (mine ? '내 일정 변경' : '일정 상세 보기'))}" ${pending ? 'disabled' : ''}><span class="week-status-main"><i class="week-status-dot" aria-hidden="true"></i><span>${status.label}</span></span><small class="week-status-note">${esc(status.note)}</small></button></td>`;
+    }).join('')}</tr>`).join('') + `<tr class="week-total"><th scope="row">함께하는 인원</th>${days.map(d => `<td class="week-count ${d === date ? 'current' : ''}"><strong>${C.participants(d, day(d), s).length}명</strong></td>`).join('')}</tr>`;
+  }
+  function showWeekMember(id, targetDate) {
+    const member = C.MEMBERS.find(m => m.id === id); if (!member || !C.validDate(targetDate)) return;
+    if (identity === id) return showAvailability(targetDate);
+    const status = weekStatus(member, targetDate);
+    openDialog(member.name + '님의 주간 일정', `<p class="dialog-copy">${esc(member.team)} · ${esc(dateText(targetDate))}</p><p class="dialog-copy"><strong>${esc(status.label)}</strong><br>${esc(status.note)}</p><p class="dialog-copy">${identity ? '본인의 일정은 주간표에서 내 이름의 날짜 칸을 눌러 바꿀 수 있어요.' : '내 일정을 바꾸려면 상단에서 내 이름을 먼저 선택해 주세요.'}</p><button class="secondary-button" data-action="weekOpenDate" data-id="${targetDate}">이 날짜의 점심 보기 →</button>`);
   }
   function render() {
     const focused = document.activeElement?.id;
     if (focused === 'meetingTime') draftTime = $('meetingTime').value;
     if (focused === 'decisionPlace') selectedDecision = $('decisionPlace').value;
     renderConnection(); renderMembers(); renderMenuCards(); renderDecision(); renderWeek(); ensureMenuImage();
-    if ((focused === 'meetingTime' || focused === 'decisionPlace') && $(focused)) $(focused).focus({ preventScroll: true });
+    if ((focused === 'meetingTime' || focused === 'decisionPlace' || /^week(?:Cell|Cancel|Date)-/.test(focused || '')) && $(focused)) $(focused).focus({ preventScroll: true });
   }
   function mergeResponse(result) {
     if (!result || !result.ok) throw new Error(result?.error || '공유 연결 응답을 확인하지 못했어요.');
@@ -159,7 +186,8 @@
     });
     if (result.settings && (result.configRevision || 0) >= shared.configRevision) { shared.settings = C.settings(result.settings); shared.configRevision = result.configRevision || 0; }
     shared.features = result.features || {};
-    shared.menuImages = result.menuImages || {};
+    // A weekday receipt may omit a selected weekend's daily menu image.
+    if (result.days && Object.prototype.hasOwnProperty.call(result.days, date)) shared.menuImages = result.menuImages || {};
     connectedReady = true; lastSync = new Date(); syncError = '';
   }
   function jsonp(params, target = connection) {
@@ -336,7 +364,7 @@
       }
       throw new Error('저장 완료 응답을 받지 못했어요. 새로고침 후 결과를 확인해 주세요.');
     } catch (e) { syncError = e.name === 'AbortError' ? '저장 확인 시간이 지났어요. 새로고침 후 결과를 확인해 주세요.' : e.message; toast(syncError); return false; }
-    finally { busy = false; render(); }
+    finally { busy = false; render(); if (opDate !== date && target === connection) sync(); }
   }
   function changeDate(next) {
     if (!C.validDate(next)) { toast('올바른 날짜를 선택해 주세요.'); return; }
@@ -347,16 +375,19 @@
     identity = id; try { write(KEYS.identity, id); } catch (_) {} render(); toast(nameOf(id) + '님으로 선택했어요.');
   }
   function showIdentity() { openDialog('먼저 내 이름을 알려주세요', '<p class="dialog-copy">내 이름으로 식당을 고르고, 내 참석 상태를 바꿔요.</p><div class="choice-grid">' + C.MEMBERS.map(m => `<button data-action="chooseIdentity" data-id="${m.id}">${m.name}<small style="display:block;color:#89917f;font-weight:400">${m.team}</small></button>`).join('') + '</div>'); }
-  function showAvailability() {
+  function showAvailability(targetDate = date) {
     if (!identity) return showIdentity();
-    const current = day().overrides[identity] || 'auto';
-    openDialog(nameOf(identity) + '님의 ' + dateText(date), `<p class="dialog-copy">오늘만 바꿀 수 있어요. 다른 날짜의 기본 일정은 유지됩니다.</p><div class="availability-options">${[['auto','기본 일정 따르기','요일별 대표님과 점심 일정을 자동으로 반영해요'],['in','오늘 함께 먹어요','대표님과 점심 일정이 달라졌거나 함께 먹을 수 있어요'],['out','오늘 점심 안 먹어요','속이 안 좋음 · 선약 · 병원 등 / 사유는 선택사항'],['ceo','오늘은 대표님과 점심','기본 일정과 달리 대표님과 점심에 참석해요']].map(([id,title,sub]) => `<button data-action="${id === 'out' ? 'absence' : 'setAvailability'}" data-id="${id}" class="${current === id ? 'active' : ''}">${title}<small>${sub}</small></button>`).join('')}</div>`);
+    if (!C.validDate(targetDate)) return;
+    const current = day(targetDate).overrides[identity] || 'auto', selectedDay = targetDate === C.today() ? '오늘' : '이날';
+    openDialog(nameOf(identity) + '님의 ' + dateText(targetDate), `<p class="dialog-copy">${esc(dateText(targetDate))}의 일정만 바꿉니다. 다른 날짜와 기본 반복 일정은 유지돼요.</p><div class="availability-options">${[['auto','기본 일정 따르기','요일별 대표님과 점심과 해당 날짜의 취소 여부를 반영해요'],['in',selectedDay + ' 함께 먹어요','대표님과 점심 일정이 달라졌거나 함께 먹을 수 있어요'],['out',selectedDay + ' 점심 안 먹어요','속이 안 좋음 · 선약 · 병원 등 / 사유는 선택사항'],['ceo',selectedDay + '은 대표님과 점심','기본 일정과 달리 별도의 대표님과 점심에 참석해요']].map(([id,title,sub]) => `<button data-action="${id === 'out' ? 'absence' : 'setAvailability'}" data-id="${id}" data-date="${targetDate}" data-member="${identity}" class="${current === id ? 'active' : ''}">${title}<small>${sub}</small></button>`).join('')}</div>`);
   }
-  function showAbsence() {
-    const current = day().absenceReasons[identity] || '';
+  function showAbsence(targetDate = date, actor = identity) {
+    if (!identity) return showIdentity();
+    if (actor !== identity || !C.validDate(targetDate)) { toast('내 이름과 변경할 날짜를 다시 확인해 주세요.'); return; }
+    const current = day(targetDate).absenceReasons[identity] || '';
     const options = ['', '속이 안 좋아요', '선약이 있어요', '병원에 가요', '개인 사정'];
     const custom = current && !options.includes(current);
-    openDialog('오늘 점심 안 먹어요', `<p class="dialog-copy">${esc(dateText(date))}의 참석 인원과 투표 집계에서 빠져요. 사유는 남기지 않아도 됩니다. 적은 사유는 점심판 멤버에게 보여요.</p><form id="absenceForm" class="dialog-form"><label>사유 · 선택<select name="reason" id="absenceReason">${options.map(x => `<option value="${esc(x)}" ${current === x ? 'selected' : ''}>${x || '사유는 남기지 않을게요'}</option>`).join('')}<option value="custom" ${custom ? 'selected' : ''}>직접 입력</option></select></label><label id="customReasonLabel" ${custom ? '' : 'hidden'}>한 줄 메모<input name="customReason" maxlength="60" value="${custom ? esc(current) : ''}" placeholder="필요한 내용만 간단히 남겨 주세요"></label><button class="primary-button">오늘 안 먹는 것으로 저장</button></form>`);
+    openDialog(dateText(targetDate) + ' · 점심 불참', `<p class="dialog-copy">${esc(dateText(targetDate))}의 참석 인원과 투표 집계에서 빠져요. 사유는 남기지 않아도 됩니다. 적은 사유는 점심판 멤버에게 보여요.</p><form id="absenceForm" class="dialog-form" data-date="${targetDate}" data-member="${identity}"><label>사유 · 선택<select name="reason" id="absenceReason">${options.map(x => `<option value="${esc(x)}" ${current === x ? 'selected' : ''}>${x || '사유는 남기지 않을게요'}</option>`).join('')}<option value="custom" ${custom ? 'selected' : ''}>직접 입력</option></select></label><label id="customReasonLabel" ${custom ? '' : 'hidden'}>한 줄 메모<input name="customReason" maxlength="60" value="${custom ? esc(current) : ''}" placeholder="필요한 내용만 간단히 남겨 주세요"></label><button class="primary-button">이날 불참으로 저장</button></form>`);
   }
   function showSource() {
     const url = C.menuUrl(date);
@@ -372,7 +403,7 @@
   }
   function showSettings() {
     const s = config();
-    openDialog('우리 점심판 설정', `<section class="settings-block"><h3>동료와 함께 쓰기</h3><p class="dialog-copy">${connection ? '초대 링크를 받은 동료는 같은 선택과 일정을 볼 수 있어요. 이름 선택 방식이며, 팀 링크를 가진 사람은 이 점심판을 수정할 수 있습니다.' : '처음 한 번만 공유 서버를 연결하면, 다섯 사람의 선택이 같은 점심판에 저장돼요.'}</p><div class="button-row"><a class="secondary-button" href="setup.html">코딩 없이 연결하는 안내 ↗</a>${connection ? '<button class="secondary-button" data-action="invite">동료 초대 링크</button>' : ''}</div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer">${connection ? '공유 연결 정보 변경' : '이미 공유 주소가 있어요'}</summary><form id="connectionForm" class="dialog-form" style="margin-top:13px"><label>Apps Script 웹 앱 URL<input name="url" type="url" required value="${esc(connection?.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label>팀 키<input name="key" type="password" required autocomplete="off" value="${esc(connection?.key || read(KEYS.pending, '') || '')}"></label><button class="primary-button">연결 확인하고 저장</button></form></details>${connection ? '<button data-action="disconnect" class="text-button" style="margin-top:13px">이 기기에서 공유 연결 해제</button>' : ''}</section><section class="settings-block"><h3>요일별 대표님과 점심</h3><p class="dialog-copy">체크한 요일은 함께 먹는 인원에서 제외돼요. 공유 연결 시 이 기본 일정도 팀 전체에 적용됩니다.</p><form id="scheduleForm" class="dialog-form">${C.MEMBERS.map(m => `<div><span style="font-size:12px;font-weight:650">${m.name} <small style="font-weight:400;color:#858e7a">${m.team}</small></span><div class="checkbox-grid">${[1,2,3,4,5].map(n => `<label><input type="checkbox" name="${m.id}" value="${n}" ${s.ceoDays[m.id].includes(n) ? 'checked' : ''}>${'일월화수목금토'[n]}</label>`).join('')}</div></div>`).join('')}<label>기본 일정 적용 마지막 날<input name="scheduleEnd" type="date" required min="2020-01-01" max="2099-12-31" value="${s.scheduleEnd}"></label><label>기본 만남 시간 · 수정 가능<input name="meetingTime" type="time" required value="${s.meetingTime}"></label><button class="primary-button">기본 일정 저장</button></form></section>`);
+    openDialog('우리 점심판 설정', `<section class="settings-block"><h3>동료와 함께 쓰기</h3><p class="dialog-copy">${connection ? '초대 링크를 받은 동료는 같은 선택과 일정을 볼 수 있어요. 이름 선택 방식이며, 팀 링크를 가진 사람은 이 점심판을 수정할 수 있습니다.' : '처음 한 번만 공유 서버를 연결하면, 우리 멤버들의 선택이 같은 점심판에 저장돼요.'}</p><div class="button-row"><a class="secondary-button" href="setup.html">코딩 없이 연결하는 안내 ↗</a>${connection ? '<button class="secondary-button" data-action="invite">동료 초대 링크</button>' : ''}</div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer">${connection ? '공유 연결 정보 변경' : '이미 공유 주소가 있어요'}</summary><form id="connectionForm" class="dialog-form" style="margin-top:13px"><label>Apps Script 웹 앱 URL<input name="url" type="url" required value="${esc(connection?.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label>팀 키<input name="key" type="password" required autocomplete="off" value="${esc(connection?.key || read(KEYS.pending, '') || '')}"></label><button class="primary-button">연결 확인하고 저장</button></form></details>${connection ? '<button data-action="disconnect" class="text-button" style="margin-top:13px">이 기기에서 공유 연결 해제</button>' : ''}</section><section class="settings-block"><h3>요일별 대표님과 점심</h3><p class="dialog-copy">체크한 요일은 함께 먹는 인원에서 제외돼요. 공유 연결 시 이 기본 일정도 팀 전체에 적용됩니다.</p><form id="scheduleForm" class="dialog-form">${C.MEMBERS.map(m => `<div><span style="font-size:12px;font-weight:650">${m.name} <small style="font-weight:400;color:#858e7a">${m.team}</small></span><div class="checkbox-grid">${[1,2,3,4,5].map(n => `<label><input type="checkbox" name="${m.id}" value="${n}" ${s.ceoDays[m.id].includes(n) ? 'checked' : ''}>${'일월화수목금토'[n]}</label>`).join('')}</div></div>`).join('')}<label>기본 일정 적용 마지막 날<input name="scheduleEnd" type="date" required min="2020-01-01" max="2099-12-31" value="${s.scheduleEnd}"></label><label>기본 만남 시간 · 수정 가능<input name="meetingTime" type="time" required value="${s.meetingTime}"></label><button class="primary-button">기본 일정 저장</button></form></section>`);
   }
   async function saveConnection(next) {
     if (!validConnection(next)) { toast('웹 앱 /exec 주소와 팀 키를 확인해 주세요.'); return false; }
@@ -420,13 +451,19 @@
     } catch (e) { toast(e.message); }
   }
   document.addEventListener('click', async e => {
-    const b = e.target.closest('[data-action]'); if (!b) return;
+    const b = e.target.closest('[data-action]'); if (!b || b.disabled) return;
     const action = b.dataset.action, id = b.dataset.id;
     if (action === 'identity') setIdentity(id);
     else if (action === 'chooseIdentity') { setIdentity(id); closeDialog(); }
     else if (action === 'availability') showAvailability();
-    else if (action === 'absence') showAbsence();
-    else if (action === 'setAvailability') { closeDialog(); if (await mutate('availability', { value: id })) toast('오늘 참석 상태를 바꿨어요.'); }
+    else if (action === 'absence') showAbsence(b.dataset.date || date, b.dataset.member || identity);
+    else if (action === 'setAvailability') {
+      const targetDate = b.dataset.date || date;
+      if (b.dataset.member && b.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
+      b.disabled = true;
+      if (await mutate('availability', { value: id }, targetDate)) { closeDialog(); toast(dateText(targetDate) + ' 참석 상태를 바꿨어요.'); }
+      else b.disabled = false;
+    }
     else if (action === 'vote') {
       if (!identity) return showIdentity();
       if (!C.memberStatus(identity, date, day(), config()).in) { toast('함께 먹는 상태로 바꾸면 선택할 수 있어요.'); return showAvailability(); }
@@ -445,6 +482,11 @@
     else if (action === 'invite') shareLink();
     else if (action === 'source') showSource();
     else if (action === 'date') changeDate(id);
+    else if (action === 'weekMember') showWeekMember(id, b.dataset.date);
+    else if (action === 'weekOpenDate') { closeDialog(); changeDate(id); }
+    else if (action === 'weekPrev') changeDate(C.shiftDate(date, -7));
+    else if (action === 'weekNext') changeDate(C.shiftDate(date, 7));
+    else if (action === 'weekToday') changeDate(C.today());
     else if (action === 'unconfirm') { if (await mutate('unconfirm', {})) toast('확정을 취소했어요. 다시 골라주세요.'); }
     else if (action === 'disconnect') {
       if (busy) return toast('저장이 끝난 뒤 연결을 해제해 주세요.');
@@ -461,7 +503,13 @@
     e.preventDefault(); const f = new FormData(form);
     if (form.id === 'menuImageForm') { await saveMenuImage(form); }
     else if (form.id === 'decisionForm') { if (await mutate('decision', { placeId: $('decisionPlace').value, time: $('meetingTime').value })) toast('오늘 점심을 확정했어요!'); }
-    else if (form.id === 'absenceForm') { const reason = f.get('reason') === 'custom' ? f.get('customReason') : f.get('reason'); if (await mutate('availability', { value: 'out', reason })) { closeDialog(); toast('오늘 점심에 함께하지 않는 것으로 저장했어요.'); } }
+    else if (form.id === 'absenceForm') {
+      if (form.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
+      const targetDate = form.dataset.date, reason = f.get('reason') === 'custom' ? f.get('customReason') : f.get('reason'), submit = form.querySelector('button');
+      submit.disabled = true;
+      if (await mutate('availability', { value: 'out', reason }, targetDate)) { closeDialog(); toast(dateText(targetDate) + ' 불참으로 저장했어요.'); }
+      else submit.disabled = false;
+    }
     else if (form.id === 'addForm') { const p = { id: 'extra_' + uid(), name: f.get('name'), subtitle: f.get('subtitle'), url: f.get('url') }; if (await mutate('addPlace', p)) { closeDialog(); toast('오늘의 다른 식당을 추가했어요.'); } }
     else if (form.id === 'noteForm') { if (await mutate('note', { placeId: form.dataset.id, text: f.get('text') })) { closeDialog(); toast('메뉴 메모를 저장했어요.'); } }
     else if (form.id === 'connectionForm') { const submit = form.querySelector('button'); submit.disabled = true; if (await saveConnection({ url: String(f.get('url')).trim(), key: String(f.get('key')).trim() })) { closeDialog(); toast('공유 연결이 준비됐어요. 동료를 초대해 주세요.'); } else submit.disabled = false; }
@@ -471,7 +519,20 @@
       if (await mutate('settings', payload)) { closeDialog(); toast('기본 일정을 저장했어요.'); }
     }
   });
-  document.addEventListener('change', e => { if (e.target.id === 'decisionPlace') selectedDecision = e.target.value; if (e.target.id === 'meetingTime') draftTime = e.target.value; if (e.target.id === 'absenceReason') $('customReasonLabel').hidden = e.target.value !== 'custom'; });
+  document.addEventListener('change', async e => {
+    if (e.target.id === 'decisionPlace') selectedDecision = e.target.value;
+    if (e.target.id === 'meetingTime') draftTime = e.target.value;
+    if (e.target.id === 'absenceReason') $('customReasonLabel').hidden = e.target.value !== 'custom';
+    if (e.target.dataset.action === 'weekCancel') {
+      const targetDate = e.target.dataset.date, cancelled = e.target.checked;
+      if (e.target.disabled || !C.validDate(targetDate)) return;
+      if (!identity) { renderWeek(); return showIdentity(); }
+      if (await mutate('ceo', { cancelled }, targetDate)) toast(dateText(targetDate) + (cancelled ? ' 기본 대표님과 점심을 취소했어요.' : ' 대표님과 점심 기본 일정을 복원했어요.'));
+      else renderWeek();
+      const focusTarget = $('weekCancel-' + targetDate);
+      if (!$('appDialog').open && focusTarget && !focusTarget.disabled) focusTarget.focus({ preventScroll: true });
+    }
+  });
   $('identitySelect').innerHTML += C.MEMBERS.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
   $('identitySelect').addEventListener('change', e => { if (e.target.value) setIdentity(e.target.value); else { identity = ''; try { localStorage.removeItem(KEYS.identity); } catch (_) {} render(); } });
   $('dateInput').addEventListener('change', e => changeDate(e.target.value));

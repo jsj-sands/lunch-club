@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#f7f5ef">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="다섯 사람의 오늘 점심. 참석 확인부터 식단 비교, 식당 선택까지 한곳에서.">
+  <meta name="description" content="우리 멤버들의 오늘 점심. 참석 확인부터 식단 비교, 식당 선택까지 한곳에서.">
   <title>오늘 점심 · SANDS Lunch Club</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
-  <script src="core.js" defer></script>
-  <script src="menu-source.js" defer></script>
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261019-weekly">
+  <script src="core.js?v=20261019-weekly" defer></script>
+  <script src="menu-source.js?v=20261019-weekly" defer></script>
+  <script src="app.js?v=20261019-weekly" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문 바로가기</a>
@@ -35,25 +35,27 @@
       <p id="availabilityHint" class="section-description"></p>
       <div id="membersGrid" class="members-grid"></div>
     </section>
+    <section id="weekSection" class="week-section" aria-labelledby="weekTitle">
+      <div class="section-heading"><div><span class="section-kicker">02 / WEEKLY BOARD</span><h2 id="weekTitle">이번 주, 함께할 점심</h2><p id="weekRange" class="week-range"></p></div><div class="week-controls" role="group" aria-label="주간 일정 이동"><button id="prevWeek" class="week-nav" data-action="weekPrev" aria-label="이전 주">←</button><button id="thisWeek" class="week-today" data-action="weekToday">이번 주</button><button id="nextWeek" class="week-nav" data-action="weekNext" aria-label="다음 주">→</button></div></div>
+      <div class="week-toolbar"><p id="weekHint" class="section-description">내 날짜 칸을 눌러 일정을 바꾸고, 동료의 칸을 눌러 상세를 확인하세요.</p><button class="week-settings" data-action="settings">기본 요일 설정 ↗</button></div>
+      <div id="weekTableScroll" class="table-scroll week-board" tabindex="0" role="region" aria-label="팀원별 주간 점심 일정표 · 좁은 화면에서는 가로로 스크롤하세요"><table class="week-table"><caption class="sr-only">월요일부터 금요일까지 멤버별 참석 상태와 날짜별 대표님과 점심 취소 여부</caption><thead id="weekHead"></thead><tbody id="weekBody"></tbody></table></div>
+      <div class="week-footer"><div class="week-legend" aria-label="상태 안내"><span class="legend-item is-in"><i aria-hidden="true"></i>함께 점심</span><span class="legend-item is-ceo"><i aria-hidden="true"></i>대표님과 점심</span><span class="legend-item is-out"><i aria-hidden="true"></i>개인 일정</span></div><span id="scheduleBadge" class="subtle-badge"></span></div>
+      <p id="weekSaveNote" class="tiny-note" role="status" aria-live="polite"></p>
+    </section>
     <div class="main-columns">
       <section id="menuSection" class="menu-section" aria-labelledby="menuTitle">
-        <div class="section-heading"><div><span class="section-kicker">02 / ON THE MENU</span><h2 id="menuTitle">오늘은 어디로 갈까요?</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
+        <div class="section-heading"><div><span class="section-kicker">03 / ON THE MENU</span><h2 id="menuTitle">오늘은 어디로 갈까요?</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
         <div id="restaurantCards" class="restaurant-cards"></div>
         <button id="addPlaceBtn" class="add-place"><span>＋</span> 다른 식당 제안하기 <small>오늘은 새로운 곳도 좋아요</small></button>
       </section>
       <aside class="decision-panel" aria-labelledby="decisionTitle">
-        <div class="section-kicker">03 / OUR PICK</div><h2 id="decisionTitle">우리의 점심 선택</h2><p id="voteSummary" class="section-description"></p>
+        <div class="section-kicker">04 / OUR PICK</div><h2 id="decisionTitle">우리의 점심 선택</h2><p id="voteSummary" class="section-description"></p>
         <div id="voteResults"></div>
         <div id="decisionContent"></div>
         <div class="share-actions"><button id="copySummary" class="secondary-button">점심 공지 복사</button><button id="shareLink" class="text-button">초대 / 선택 결과 링크 ↗</button></div>
         <p class="tiny-note">참석하는 멤버의 선택만 집계해요.<br>동률이면 함께 정하거나 가볍게 추첨하세요.</p>
       </aside>
     </div>
-    <section id="weekSection" class="week-section" aria-labelledby="weekTitle">
-      <div class="section-heading"><div><span class="section-kicker">LOOKING AHEAD</span><h2 id="weekTitle">이번 주, 함께할 점심</h2></div><span id="scheduleBadge" class="subtle-badge"></span></div>
-      <div class="table-scroll"><table class="week-table"><thead id="weekHead"></thead><tbody id="weekBody"></tbody></table></div>
-      <p class="tiny-note">● 함께 점심 &nbsp; 대표님과 점심 &nbsp; — 개인 일정 / 주말 &nbsp; · 날짜를 누르면 해당 날로 이동해요.</p>
-    </section>
     <footer><span>SANDS LUNCH CLUB <i>—</i> 작은 선택, 함께하는 점심.</span><a href="setup.html">처음 설정하는 분께 ↗</a></footer>
   </main>
   <div id="toast" role="status" class="toast" hidden></div>

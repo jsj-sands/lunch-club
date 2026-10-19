@@ -13,7 +13,12 @@
     { id: 'juri', name: '손주리', team: '전략사업팀', days: [1, 2, 5], color: 'purple' },
     { id: 'hyunsu', name: '윤현수', team: '전략사업팀', days: [1, 2, 5], color: 'blue' },
     { id: 'yunchul', name: '김윤철', team: '경영지원팀', days: [3], color: 'green' },
-    { id: 'jingi', name: '천진기', team: '디자인팀', days: [2], color: 'amber' }
+    { id: 'jingi', name: '천진기', team: '디자인팀', days: [2], color: 'amber' },
+    { id: 'minjun', name: '최민준', team: '연구기획팀', days: [1, 4], color: 'blue' },
+    { id: 'seongeun', name: '오성은', team: '경영지원팀', days: [3], color: 'green' },
+    { id: 'yunseok', name: '장윤석', team: '경영지원팀', days: [3], color: 'green' },
+    { id: 'jiwoo', name: '서지우', team: '디자인팀', days: [2], color: 'amber' },
+    { id: 'hyunju', name: '조현주', team: '영업팀', days: [1, 5], color: 'coral' }
   ];
   const DEFAULT_SETTINGS = {
     scheduleEnd: '2026-12-31',
