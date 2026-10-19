@@ -17,9 +17,24 @@ function server(){
  return {context,store,post,get,fetches:()=>fetches,locked:()=>locked};
 }
 test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요청을 한 번만 적용한다',()=>{
- const s=server();const a=s.post('vote','seongjun',{placeId:'megazone'});s.post('vote','yunchul',{placeId:'lunchtime'});
- let d=s.get().days[DATE];assert.equal(d.votes.seongjun,'megazone');assert.equal(d.votes.yunchul,'lunchtime');assert.equal(d.revision,2);
- s.context.doPost({postData:{contents:JSON.stringify(a.body)}});assert.equal(s.get().days[DATE].revision,2);assert.equal(s.get({receipt:a.body.op.id}).receipt.ok,true);assert.equal(s.locked(),false);
+ const s=server();s.post('availability','seongjun',{value:'in'});s.post('availability','yunchul',{value:'in'});
+ const a=s.post('vote','seongjun',{placeId:'megazone'});s.post('vote','yunchul',{placeId:'lunchtime'});
+ let d=s.get().days[DATE];assert.equal(d.votes.seongjun,'megazone');assert.equal(d.votes.yunchul,'lunchtime');assert.equal(d.revision,4);
+ s.context.doPost({postData:{contents:JSON.stringify(a.body)}});assert.equal(s.get().days[DATE].revision,4);assert.equal(s.get({receipt:a.body.op.id}).receipt.ok,true);assert.equal(s.locked(),false);
+});
+test('버전 3 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
+ const s=server(),state=s.get(),C=s.context.LunchCore;
+ assert.equal(state.serverVersion,3);assert.deepEqual(state.features,{menuImages:true,explicitAttendance:true,lunchPairs:true});
+ assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
+ assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
+ assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
+ s.post('availability','yunchul',{value:'in'});
+ for(const [type,payload] of [['vote',{placeId:'megazone'}],['decision',{placeId:'megazone',time:'12:00'}]]){
+  const failed=s.post(type,'seongjun',payload),received=s.get({receipt:failed.body.op.id});
+  assert.equal(received.receipt.ok,false);assert.match(received.receipt.error,/함께 먹는 상태/);assert.equal(received.days[DATE].revision,1);
+ }
+ s.post('availability','seongjun',{value:'in'});const confirmed=s.post('decision','seongjun',{placeId:'megazone',time:'12:00'});
+ assert.equal(s.get({receipt:confirmed.body.op.id}).receipt.ok,true);assert.equal(s.get().days[DATE].decision.actor,'seongjun');
 });
 test('개인 불참 사유가 서버에 보관되고 오류 요청은 성공으로 확인하지 않는다',()=>{
  const s=server();const a=s.post('availability','seongjun',{value:'out',reason:'속이 안 좋아요'});
@@ -49,4 +64,64 @@ test('긴 한국어 메뉴와 다수 식당을 저장해도 9KB 속성 한도를
  for(let i=0;i<8;i++){s.post('addPlace','seongjun',{id:'extra_'+i,name:'새로운식당'+i,subtitle:'설명'.repeat(30),url:'https://example.com/'+('a'.repeat(500))});s.post('note','seongjun',{placeId:'extra_'+i,text:'맛있는메뉴 '.repeat(60)});}
  const state=s.get();assert.equal(state.days[DATE].extras.length,8);assert.ok(state.days[DATE].notes.extra_7.length>200);
  for(const value of Object.values(s.store))assert.ok(Buffer.byteLength(value)<=9000);
+});
+test('두 사람의 동시 초대는 먼저 저장된 예약을 지키며 수락과 중복 전송은 한 번만 적용된다',()=>{
+ const s=server(),id='pair_'+'b'.repeat(24);
+ s.post('availability','jingi',{value:'in'});s.post('vote','jingi',{placeId:'lunchtime'});
+ const invited=s.post('pairInvite','seongjun',{id,to:'jingi'});
+ const pending=s.get({receipt:invited.body.op.id});assert.equal(pending.receipt.ok,true);assert.equal(pending.days[DATE].revision,3);
+ assert.equal(pending.days[DATE].overrides.seongjun,'separate');assert.equal(pending.days[DATE].overrides.jingi,'in');
+ const duplicate=JSON.parse(s.context.doPost({postData:{contents:JSON.stringify(invited.body)}}).text);
+ assert.equal(duplicate.duplicate,true);assert.equal(s.get().days[DATE].revision,3);
+ const overlap=s.post('pairInvite','yunchul',{id:'pair_'+'c'.repeat(24),to:'jingi'}),rejected=s.get({receipt:overlap.body.op.id});
+ assert.equal(rejected.receipt.ok,false);assert.match(rejected.receipt.error,/진행 중/);assert.deepEqual(rejected.days[DATE],pending.days[DATE]);
+ const accepted=s.post('pairAccept','jingi',{pairId:id});
+ const final=s.get({receipt:accepted.body.op.id});assert.equal(final.receipt.ok,true);assert.equal(final.days[DATE].revision,4);
+ assert.deepEqual(final.days[DATE].pairs,[{id,from:'seongjun',to:'jingi',status:'accepted'}]);
+ assert.equal(final.days[DATE].overrides.jingi,'separate');assert.equal(final.days[DATE].votes.jingi,'lunchtime');
+ s.context.doPost({postData:{contents:JSON.stringify(accepted.body)}});assert.equal(s.get().days[DATE].revision,4);assert.equal(s.locked(),false);
+});
+test('초대 권한과 취소 후 뒤늦게 도착한 수락을 영수증 오류로 돌려주며 다른 선택을 덮지 않는다',()=>{
+ const s=server(),id='pair_'+'b'.repeat(24);
+ s.post('availability','jingi',{value:'in'});s.post('pairInvite','seongjun',{id,to:'jingi'});
+ const pending=s.get().days[DATE];
+ for(const [type,actor] of [['pairAccept','seongjun'],['pairDecline','yunchul'],['pairCancel','jingi'],['pairLeave','seongjun']]){
+  const attempted=s.post(type,actor,{pairId:id});assert.equal(s.get({receipt:attempted.body.op.id}).receipt.ok,false);assert.deepEqual(s.get().days[DATE],pending);
+ }
+ s.post('pairCancel','seongjun',{pairId:id});const cancelled=s.get().days[DATE];
+ assert.equal(cancelled.overrides.seongjun,'separate');assert.equal(cancelled.overrides.jingi,'in');assert.deepEqual(cancelled.pairs,[]);
+ const stale=s.post('pairAccept','jingi',{pairId:id}),current=s.get({receipt:stale.body.op.id});
+ assert.equal(current.receipt.ok,false);assert.match(current.receipt.error,/이미 변경/);assert.deepEqual(current.days[DATE],cancelled);
+ assert.equal(s.locked(),false);
+});
+test('짝 탈퇴와 개인 상태 변경은 해당 날짜에만 적용되고 다른 날짜의 초대는 유지된다',()=>{
+ const s=server(),id='pair_'+'b'.repeat(24),tuesday='2026-10-20';
+ s.post('pairInvite','seongjun',{id,to:'jingi'});s.post('pairAccept','jingi',{pairId:id});
+ s.post('pairInvite','seongjun',{id,to:'yunchul'},{date:tuesday});
+ const other=s.get({date:tuesday}).days[tuesday];assert.equal(other.pairs[0].status,'pending');
+ const leave=s.post('pairLeave','jingi',{pairId:id}),left=s.get({receipt:leave.body.op.id});
+ assert.equal(left.receipt.ok,true);assert.deepEqual(left.days[DATE].pairs,[]);assert.equal(left.days[DATE].overrides.jingi,'pending');assert.equal(left.days[DATE].overrides.seongjun,'separate');
+ assert.deepEqual(left.days[tuesday],other);assert.equal(s.get({date:tuesday,receipt:leave.body.op.id}).receipt,null);
+ s.post('availability','seongjun',{value:'in'},{date:tuesday});const changed=s.get({date:tuesday});
+ assert.deepEqual(changed.days[tuesday].pairs,[]);assert.equal(changed.days[tuesday].overrides.yunchul,undefined);
+ assert.deepEqual(changed.days[DATE],left.days[DATE]);
+ const stale=s.post('pairAccept','yunchul',{pairId:id},{date:tuesday});
+ assert.equal(s.get({date:tuesday,receipt:stale.body.op.id}).receipt.ok,false);
+ const nextWeek=s.get({date:'2026-10-26'});assert.equal(nextWeek.days[DATE],undefined);assert.equal(nextWeek.days[tuesday],undefined);
+ assert.deepEqual(s.get().days[DATE],left.days[DATE]);
+});
+test('기존 버전의 저장된 일일 기록·영수증·사용자 일정은 새로운 상태와 함께 유지된다',()=>{
+ const s=server(),oldReceipt='f'.repeat(24);
+ const data={ceoCancelled:true,overrides:{seongjun:'in',jingi:'out'},absenceReasons:{jingi:'외부 일정'},votes:{seongjun:'megazone',yunchul:'lunchtime'},extras:[],notes:{megazone:'기존 메뉴 메모'},decision:{placeId:'megazone',time:'12:10',actor:'yunchul',at:'2026-10-19T01:00:00Z'},revision:27,updatedAt:'2026-10-19T01:00:00Z'};
+ const cfg={scheduleEnd:'2027-06-30',meetingTime:'12:10',ceoDays:{seongjun:[1],juri:[2],hyunsu:[],yunchul:[4],jingi:[1,5],minjun:[3]}};
+ s.store.LUNCH_CONFIG=JSON.stringify({settings:cfg,revision:9});
+ s.store['LUNCH_DAY_'+DATE]=JSON.stringify({parts:1,generation:'legacy'});
+ s.store['LUNCH_DAY_'+DATE+'_legacy_0']=JSON.stringify({data,receipts:{[oldReceipt]:{ok:true,at:data.updatedAt}}});
+ const restored=s.get({receipt:oldReceipt});
+ assert.deepEqual(restored.days[DATE],{...data,pairs:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
+ for(const [id,days] of Object.entries(cfg.ceoDays))assert.deepEqual(restored.settings.ceoDays[id],days);
+ assert.equal(restored.settings.scheduleEnd,cfg.scheduleEnd);assert.equal(restored.settings.meetingTime,cfg.meetingTime);
+ s.post('pairInvite','yunchul',{id:'pair_'+'b'.repeat(24),to:'jiwoo'});const latest=s.get({receipt:oldReceipt});
+ assert.deepEqual(latest.days[DATE].votes,data.votes);assert.deepEqual(latest.days[DATE].decision,data.decision);assert.deepEqual(latest.days[DATE].notes,data.notes);
+ assert.equal(latest.days[DATE].overrides.seongjun,'in');assert.equal(latest.days[DATE].absenceReasons.jingi,'외부 일정');assert.deepEqual(latest.settings,restored.settings);assert.equal(latest.receipt.ok,true);
 });

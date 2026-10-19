@@ -20,6 +20,9 @@
     { id: 'jiwoo', name: '서지우', team: '디자인팀', days: [2], color: 'amber' },
     { id: 'hyunju', name: '조현주', team: '영업팀', days: [1, 5], color: 'coral' }
   ];
+  const MEMBER_IDS = new Set(MEMBERS.map(m => m.id));
+  const PAIR_ID = /^pair_[a-f0-9]{24}$/;
+  const OVERRIDE_VALUES = ['in', 'out', 'ceo', 'pending', 'separate'];
   const DEFAULT_SETTINGS = {
     scheduleEnd: '2026-12-31',
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
@@ -54,7 +57,7 @@
     MEMBERS.forEach(m => { if (v.ceoDays && Array.isArray(v.ceoDays[m.id])) out.ceoDays[m.id] = [...new Set(v.ceoDays[m.id].filter(n => Number.isInteger(n) && n >= 1 && n <= 5))]; });
     return out;
   }
-  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, notes: {}, revision: 0, updatedAt: null }; }
+  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, notes: {}, pairs: [], revision: 0, updatedAt: null }; }
   function safeUrl(url) {
     if (!url) return '';
     const value = String(url).trim();
@@ -65,7 +68,7 @@
   function cleanDay(value) {
     const v = value || {}, d = emptyDay(); d.ceoCancelled = v.ceoCancelled === true;
     MEMBERS.forEach(m => {
-      if (['in', 'out', 'ceo'].includes(v.overrides && v.overrides[m.id])) d.overrides[m.id] = v.overrides[m.id];
+      if (OVERRIDE_VALUES.includes(v.overrides && v.overrides[m.id])) d.overrides[m.id] = v.overrides[m.id];
       if (d.overrides[m.id] === 'out' && typeof (v.absenceReasons && v.absenceReasons[m.id]) === 'string') d.absenceReasons[m.id] = v.absenceReasons[m.id].trim().slice(0, 60);
       if (typeof (v.votes && v.votes[m.id]) === 'string') d.votes[m.id] = v.votes[m.id].slice(0, 70);
     });
@@ -78,20 +81,31 @@
     if (v.decision && PLACES.concat(d.extras).some(p => p.id === v.decision.placeId)) {
       d.decision = { placeId: v.decision.placeId, time: /^([01]\d|2[0-3]):[0-5]\d$/.test(v.decision.time || '') ? v.decision.time : '12:00', actor: MEMBERS.some(m => m.id === v.decision.actor) ? v.decision.actor : '', at: String(v.decision.at || '') };
     }
+    const pairs = (Array.isArray(v.pairs) ? v.pairs : []).slice(0, MEMBERS.length * MEMBERS.length), pairIds = new Set(), pairedMembers = new Set();
+    // Prefer existing consented pairs when a malformed record contains overlaps.
+    ['accepted', 'pending'].forEach(status => pairs.forEach(pair => {
+      if (!pair || typeof pair !== 'object' || Array.isArray(pair) || pair.status !== status || typeof pair.id !== 'string' || !PAIR_ID.test(pair.id) || !MEMBER_IDS.has(pair.from) || !MEMBER_IDS.has(pair.to) || pair.from === pair.to) return;
+      if (d.overrides[pair.from] !== 'separate' || status === 'accepted' && d.overrides[pair.to] !== 'separate') return;
+      if (pairIds.has(pair.id) || pairedMembers.has(pair.from) || pairedMembers.has(pair.to)) return;
+      pairIds.add(pair.id); pairedMembers.add(pair.from); pairedMembers.add(pair.to);
+      d.pairs.push({ id: pair.id, from: pair.from, to: pair.to, status: status });
+    }));
     d.revision = Number.isInteger(v.revision) ? Math.max(0, v.revision) : 0; d.updatedAt = v.updatedAt || null;
     return d;
   }
   function memberStatus(id, date, day, config) {
     const m = MEMBERS.find(x => x.id === id); if (!m) throw new Error('멤버를 확인해 주세요.');
-    const d = day || emptyDay(), s = settings(config), over = d.overrides[id];
-    if (over === 'in') return { in: true, reason: '오늘 함께해요', manual: true };
-    if (over === 'out') return { in: false, reason: '오늘 안 먹음', detail: (d.absenceReasons || {})[id] || '', manual: true };
-    if (over === 'ceo') return { in: false, reason: '대표님과 점심', manual: true };
-    const dow = weekday(date);
-    if (dow === 0 || dow === 6) return { in: false, reason: '주말', manual: false };
-    if (!d.ceoCancelled && date <= s.scheduleEnd && s.ceoDays[id].includes(dow)) return { in: false, reason: '대표님과 점심', manual: false };
-    return { in: true, reason: '함께 먹어요', manual: false };
+    const d = day || emptyDay(), s = settings(config), over = (d.overrides || {})[id], dow = weekday(date);
+    if (over === 'in') return { kind: 'in', in: true, reason: '함께 점심', manual: true };
+    if (over === 'out') return { kind: 'out', in: false, reason: '오늘 안 먹음', detail: (d.absenceReasons || {})[id] || '', manual: true };
+    if (over === 'ceo') return { kind: 'ceo', in: false, reason: '대표님과 점심', manual: true };
+    if (over === 'pending') return { kind: 'pending', in: false, reason: '미선택', manual: true };
+    if (over === 'separate') return { kind: 'separate', in: false, reason: '따로 먹어요', manual: true };
+    if (!d.ceoCancelled && date <= s.scheduleEnd && s.ceoDays[id].includes(dow)) return { kind: 'ceo', in: false, reason: '대표님과 점심', manual: false };
+    return { kind: 'pending', in: false, reason: '미선택', manual: false };
   }
+  function pairFor(id, day) { return cleanDay(day).pairs.find(pair => pair.from === id || pair.to === id) || null; }
+  function incomingPairs(id, day) { return cleanDay(day).pairs.filter(pair => pair.to === id && pair.status === 'pending'); }
   function participants(date, day, config) { return MEMBERS.filter(m => memberStatus(m.id, date, day, config).in); }
   function places(day) { return PLACES.concat((day || emptyDay()).extras || []); }
   function tally(date, day, config) {
@@ -105,12 +119,46 @@
     const d = cleanDay(value), p = op.payload || {}; const hasPlace = id => places(d).some(x => x.id === id);
     switch (op.type) {
       case 'availability':
-        if (!['auto', 'in', 'out', 'ceo'].includes(p.value)) throw new Error('참석 상태를 확인해 주세요.');
+        if (!['auto'].concat(OVERRIDE_VALUES).includes(p.value)) throw new Error('참석 상태를 확인해 주세요.');
+        d.pairs = d.pairs.filter(pair => pair.from !== op.actor && pair.to !== op.actor);
         if (p.value === 'auto') delete d.overrides[op.actor]; else d.overrides[op.actor] = p.value;
         if (p.value === 'out') d.absenceReasons[op.actor] = String(p.reason || '').trim().slice(0, 60);
         else delete d.absenceReasons[op.actor];
         break;
       case 'ceo': if (typeof p.cancelled !== 'boolean') throw new Error('일정을 확인해 주세요.'); d.ceoCancelled = p.cancelled; break;
+      case 'pairInvite': {
+        if (typeof p.id !== 'string' || !PAIR_ID.test(p.id)) throw new Error('초대 번호를 확인해 주세요.');
+        if (!MEMBER_IDS.has(p.to) || p.to === op.actor) throw new Error('함께 따로 먹을 다른 멤버를 선택해 주세요.');
+        if (d.pairs.some(pair => pair.id === p.id)) throw new Error('이미 사용 중인 초대 번호예요. 새로고침 후 다시 초대해 주세요.');
+        if (pairFor(op.actor, d)) throw new Error('진행 중인 초대나 함께 먹을 짝이 있어요. 먼저 취소하거나 나가 주세요.');
+        if (pairFor(p.to, d)) throw new Error('상대에게 진행 중인 초대나 함께 먹을 짝이 있어요. 다른 멤버를 선택해 주세요.');
+        d.overrides[op.actor] = 'separate'; delete d.absenceReasons[op.actor];
+        d.pairs.push({ id: p.id, from: op.actor, to: p.to, status: 'pending' });
+        break;
+      }
+      case 'pairAccept':
+      case 'pairDecline':
+      case 'pairCancel':
+      case 'pairLeave': {
+        if (typeof p.pairId !== 'string' || !PAIR_ID.test(p.pairId)) throw new Error('초대 번호를 확인해 주세요.');
+        const pair = d.pairs.find(item => item.id === p.pairId);
+        if (!pair) throw new Error('초대나 짝이 이미 변경됐어요. 새로고침 후 확인해 주세요.');
+        if (op.type === 'pairLeave') {
+          if (pair.status !== 'accepted') throw new Error('수락한 짝에서만 나갈 수 있어요.');
+          if (pair.from !== op.actor && pair.to !== op.actor) throw new Error('본인이 속한 짝에서만 나갈 수 있어요.');
+          d.pairs = d.pairs.filter(item => item.id !== pair.id);
+          d.overrides[op.actor] = 'pending'; delete d.absenceReasons[op.actor];
+        } else {
+          if (pair.status !== 'pending') throw new Error('초대가 이미 처리됐어요. 새로고침 후 확인해 주세요.');
+          if (op.type === 'pairCancel' ? pair.from !== op.actor : pair.to !== op.actor) throw new Error(op.type === 'pairCancel' ? '초대한 본인만 초대를 취소할 수 있어요.' : '초대받은 본인만 수락하거나 거절할 수 있어요.');
+          if (op.type === 'pairAccept') {
+            pair.status = 'accepted';
+            d.overrides[pair.from] = 'separate'; d.overrides[pair.to] = 'separate';
+            delete d.absenceReasons[pair.from]; delete d.absenceReasons[pair.to];
+          } else d.pairs = d.pairs.filter(item => item.id !== pair.id);
+        }
+        break;
+      }
       case 'vote':
         if (p.placeId === null) { delete d.votes[op.actor]; break; }
         if (!memberStatus(op.actor, date, d, config).in) throw new Error('오늘 함께 먹는 상태로 바꾼 뒤 선택해 주세요.');
@@ -133,6 +181,7 @@
         d.notes[p.placeId] = String(p.text || '').trim().slice(0, 300); break;
       case 'decision':
         if (!hasPlace(p.placeId)) throw new Error('확정할 식당을 선택해 주세요.');
+        if (!memberStatus(op.actor, date, d, config).in) throw new Error('함께 먹는 상태로 바꾼 뒤 점심을 확정해 주세요.');
         if (!participants(date, d, config).length) throw new Error('오늘 함께 먹는 사람이 없습니다.');
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time || '')) throw new Error('만날 시간을 입력해 주세요.');
         d.decision = { placeId: p.placeId, time: p.time, actor: op.actor, at: now || new Date().toISOString() }; break;
@@ -147,7 +196,7 @@
     return block.split(/^## /m)[0].split('\n').filter(x => /^- /.test(x)).map(x => x.slice(2).trim()).filter(Boolean).slice(0, 12);
   }
   function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
-  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
 });
 
 
@@ -376,7 +425,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 2, features: { menuImages: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 3, features: { menuImages: true, explicitAttendance: true, lunchPairs: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
   const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;

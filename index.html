@@ -9,10 +9,11 @@
   <meta name="description" content="우리 멤버들의 오늘 점심. 참석 확인부터 식단 비교, 식당 선택까지 한곳에서.">
   <title>오늘 점심 · SANDS Lunch Club</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261019-daily">
-  <script src="core.js?v=20261019-daily" defer></script>
-  <script src="menu-source.js?v=20261019-daily" defer></script>
-  <script src="app.js?v=20261019-daily" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261019-choice">
+  <script src="core.js?v=20261019-choice" defer></script>
+  <script src="menu-source.js?v=20261019-choice" defer></script>
+  <script src="restaurant-guide.js?v=20261019-choice" defer></script>
+  <script src="app.js?v=20261019-choice" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문 바로가기</a>
@@ -27,19 +28,34 @@
     </section>
     <div id="connectionBanner" class="connection-banner" aria-live="polite"></div>
     <section id="peopleSection" class="people-section daily-section" aria-labelledby="peopleTitle">
-      <div class="section-heading"><div><span class="section-kicker">01 / TODAY'S CREW</span><h2 id="peopleTitle">오늘 점심 현황</h2></div><label class="switch-label"><input id="ceoCancelled" type="checkbox" role="switch"><span class="switch-track"></span><span id="ceoCancelLabel">오늘 대표님과 점심 취소</span></label></div>
+      <div class="section-heading"><div><span class="section-kicker">01 / TODAY'S CREW</span><h2 id="peopleTitle">오늘 점심 현황</h2></div></div>
       <div class="date-toolbar daily-date-toolbar" role="group" aria-label="날짜와 참여자 선택">
         <div class="date-controls"><button id="prevDate" class="icon-button" aria-label="이전 날">←</button><label class="date-label"><span class="sr-only">점심 날짜</span><input type="date" id="dateInput" min="2020-01-01" max="2099-12-31"></label><button id="nextDate" class="icon-button" aria-label="다음 날">→</button><button id="todayBtn" class="small-button">오늘</button></div>
-        <label class="identity"><span>나는</span><select id="identitySelect" aria-label="내 이름"><option value="">이름 선택</option></select></label>
       </div>
+      <section id="myResponsePanel" class="response-panel" aria-labelledby="myResponseTitle">
+        <header class="response-heading"><h3 id="myResponseTitle">오늘 점심, 어떻게 할까요?</h3><label class="identity"><span>나는</span><select id="identitySelect" aria-label="내 이름"><option value="">이름 선택</option></select></label></header>
+        <div id="myResponseContent"></div>
+        <div id="pairInvitations" class="pair-invitations"></div>
+      </section>
+      <div id="ceoControls" class="ceo-controls"><div><strong>대표님과 점심 일정</strong><p id="ceoControlHint">전체 일정이 취소된 날에 체크해 주세요.</p></div><label class="ceo-cancel-toggle"><input id="ceoCancelled" type="checkbox"><span id="ceoCancelLabel">오늘 대표님 점심 전체 취소</span></label></div>
       <p id="availabilityHint" class="section-description"></p>
       <div id="membersGrid" class="daily-groups"></div>
+      <section id="pairBoard" class="pair-board" aria-label="따로 먹는 점심 모임" hidden></section>
       <div class="daily-tools"><button class="text-button" data-action="settings">기본 요일 설정 ↗</button><p id="dailySaveNote" class="tiny-note" role="status" aria-live="polite"></p></div>
     </section>
     <div class="main-columns">
       <section id="menuSection" class="menu-section" aria-labelledby="menuTitle">
         <div class="section-heading"><div><span class="section-kicker">02 / ON THE MENU</span><h2 id="menuTitle">오늘은 어디로 갈까요?</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
         <div id="restaurantCards" class="restaurant-cards"></div>
+        <section id="guideSection" class="restaurant-guide" aria-labelledby="guideTitle">
+          <div class="guide-heading"><h3 id="guideTitle">과천 맛집 골라보기</h3><a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">저장한 지도 ↗</a></div>
+          <p id="guideIntro" class="section-description"></p>
+          <div class="guide-tools"><div id="guideFilters" class="guide-filters" role="group" aria-label="음식 종류"></div><label class="guide-search"><span class="sr-only">식당 또는 메뉴 검색</span><input id="guideSearch" type="search" placeholder="식당 또는 메뉴 검색" autocomplete="off"></label></div>
+          <p id="guideResultCount" class="guide-result-count" role="status"></p>
+          <div id="guideCards" class="guide-cards"></div>
+          <p id="guideEmpty" class="guide-empty" hidden></p>
+          <button id="guideMore" class="guide-more" data-action="guideMore" hidden>맛집 더 보기</button>
+        </section>
         <button id="addPlaceBtn" class="add-place"><span>＋</span> 다른 식당 제안하기 <small>오늘은 새로운 곳도 좋아요</small></button>
       </section>
       <aside class="decision-panel" aria-labelledby="decisionTitle">

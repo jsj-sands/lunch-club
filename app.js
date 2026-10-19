@@ -22,6 +22,8 @@
   if (!menus['2026-10-19']) menus['2026-10-19'] = { date: '2026-10-19', dishes: ['나주곰탕*당면사리', '눈꽃치즈김치볶음밥', '[오늘의데일리팩] 치킨텐더포케'], fetchedAt: '2026-10-19T02:51:00.000Z', initial: true };
   let syncing = false, busy = false, syncError = '', lastSync = null, menuLoading = false, toastTimer;
   let menuView = 'day';
+  let guideCategory = '전체', guideQuery = '', guideLimit = 6;
+  const GUIDE_CATEGORIES = ['한식', '중식', '일식', '양식', '분식', '아시안'];
   const menuRequests = new Map(), menuLoadingDates = new Set();
   let localImages = read(KEYS.images, {});
   if (!localImages || typeof localImages !== 'object' || Array.isArray(localImages)) localImages = {};
@@ -31,6 +33,8 @@
   const state = () => connection ? shared : local;
   const config = () => C.settings(state().settings);
   const day = (d = date) => C.cleanDay(state().days[d]);
+  const dayReady = (d = date) => !connection || connectedReady && Object.prototype.hasOwnProperty.call(shared.days, d);
+  const needsServerUpdate = () => !!connection && connectedReady && (!shared.features.explicitAttendance || !shared.features.lunchPairs);
   const dateText = d => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일 ${'일월화수목금토'[C.weekday(d)]}요일`;
   const timeText = iso => { const d = new Date(iso); return isNaN(d) ? '' : new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(d); };
   const nameOf = id => MEMBERS.find(m => m.id === id)?.name || '';
@@ -53,34 +57,69 @@
   }
   function renderConnection() {
     const el = $('connectionBanner');
-    el.className = `connection-banner${connection ? syncError ? ' error' : ' live' : ''}`;
+    el.className = `connection-banner${connection ? syncError || needsServerUpdate() ? ' error' : ' live' : ''}`;
     if (!connection) el.innerHTML = '<span><i class="status-dot"></i>현재 이 기기에만 저장돼요. 함께 선택하려면 팀 공유를 연결하세요.</span><button data-action="settings">공유 연결</button>';
     else if (syncError) el.innerHTML = `<span><i class="status-dot"></i>${esc(syncError)}</span><button data-action="retry">다시 연결</button>`;
+    else if (needsServerUpdate()) el.innerHTML = '<span><i class="status-dot"></i>새 참석 선택과 따로 먹기를 쓰려면 공유 서버를 업데이트해 주세요.</span><a href="setup.html#update">업데이트 안내 ↗</a>';
     else el.innerHTML = `<span><i class="status-dot"></i>${busy ? '선택을 팀에 저장하고 있어요…' : syncing && !lastSync ? '팀 점심판을 불러오고 있어요…' : connectedReady ? '팀 공유 연결됨 · 30초마다 새 선택을 확인해요' : '팀 공유 연결을 확인해 주세요'}</span><button data-action="invite">동료 초대</button>`;
+  }
+  function renderMyResponse() {
+    const d = day(), mine = MEMBERS.find(m => m.id === identity), status = mine && dailyStatus(mine, date);
+    const disabled = busy || !dayReady() || needsServerUpdate(), target = date === C.today() ? '오늘' : '이날';
+    const attrs = `data-date="${date}" data-member="${identity}" ${disabled ? 'disabled' : ''}`;
+    $('myResponseTitle').textContent = `${target} 점심, 어떻게 할까요?`;
+    let content = `<p class="response-status${status ? ' is-' + status.kind : ''}">${mine ? `<span>${esc(mine.name)}님의 선택</span><strong>${dayReady() ? esc(status.label) : '확인 중…'}</strong>` : '내 이름을 고르고 아래 버튼으로 점심 여부를 알려 주세요.'}</p>`;
+    content += `<div class="response-actions" role="group" aria-label="${esc(dateText(date))} 내 점심 선택"><button id="choiceIn" class="response-option is-in" data-action="setAvailability" data-id="in" ${attrs} aria-pressed="${status?.kind === 'in'}"><strong>함께 먹기</strong><small>같이 먹는 인원에 참여</small></button><button id="choiceSeparate" class="response-option is-separate" data-action="separate" ${attrs} aria-pressed="${status?.kind === 'separate'}"><strong>따로 먹기</strong><small>동료와 따로 또는 개별 식사</small></button><button id="choiceOut" class="response-option is-out" data-action="absence" ${attrs} aria-pressed="${status?.kind === 'out'}"><strong>안 먹기</strong><small>불참 사유는 선택사항</small></button></div>`;
+    content += `<div class="response-secondary"><button class="text-button" data-action="setAvailability" data-id="pending" ${attrs}>선택 취소 · 미선택으로</button><button class="text-button" data-action="setAvailability" data-id="ceo" ${attrs}>대표님과 먹어요</button></div>`;
+    if (status?.kind === 'ceo') content += `<div class="personal-ceo-notice"><strong>${target}은 대표님과 점심 일정이 있어요.</strong><button id="cancelMyCeo" class="secondary-button" data-action="setAvailability" data-id="pending" ${attrs}>내 대표님 점심 취소</button><small>취소하면 미선택으로 이동해요. 이후 함께 먹기·따로 먹기·안 먹기를 골라 주세요.</small></div>`;
+    else if (mine && d.overrides[mine.id] === 'pending' && !d.ceoCancelled && date <= config().scheduleEnd && config().ceoDays[mine.id].includes(C.weekday(date))) content += `<div class="personal-ceo-notice"><strong>내 기본 대표님 점심은 해제되어 있어요.</strong><button class="secondary-button" data-action="setAvailability" data-id="auto" ${attrs}>내 기본 대표님 일정 복원</button></div>`;
+    if (needsServerUpdate()) content += '<p class="response-warning">공유 서버 업데이트 후 선택할 수 있어요. <a href="setup.html#update">관리자 업데이트 안내 ↗</a></p>';
+    $('myResponseContent').innerHTML = content;
+    const incoming = identity && dayReady() ? C.incomingPairs(identity, d) : [];
+    $('pairInvitations').innerHTML = incoming.map(pair => `<article class="pair-invitation"><p><strong>${esc(nameOf(pair.from))}님과 따로 점심</strong><br>수락하면 두 사람의 점심 모임으로 표시됩니다.</p><div class="button-row"><button class="primary-button" data-action="pairAccept" data-id="${pair.id}" ${attrs}>수락하고 따로 먹기</button><button class="secondary-button" data-action="pairDecline" data-id="${pair.id}" ${attrs}>거절</button></div></article>`).join('');
+  }
+  function renderPairBoard() {
+    const d = day(), separate = MEMBERS.filter(m => dailyStatus(m, date).kind === 'separate');
+    $('pairBoard').hidden = !dayReady() || !separate.length;
+    if ($('pairBoard').hidden) { $('pairBoard').innerHTML = ''; return; }
+    const used = new Set(), groups = [];
+    (d.pairs || []).forEach(pair => {
+      const accepted = pair.status === 'accepted';
+      const ids = accepted ? [pair.from, pair.to] : [pair.from];
+      ids.forEach(id => used.add(id));
+      groups.push({ ids, pair, label: accepted ? '둘이 따로 점심' : '동료의 수락을 기다려요' });
+    });
+    separate.filter(m => !used.has(m.id)).forEach(m => groups.push({ ids: [m.id], pair: null, label: '개별 식사' }));
+    groups.sort((a, b) => MEMBERS.findIndex(m => a.ids.includes(m.id)) - MEMBERS.findIndex(m => b.ids.includes(m.id)));
+    $('pairBoard').innerHTML = `<h3>따로 먹는 점심 <span>${separate.length}명</span></h3><div class="pair-list">${groups.map(group => {
+      const ids = MEMBERS.filter(m => group.ids.includes(m.id)).map(m => m.id);
+      return `<article class="lunch-pair is-${group.pair?.status || 'solo'}"><strong>${ids.map(id => esc(nameOf(id))).join(' · ')}</strong><p>${group.label}${group.pair?.status === 'pending' ? ` · ${esc(nameOf(group.pair.to))}님 초대 중` : ''}</p><button class="text-button" data-action="pairDetails" data-id="${ids[0]}" data-date="${date}">모임 보기 ↗</button></article>`;
+    }).join('')}</div><p class="tiny-note">따로 먹는 사람은 함께 점심 인원과 식당 투표 집계에서 빠져요.</p>`;
   }
   function renderMembers() {
     const d = day(), s = config(), attending = C.participants(date, d, s), isToday = date === C.today();
-    const ready = !connection || connectedReady && Object.prototype.hasOwnProperty.call(shared.days, date);
-    const pending = busy || !ready;
+    const ready = dayReady(), pending = busy || !ready || needsServerUpdate();
     $('heroDate').textContent = dateText(date); $('heroCount').textContent = ready ? `${isToday ? '오늘' : '이날'} 함께 ${attending.length}명` : '현황 확인 중…';
     $('peopleTitle').textContent = isToday ? '오늘 점심 현황' : '선택한 날의 점심 현황';
     $('dateInput').value = date; $('identitySelect').value = identity;
     $('ceoCancelled').checked = d.ceoCancelled; $('ceoCancelled').disabled = pending;
-    $('ceoCancelLabel').textContent = `${isToday ? '오늘' : '이날'} 대표님과 점심 취소`;
-    $('ceoCancelled').setAttribute('aria-label', dateText(date) + ' 기본 대표님과 점심 취소');
-    $('availabilityHint').textContent = !ready ? '선택한 날짜의 공유 현황을 확인하고 있어요.' : date > s.scheduleEnd ? '기본 일정 적용 기간이 지났어요. 기본 요일 설정에서 확인해 주세요.' : C.weekday(date) === 0 || C.weekday(date) === 6 ? '주말은 기본 불참이에요. 내 이름을 눌러 참석으로 바꿀 수 있어요.' : d.ceoCancelled ? '기본 대표님 점심은 취소됐어요. 개인이 바꾼 일정은 유지됩니다.' : identity ? '내 이름을 누르면 참석 여부를 바꿀 수 있어요.' : '상단에서 내 이름을 선택하면 참석 여부를 바꿀 수 있어요.';
+    $('ceoCancelLabel').textContent = `${isToday ? '오늘' : '이날'} 대표님 점심 전체 취소${d.ceoCancelled ? '됨' : ''}`;
+    $('ceoCancelled').setAttribute('aria-label', dateText(date) + ' 기본 대표님과 점심 전체 취소');
+    $('ceoControlHint').textContent = d.ceoCancelled ? '기본 대표님 일정이 미선택으로 바뀌었어요. 각자 점심 여부를 선택해 주세요.' : '전체 일정이 취소된 날에 체크해 주세요. 내 일정만 취소할 때는 위의 개인 취소 버튼을 이용하세요.';
+    $('availabilityHint').textContent = !ready ? '선택한 날짜의 공유 현황을 확인하고 있어요.' : date > s.scheduleEnd ? '대표님 기본 일정의 적용 기간이 지났어요. 기본 요일 설정을 확인해 주세요.' : '함께 먹기를 직접 선택한 사람만 초록색에 표시돼요. 아직 응답하지 않았다면 미선택입니다.';
     $('dailySaveNote').textContent = connection ? !ready ? '공유 현황 확인 중…' : busy ? '팀에 저장 중…' : `총 ${MEMBERS.length}명 · 팀 공유` : `총 ${MEMBERS.length}명 · 이 기기에 저장`;
     const members = MEMBERS.map(m => ({ ...m, status: dailyStatus(m, date) }));
-    const groups = [['in', '함께 점심'], ['ceo', '대표님과 점심'], ['out', isToday ? '오늘 안 먹음' : '이날 안 먹음']];
-    $('membersGrid').setAttribute('aria-busy', String(pending));
+    const groups = [['in', '함께 점심'], ['ceo', '대표님과 점심'], ['out', isToday ? '오늘 안 먹음' : '이날 안 먹음'], ['pending', '미선택']];
+    $('membersGrid').setAttribute('aria-busy', String(!ready || busy));
     $('membersGrid').innerHTML = groups.map(([kind, label]) => {
       const list = members.filter(m => m.status.kind === kind);
       const rows = teamGroups(list).map(group => `<div class="daily-team-row"><span class="daily-team-name">${esc(group.team)}</span><div class="daily-name-list">${group.members.map(m => {
         const me = m.id === identity;
-        return `<button id="dailyMember-${m.id}" class="daily-member${me ? ' is-me' : ''}" data-action="dailyMember" data-id="${m.id}" data-date="${date}" aria-label="${esc(m.team + ', ' + m.name + ', ' + dateText(date) + ', ' + m.status.label + (m.status.detail ? ', ' + m.status.detail : '') + '. ' + (me ? '내 일정 변경' : '일정 상세 보기'))}" ${pending ? 'disabled' : ''}><span class="daily-member-name">${esc(m.name)}</span>${me ? '<small class="daily-me">나</small>' : ''}${m.status.detail ? `<span class="daily-member-note">${esc(m.status.detail)}</span>` : ''}</button>`;
+        return `<button id="dailyMember-${m.id}" class="daily-member${me ? ' is-me' : ''}" data-action="dailyMember" data-id="${m.id}" data-date="${date}" aria-label="${esc(m.team + ', ' + m.name + ', ' + dateText(date) + ', ' + m.status.label + (m.status.detail ? ', ' + m.status.detail : '') + '. ' + (me ? '내 일정 변경' : '일정 상세 보기'))}" ${busy || !ready ? 'disabled' : ''}><span class="daily-member-name">${esc(m.name)}</span>${me ? '<small class="daily-me">나</small>' : ''}${m.status.detail ? `<span class="daily-member-note">${esc(m.status.detail)}</span>` : ''}</button>`;
       }).join('')}</div></div>`).join('');
       return `<article id="dailyGroup-${kind}" class="daily-group is-${kind}" aria-labelledby="dailyHeading-${kind}"><header class="daily-group-heading"><h3 id="dailyHeading-${kind}">${label}</h3><span class="daily-group-count"><b>${ready ? list.length : '–'}</b>명</span></header>${!ready ? '<p class="daily-empty">현황 확인 중…</p>' : list.length ? `<div class="daily-team-list">${rows}</div>` : '<p class="daily-empty">해당 인원 없음</p>'}</article>`;
     }).join('');
+    renderMyResponse(); renderPairBoard();
   }
   function menuDishesHTML(menu) {
     return `<ul class="menu-list">${menu.dishes.map((dish, ix) => `<li><span class="course">${/데일리팩|takeout|테이크/i.test(dish) ? '간편식' : `메뉴 ${ix + 1}`}</span><span>${esc(dish)}</span></li>`).join('')}</ul>`;
@@ -141,30 +180,77 @@
         content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>런치타임 카카오 채널 열기</strong><p>친구 추가 후 프로필의 식단 이미지를 확인해 주세요</p></div><span class="arrow">↗</span></a>${renderLunchImage()}`;
       } else content = `<p class="channel-info">${esc(p.subtitle || '동료가 제안한 오늘의 다른 식당이에요.')}</p>`;
       if (note) content += `<div class="menu-note"><strong>${esc(dateText(date))} · 함께 적은 메뉴 메모</strong>${esc(note)}</div>`;
-      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.id === 'megazone' ? `<button data-action="source">실시간 식단 ↗</button>` : p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">지도 ↗</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button>${i > 1 ? `<button data-action="remove" data-id="${esc(p.id)}">삭제</button>` : ''}</div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy ? 'disabled' : ''}>${chosen ? '✓ 내 선택' : '여기로 갈래요'}</button></div></article>`;
+      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.id === 'megazone' ? `<button data-action="source">실시간 식단 ↗</button>` : p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">지도 ↗</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button>${i > 1 ? `<button data-action="remove" data-id="${esc(p.id)}">삭제</button>` : ''}</div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 내 선택' : '여기로 갈래요'}</button></div></article>`;
     }).join('');
   }
   function renderDecision() {
     const d = day(), s = config(), list = C.places(d), attending = C.participants(date, d, s).sort(compareMembers), votes = C.tally(date, d, s);
     const selectedDay = date === C.today() ? '오늘' : '이날';
     const total = Object.values(votes).reduce((n, v) => n + v.length, 0), top = Math.max(0, ...Object.values(votes).map(v => v.length));
-    $('voteSummary').textContent = attending.length ? `함께하는 ${attending.length}명 중 ${total}명이 골랐어요` : '아직 함께 먹는 멤버가 없어요';
+    $('voteSummary').textContent = attending.length ? `함께하는 ${attending.length}명 중 ${total}명이 골랐어요` : '위에서 함께 먹기를 선택한 사람부터 집계해요';
     $('voteResults').innerHTML = list.map(p => `<div class="result-row"><div class="result-heading"><span>${esc(p.name)}</span><b>${votes[p.id].length}표</b></div><div class="result-track"><div class="result-bar${top > 0 && votes[p.id].length === top ? ' leading' : ''}" style="width:${attending.length ? votes[p.id].length / attending.length * 100 : 0}%"></div></div><div class="voter-names">${votes[p.id].length ? MEMBERS.filter(m => votes[p.id].includes(m.id)).map(m => m.name).join(' · ') : '아직 선택한 사람이 없어요'}</div></div>`).join('');
     if (d.decision) {
       const p = list.find(p => p.id === d.decision.placeId);
       $('decisionContent').innerHTML = `<div class="confirmed"><span class="confirmed-label">✓ ${selectedDay} 점심 확정</span><h3>${esc(p.name)}</h3><p class="meeting">${esc(d.decision.time)}에 만나요</p><p class="people">${attending.map(m => m.name).join(' · ') || '참석 인원을 다시 확인해 주세요'}</p><button class="text-button" data-action="unconfirm">확정 취소 / 다시 고르기</button></div>`;
     } else {
       if (!list.some(p => p.id === selectedDecision)) selectedDecision = '';
-      $('decisionContent').innerHTML = `<form id="decisionForm" class="decision-form"><label class="field-label" for="decisionPlace">함께 정한 식당</label><select id="decisionPlace" required><option value="">식당을 선택해 주세요</option>${list.map(p => `<option value="${esc(p.id)}" ${selectedDecision === p.id ? 'selected' : ''}>${esc(p.name)}${votes[p.id].length ? ` · ${votes[p.id].length}표` : ''}</option>`).join('')}</select><label class="time-row" for="meetingTime">만날 시간<input id="meetingTime" type="time" required value="${esc(draftTime || s.meetingTime)}"></label><button class="primary-button" type="submit" ${busy ? 'disabled' : ''}>${selectedDay} 점심 확정하기 <span>↗</span></button><button class="random-button" type="button" data-action="random">못 고르겠다면? 최다 득표 후보 추첨</button></form>`;
+      $('decisionContent').innerHTML = `<form id="decisionForm" class="decision-form"><label class="field-label" for="decisionPlace">함께 정한 식당</label><select id="decisionPlace" required><option value="">식당을 선택해 주세요</option>${list.map(p => `<option value="${esc(p.id)}" ${selectedDecision === p.id ? 'selected' : ''}>${esc(p.name)}${votes[p.id].length ? ` · ${votes[p.id].length}표` : ''}</option>`).join('')}</select><label class="time-row" for="meetingTime">만날 시간<input id="meetingTime" type="time" required value="${esc(draftTime || s.meetingTime)}"></label><button class="primary-button" type="submit" ${busy || !dayReady() || needsServerUpdate() || !identity || !C.memberStatus(identity, date, d, s).in ? 'disabled' : ''}>${selectedDay} 점심 확정하기 <span>↗</span></button><button class="random-button" type="button" data-action="random">못 고르겠다면? 최다 득표 후보 추첨</button></form>`;
     }
   }
+  function guideData() { return window.LunchRestaurantGuide || { restaurants: [] }; }
+  function renderGuide() {
+    const data = guideData(), all = Array.isArray(data.restaurants) ? data.restaurants : [];
+    const query = guideQuery.trim().toLocaleLowerCase('ko');
+    const filtered = all.filter(item => (guideCategory === '전체' || item.category === guideCategory) && (!query || [item.name, item.category, item.menu, item.area].filter(Boolean).join(' ').toLocaleLowerCase('ko').includes(query)));
+    $('guideIntro').textContent = all.length ? `저장한 ‘${data.title || '과천 맛집'}’ ${all.length}곳을 음식 종류별로 모았어요.` : '저장한 과천 맛집을 음식 종류별로 골라보세요.';
+    $('guideFilters').innerHTML = ['전체', ...GUIDE_CATEGORIES].map((category, i) => `<button id="guideFilter-${i}" data-action="guideFilter" data-id="${category}" aria-pressed="${guideCategory === category}">${category}<small>${category === '전체' ? all.length : all.filter(item => item.category === category).length}</small></button>`).join('');
+    $('guideResultCount').textContent = `${guideCategory} · ${filtered.length}곳`;
+    const choices = C.places(day()), blocked = busy || !dayReady() || needsServerUpdate();
+    $('guideCards').innerHTML = filtered.slice(0, guideLimit).map(item => {
+      const added = choices.some(p => p.name === item.name || p.url && p.url === item.url), safeUrl = C.safeUrl(item.url);
+      return `<article class="guide-card"><span class="guide-category">${esc(item.category)}</span><h4>${esc(item.name)}</h4><p class="guide-menu">${esc(item.menu || item.rawCategory || item.category)}</p>${item.area ? `<p class="guide-area">${esc(item.area)}</p>` : ''}<div class="guide-card-actions">${safeUrl ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">네이버 지도 ↗</a>` : ''}<button data-action="guideAdd" data-id="${esc(item.id)}" ${added || blocked ? 'disabled' : ''}>${added ? '후보에 있어요' : '+ 점심 후보'}</button></div></article>`;
+    }).join('');
+    $('guideEmpty').hidden = !!filtered.length;
+    $('guideEmpty').textContent = all.length ? '조건에 맞는 식당이 없어요. 다른 종류나 검색어를 골라 주세요.' : '목록을 준비 중이에요. 위의 저장한 지도에서 식당을 확인할 수 있어요.';
+    $('guideMore').hidden = filtered.length <= guideLimit;
+    $('guideMore').textContent = `맛집 더 보기 · ${Math.max(0, filtered.length - guideLimit)}곳 남음`;
+  }
+  async function addGuidePlace(id) {
+    const item = (guideData().restaurants || []).find(item => item.id === id); if (!item) return;
+    if (!identity) return showIdentity();
+    if (C.places(day()).some(p => p.name === item.name || p.url && p.url === item.url)) return toast('이미 이 날짜의 점심 후보에 있어요.');
+    const payload = { id: 'extra_' + String(item.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 44), name: item.name, subtitle: [item.category, item.menu].filter(Boolean).join(' · ').slice(0, 60), url: item.url };
+    if (await mutate('addPlace', payload)) toast(item.name + '을 점심 후보에 추가했어요.');
+  }
+  function showPairDialog(targetDate = date) {
+    if (!identity) return showIdentity();
+    if (!C.validDate(targetDate)) return;
+    const record = day(targetDate), pair = C.pairFor(identity, record);
+    if (pair) return showPairDetails(identity, targetDate);
+    const available = MEMBERS.filter(m => m.id !== identity && !C.pairFor(m.id, record));
+    const attrs = `data-date="${targetDate}" data-member="${identity}"`;
+    openDialog(dateText(targetDate) + ' · 따로 먹기', `<p class="dialog-copy">따로 점심을 먹을 동료를 선택해 주세요. 상대가 수락하면 두 사람의 모임으로 표시됩니다. 초대를 보내면 나는 따로 먹는 인원으로 이동해요.</p><form id="pairInviteForm" class="dialog-form" ${attrs}><label>함께할 동료<select id="pairPartner" name="to" required><option value="">동료 선택</option>${available.map(m => `<option value="${m.id}">${esc(m.name)} · ${esc(m.team)} · ${esc(dailyStatus(m, targetDate).label)}</option>`).join('')}</select></label><button class="primary-button" ${available.length ? '' : 'disabled'}>따로 먹기 초대하기</button></form>${available.length ? '' : '<p class="dialog-copy">지금 초대할 수 있는 동료가 없어요.</p>'}<button class="text-button" data-action="setAvailability" data-id="separate" ${attrs}>동료 지정 없이 따로 먹기</button><p class="tiny-note">${connection ? '초대받은 동료는 본인 이름을 선택한 뒤 수락할 수 있어요.' : '현재 이 기기에만 저장됩니다. 동료의 기기에서도 수락하려면 팀 공유를 연결해 주세요.'}</p>`);
+  }
+  function showPairDetails(memberId, targetDate) {
+    if (!C.validDate(targetDate)) return;
+    const record = day(targetDate), pair = C.pairFor(memberId, record);
+    if (!pair) {
+      if (identity === memberId) return showPairDialog(targetDate);
+      return openDialog(nameOf(memberId) + '님의 따로 점심', `<p class="dialog-copy">${esc(dateText(targetDate))} · 개별 식사</p>`);
+    }
+    const attrs = `data-date="${targetDate}" data-member="${identity}"`;
+    let actions = '';
+    if (pair.status === 'pending' && pair.to === identity) actions = `<button class="primary-button" data-action="pairAccept" data-id="${pair.id}" ${attrs}>수락하고 따로 먹기</button><button class="secondary-button" data-action="pairDecline" data-id="${pair.id}" ${attrs}>거절</button>`;
+    else if (pair.status === 'pending' && pair.from === identity) actions = `<button class="secondary-button" data-action="pairCancel" data-id="${pair.id}" ${attrs}>초대 취소</button>`;
+    else if (pair.status === 'accepted' && [pair.from, pair.to].includes(identity)) actions = `<button class="secondary-button" data-action="pairLeave" data-id="${pair.id}" ${attrs}>모임 나가기 · 미선택으로</button>`;
+    openDialog(dateText(targetDate) + ' · 따로 먹는 모임', `<p class="dialog-copy"><strong>${esc(nameOf(pair.from))} · ${esc(nameOf(pair.to))}</strong><br>${pair.status === 'accepted' ? '두 사람이 따로 점심을 먹어요.' : esc(nameOf(pair.to)) + '님의 수락을 기다리고 있어요.'}</p><div class="button-row">${actions}</div><p class="tiny-note">${pair.status === 'accepted' ? '두 사람은 함께 점심 인원과 식당 투표 집계에 포함되지 않습니다.' : '초대한 사람만 따로 먹기로 표시돼요. 수락 전까지 상대의 기존 선택은 유지됩니다.'}</p>`);
+  }
   function dailyStatus(member, targetDate) {
-    const record = day(targetDate), s = config(), status = C.memberStatus(member.id, targetDate, record, s);
-    const scheduled = targetDate <= s.scheduleEnd && s.ceoDays[member.id].includes(C.weekday(targetDate));
-    const kind = status.in ? 'in' : status.reason === '대표님과 점심' ? 'ceo' : 'out';
-    const label = kind === 'in' ? '함께 점심' : kind === 'ceo' ? '대표님과 점심' : targetDate === C.today() ? '오늘 안 먹음' : '이날 안 먹음';
-    const note = status.detail || (status.manual ? kind === 'in' ? '직접 참석으로 변경' : kind === 'ceo' ? '개별 대표님 일정' : '점심 불참' : status.reason === '주말' ? '주말 기본 휴식' : record.ceoCancelled && scheduled ? '대표님 일정 취소' : kind === 'ceo' ? '요일별 기본 일정' : '참석 예정');
-    return { ...status, kind, label, note };
+    const record = day(targetDate), status = C.memberStatus(member.id, targetDate, record, config());
+    const kind = status.kind;
+    const labels = { in: '함께 점심', ceo: '대표님과 점심', out: targetDate === C.today() ? '오늘 안 먹음' : '이날 안 먹음', pending: '미선택', separate: '따로 점심' };
+    const notes = { in: '직접 함께 먹기를 선택했어요', ceo: status.manual ? '직접 지정한 대표님 일정' : '요일별 기본 일정', out: '점심 불참', pending: '아직 점심 여부를 선택하지 않았어요', separate: '함께 점심과 별도로 식사해요' };
+    return { ...status, kind, label: labels[kind], note: status.detail || notes[kind] };
   }
   function showDailyMember(id, targetDate) {
     const member = MEMBERS.find(m => m.id === id); if (!member || !C.validDate(targetDate)) return;
@@ -176,8 +262,8 @@
     const focused = document.activeElement?.id;
     if (focused === 'meetingTime') draftTime = $('meetingTime').value;
     if (focused === 'decisionPlace') selectedDecision = $('decisionPlace').value;
-    renderConnection(); renderMembers(); renderMenuCards(); renderDecision(); ensureMenuImage();
-    if ((focused === 'meetingTime' || focused === 'decisionPlace' || /^dailyMember-/.test(focused || '')) && $(focused)) $(focused).focus({ preventScroll: true });
+    renderConnection(); renderMembers(); renderMenuCards(); renderDecision(); renderGuide(); ensureMenuImage();
+    if ((focused === 'meetingTime' || focused === 'decisionPlace' || /^(?:dailyMember-|choice|cancelMyCeo|guideFilter-)/.test(focused || '')) && $(focused)) $(focused).focus({ preventScroll: true });
   }
   function mergeResponse(result) {
     if (!result || !result.ok) throw new Error(result?.error || '공유 연결 응답을 확인하지 못했어요.');
@@ -337,7 +423,8 @@
   async function mutate(type, payload, requestedDate = date) {
     if (busy) return false;
     if (!identity) { showIdentity(); return false; }
-    if (connection && !connectedReady) { toast('공유 연결을 먼저 확인해 주세요.'); return false; }
+    if (connection && (!connectedReady || !dayReady(requestedDate))) { toast('선택한 날짜의 공유 현황을 먼저 확인해 주세요.'); return false; }
+    if (needsServerUpdate()) { toast('공유 서버 업데이트 후 사용할 수 있어요. 설정 안내를 확인해 주세요.'); return false; }
     const opDate = requestedDate, actor = identity, op = { type, payload, actor, id: uid() }, target = connection;
     let next;
     try { if (!['settings', 'menuImageUpload'].includes(type)) next = C.applyOperation(day(opDate), opDate, config(), op); }
@@ -378,14 +465,16 @@
   function showAvailability(targetDate = date) {
     if (!identity) return showIdentity();
     if (!C.validDate(targetDate)) return;
-    const current = day(targetDate).overrides[identity] || 'auto', selectedDay = targetDate === C.today() ? '오늘' : '이날';
-    openDialog(nameOf(identity) + '님의 ' + dateText(targetDate), `<p class="dialog-copy">${esc(dateText(targetDate))}의 일정만 바꿉니다. 다른 날짜와 기본 반복 일정은 유지돼요.</p><div class="availability-options">${[['auto','기본 일정 따르기','요일별 대표님과 점심과 해당 날짜의 취소 여부를 반영해요'],['in',selectedDay + ' 함께 먹어요','대표님과 점심 일정이 달라졌거나 함께 먹을 수 있어요'],['out',selectedDay + ' 점심 안 먹어요','속이 안 좋음 · 선약 · 병원 등 / 사유는 선택사항'],['ceo',selectedDay + '은 대표님과 점심','기본 일정과 달리 별도의 대표님과 점심에 참석해요']].map(([id,title,sub]) => `<button data-action="${id === 'out' ? 'absence' : 'setAvailability'}" data-id="${id}" data-date="${targetDate}" data-member="${identity}" class="${current === id ? 'active' : ''}">${title}<small>${sub}</small></button>`).join('')}</div>`);
+    const member = MEMBERS.find(m => m.id === identity), current = dailyStatus(member, targetDate).kind;
+    const selectedDay = targetDate === C.today() ? '오늘' : '이날';
+    const options = [['in', selectedDay + ' 함께 먹어요', '함께 점심 인원과 식당 투표에 참여해요'], ['separate', selectedDay + ' 따로 먹어요', '동료와 따로 먹거나 개별 식사해요'], ['out', selectedDay + ' 점심 안 먹어요', '연차·반차·외근·출장 등 사유는 선택사항'], ['pending', '선택 취소 · 미선택으로', '내 대표님 점심 취소도 미선택으로 바꿔요'], ['ceo', selectedDay + '은 대표님과 점심', '대표님과 점심으로 직접 지정해요'], ['auto', '기본 일정 따르기', '기본 대표님 일정이 없으면 미선택이 됩니다']];
+    openDialog(nameOf(identity) + '님의 ' + dateText(targetDate), `<p class="dialog-copy">${esc(dateText(targetDate))}의 일정만 바꿉니다.</p><div class="availability-options">${options.map(([id, title, sub]) => `<button data-action="${id === 'out' ? 'absence' : id === 'separate' ? 'separate' : 'setAvailability'}" data-id="${id}" data-date="${targetDate}" data-member="${identity}" class="${current === id ? 'active' : ''}">${title}<small>${sub}</small></button>`).join('')}</div>`);
   }
   function showAbsence(targetDate = date, actor = identity) {
     if (!identity) return showIdentity();
     if (actor !== identity || !C.validDate(targetDate)) { toast('내 이름과 변경할 날짜를 다시 확인해 주세요.'); return; }
     const current = day(targetDate).absenceReasons[identity] || '';
-    const options = ['', '속이 안 좋아요', '선약이 있어요', '병원에 가요', '개인 사정'];
+    const options = ['', '연차·반차·외근·출장', '속이 안 좋아요', '선약이 있어요', '병원에 가요', '개인 사정'];
     const custom = current && !options.includes(current);
     openDialog(dateText(targetDate) + ' · 점심 불참', `<p class="dialog-copy">${esc(dateText(targetDate))}의 참석 인원과 투표 집계에서 빠져요. 사유는 남기지 않아도 됩니다. 적은 사유는 점심판 멤버에게 보여요.</p><form id="absenceForm" class="dialog-form" data-date="${targetDate}" data-member="${identity}"><label>사유 · 선택<select name="reason" id="absenceReason">${options.map(x => `<option value="${esc(x)}" ${current === x ? 'selected' : ''}>${x || '사유는 남기지 않을게요'}</option>`).join('')}<option value="custom" ${custom ? 'selected' : ''}>직접 입력</option></select></label><label id="customReasonLabel" ${custom ? '' : 'hidden'}>한 줄 메모<input name="customReason" maxlength="60" value="${custom ? esc(current) : ''}" placeholder="필요한 내용만 간단히 남겨 주세요"></label><button class="primary-button">이날 불참으로 저장</button></form>`);
   }
@@ -403,7 +492,7 @@
   }
   function showSettings() {
     const s = config();
-    openDialog('우리 점심판 설정', `<section class="settings-block"><h3>동료와 함께 쓰기</h3><p class="dialog-copy">${connection ? '초대 링크를 받은 동료는 같은 선택과 일정을 볼 수 있어요. 이름 선택 방식이며, 팀 링크를 가진 사람은 이 점심판을 수정할 수 있습니다.' : '처음 한 번만 공유 서버를 연결하면, 우리 멤버들의 선택이 같은 점심판에 저장돼요.'}</p><div class="button-row"><a class="secondary-button" href="setup.html">코딩 없이 연결하는 안내 ↗</a>${connection ? '<button class="secondary-button" data-action="invite">동료 초대 링크</button>' : ''}</div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer">${connection ? '공유 연결 정보 변경' : '이미 공유 주소가 있어요'}</summary><form id="connectionForm" class="dialog-form" style="margin-top:13px"><label>Apps Script 웹 앱 URL<input name="url" type="url" required value="${esc(connection?.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label>팀 키<input name="key" type="password" required autocomplete="off" value="${esc(connection?.key || read(KEYS.pending, '') || '')}"></label><button class="primary-button">연결 확인하고 저장</button></form></details>${connection ? '<button data-action="disconnect" class="text-button" style="margin-top:13px">이 기기에서 공유 연결 해제</button>' : ''}</section><section class="settings-block"><h3>요일별 대표님과 점심</h3><p class="dialog-copy">체크한 요일은 함께 먹는 인원에서 제외돼요. 공유 연결 시 이 기본 일정도 팀 전체에 적용됩니다.</p><form id="scheduleForm" class="dialog-form">${MEMBERS.map(m => `<div><span style="font-size:12px;font-weight:650">${m.name} <small style="font-weight:400;color:#858e7a">${m.team}</small></span><div class="checkbox-grid">${[1,2,3,4,5].map(n => `<label><input type="checkbox" name="${m.id}" value="${n}" ${s.ceoDays[m.id].includes(n) ? 'checked' : ''}>${'일월화수목금토'[n]}</label>`).join('')}</div></div>`).join('')}<label>기본 일정 적용 마지막 날<input name="scheduleEnd" type="date" required min="2020-01-01" max="2099-12-31" value="${s.scheduleEnd}"></label><label>기본 만남 시간 · 수정 가능<input name="meetingTime" type="time" required value="${s.meetingTime}"></label><button class="primary-button">기본 일정 저장</button></form></section>`);
+    openDialog('우리 점심판 설정', `<section class="settings-block"><h3>동료와 함께 쓰기</h3><p class="dialog-copy">${connection ? '초대 링크를 받은 동료는 같은 선택과 일정을 볼 수 있어요. 이름 선택 방식이며, 팀 링크를 가진 사람은 이 점심판을 수정할 수 있습니다.' : '처음 한 번만 공유 서버를 연결하면, 우리 멤버들의 선택이 같은 점심판에 저장돼요.'}</p><div class="button-row"><a class="secondary-button" href="setup.html">코딩 없이 연결하는 안내 ↗</a>${connection ? '<button class="secondary-button" data-action="invite">동료 초대 링크</button>' : ''}</div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer">${connection ? '공유 연결 정보 변경' : '이미 공유 주소가 있어요'}</summary><form id="connectionForm" class="dialog-form" style="margin-top:13px"><label>Apps Script 웹 앱 URL<input name="url" type="url" required value="${esc(connection?.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label><label>팀 키<input name="key" type="password" required autocomplete="off" value="${esc(connection?.key || read(KEYS.pending, '') || '')}"></label><button class="primary-button">연결 확인하고 저장</button></form></details>${connection ? '<button data-action="disconnect" class="text-button" style="margin-top:13px">이 기기에서 공유 연결 해제</button>' : ''}</section><section class="settings-block"><h3>요일별 대표님과 점심</h3><p class="dialog-copy">체크한 요일에는 대표님과 점심으로 자동 표시돼요. 나머지 날은 미선택으로 시작합니다. 공유 연결 시 이 기본 일정도 팀 전체에 적용됩니다.</p><form id="scheduleForm" class="dialog-form" data-config-revision="${connection ? shared.configRevision : -1}">${MEMBERS.map(m => `<div><span style="font-size:12px;font-weight:650">${m.name} <small style="font-weight:400;color:#858e7a">${m.team}</small></span><div class="checkbox-grid">${[1,2,3,4,5].map(n => `<label><input type="checkbox" name="${m.id}" value="${n}" ${s.ceoDays[m.id].includes(n) ? 'checked' : ''}>${'일월화수목금토'[n]}</label>`).join('')}</div></div>`).join('')}<label>기본 일정 적용 마지막 날<input name="scheduleEnd" type="date" required min="2020-01-01" max="2099-12-31" value="${s.scheduleEnd}"></label><label>기본 만남 시간 · 수정 가능<input name="meetingTime" type="time" required value="${s.meetingTime}"></label><button class="primary-button">기본 일정 저장</button></form></section>`);
   }
   async function saveConnection(next) {
     if (!validConnection(next)) { toast('웹 앱 /exec 주소와 팀 키를 확인해 주세요.'); return false; }
@@ -456,12 +545,28 @@
     if (action === 'identity') setIdentity(id);
     else if (action === 'chooseIdentity') { setIdentity(id); closeDialog(); }
     else if (action === 'availability') showAvailability();
+    else if (action === 'separate') {
+      if (b.dataset.member && b.dataset.member !== identity) return toast('내 이름을 다시 선택해 주세요.');
+      showPairDialog(b.dataset.date || date);
+    }
+    else if (action === 'pairDetails') showPairDetails(id, b.dataset.date || date);
+    else if (['pairAccept', 'pairDecline', 'pairCancel', 'pairLeave'].includes(action)) {
+      if (b.dataset.member && b.dataset.member !== identity) return toast('내 이름을 다시 선택해 주세요.');
+      b.disabled = true;
+      if (await mutate(action, { pairId: id }, b.dataset.date || date)) {
+        if ($('appDialog').open) closeDialog();
+        toast({ pairAccept: '두 사람의 따로 점심 모임이 정해졌어요.', pairDecline: '초대를 거절했어요.', pairCancel: '초대를 취소했어요.', pairLeave: '모임에서 나왔어요. 내 점심 여부를 다시 골라 주세요.' }[action]);
+      } else b.disabled = false;
+    }
+    else if (action === 'guideFilter') { guideCategory = ['전체', ...GUIDE_CATEGORIES].includes(id) ? id : '전체'; guideLimit = 6; renderGuide(); }
+    else if (action === 'guideMore') { guideLimit += 6; renderGuide(); }
+    else if (action === 'guideAdd') await addGuidePlace(id);
     else if (action === 'absence') showAbsence(b.dataset.date || date, b.dataset.member || identity);
     else if (action === 'setAvailability') {
       const targetDate = b.dataset.date || date;
       if (b.dataset.member && b.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
       b.disabled = true;
-      if (await mutate('availability', { value: id }, targetDate)) { closeDialog(); toast(dateText(targetDate) + ' 참석 상태를 바꿨어요.'); }
+      if (await mutate('availability', { value: id }, targetDate)) { if ($('appDialog').open) closeDialog(); toast(dateText(targetDate) + ' 참석 상태를 바꿨어요.'); }
       else b.disabled = false;
     }
     else if (action === 'vote') {
@@ -495,9 +600,15 @@
     }
   });
   document.addEventListener('submit', async e => {
-    const form = e.target; if (!['decisionForm','addForm','noteForm','connectionForm','scheduleForm','absenceForm','menuImageForm'].includes(form.id)) return;
+    const form = e.target; if (!['decisionForm','addForm','noteForm','connectionForm','scheduleForm','absenceForm','menuImageForm','pairInviteForm'].includes(form.id)) return;
     e.preventDefault(); const f = new FormData(form);
-    if (form.id === 'menuImageForm') { await saveMenuImage(form); }
+    if (form.id === 'pairInviteForm') {
+      if (form.dataset.member !== identity) return toast('내 이름을 다시 선택해 주세요.');
+      const submit = form.querySelector('button'); submit.disabled = true;
+      if (await mutate('pairInvite', { id: 'pair_' + uid(), to: String(f.get('to') || '') }, form.dataset.date)) { closeDialog(); toast('따로 먹기 초대를 보냈어요. 동료의 수락을 기다려 주세요.'); }
+      else submit.disabled = false;
+    }
+    else if (form.id === 'menuImageForm') { await saveMenuImage(form); }
     else if (form.id === 'decisionForm') { if (await mutate('decision', { placeId: $('decisionPlace').value, time: $('meetingTime').value })) toast('오늘 점심을 확정했어요!'); }
     else if (form.id === 'absenceForm') {
       if (form.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
@@ -510,6 +621,7 @@
     else if (form.id === 'noteForm') { if (await mutate('note', { placeId: form.dataset.id, text: f.get('text') })) { closeDialog(); toast('메뉴 메모를 저장했어요.'); } }
     else if (form.id === 'connectionForm') { const submit = form.querySelector('button'); submit.disabled = true; if (await saveConnection({ url: String(f.get('url')).trim(), key: String(f.get('key')).trim() })) { closeDialog(); toast('공유 연결이 준비됐어요. 동료를 초대해 주세요.'); } else submit.disabled = false; }
     else if (form.id === 'scheduleForm') {
+      if (connection && Number(form.dataset.configRevision) !== shared.configRevision) { showSettings(); return toast('다른 동료가 기본 일정을 바꿨어요. 새로 불러온 설정을 확인한 뒤 저장해 주세요.'); }
       const payload = { scheduleEnd: f.get('scheduleEnd'), meetingTime: f.get('meetingTime'), ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, f.getAll(m.id).map(Number)])) };
       if (!C.validDate(payload.scheduleEnd)) return toast('일정 적용 기간을 확인해 주세요.');
       if (await mutate('settings', payload)) { closeDialog(); toast('기본 일정을 저장했어요.'); }
@@ -522,6 +634,7 @@
   });
   $('identitySelect').innerHTML += teamGroups(MEMBERS).map(group => `<optgroup label="${esc(group.team)}">${group.members.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</optgroup>`).join('');
   $('identitySelect').addEventListener('change', e => { if (e.target.value) setIdentity(e.target.value); else { identity = ''; try { localStorage.removeItem(KEYS.identity); } catch (_) {} render(); } });
+  $('guideSearch').addEventListener('input', e => { guideQuery = e.target.value; guideLimit = 6; renderGuide(); });
   $('dateInput').addEventListener('change', e => changeDate(e.target.value));
   $('prevDate').onclick = () => changeDate(C.shiftDate(date, -1)); $('nextDate').onclick = () => changeDate(C.shiftDate(date, 1)); $('todayBtn').onclick = () => changeDate(C.today());
   $('settingsBtn').onclick = showSettings; $('addPlaceBtn').onclick = showAddPlace; $('refreshMenu').onclick = () => loadMenu(true);

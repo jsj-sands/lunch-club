@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const C = require('../core.js');
+const G = require('../restaurant-guide.js');
 
 const root = path.resolve(__dirname, '..');
 const monday = '2026-10-19';
@@ -12,6 +13,7 @@ const fixedTime = '2026-10-19T03:26:00.000Z';
 const localKey = 'sandsLunch.local.v1';
 const imageKey = 'sandsLunch.menuImages.v1';
 const connection = { url: 'https://script.google.com/macros/s/test_deployment/exec', key: 'a'.repeat(64) };
+const sharedFeatures = { menuImages: true, explicitAttendance: true, lunchPairs: true };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNQAAAABJRU5ErkJggg==';
 // A valid 2 x 2 JPEG returned by the canvas fixture. Pixel rendering is not tested.
 const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7CooorID/2Q==';
@@ -57,10 +59,10 @@ function dailyMembers(ui, kind) {
 
 function assertDailyBoard(ui, date, expected) {
   const board = ui.element('membersGrid').innerHTML;
-  assert.equal((board.match(/\bid="dailyGroup-(?:in|ceo|out)"/g) || []).length, 3);
+  assert.equal((board.match(/\bid="dailyGroup-(?:in|ceo|out|pending)"/g) || []).length, 4);
   assert.equal((board.match(/\bid="dailyMember-[^"]+"/g) || []).length, 10);
   const all = [];
-  for (const kind of ['in', 'ceo', 'out']) {
+  for (const kind of ['in', 'ceo', 'out', 'pending']) {
     assert.match(ui.element('dailyGroup-' + kind).className, new RegExp('\\bis-' + kind + '\\b'));
     const ids = dailyMembers(ui, kind);
     assert.deepEqual(ids, expected[kind]);
@@ -240,6 +242,7 @@ async function boot(options = {}) {
   });
   context.window = context;
   vm.runInContext(fs.readFileSync(path.join(root, 'core.js'), 'utf8'), context, { filename: 'core.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'restaurant-guide.js'), 'utf8'), context, { filename: 'restaurant-guide.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), context, { filename: 'app.js' });
 
   const element = id => { assert.ok(elements.has(id), `Missing rendered element #${id}`); return elements.get(id); };
@@ -255,7 +258,8 @@ async function boot(options = {}) {
     await settle();
   }
   function findControl(attributes, tagName) {
-    const markup = [html, ...[...elements.values()].map(el => el.innerHTML)].join('\n');
+    const markup = elements.get('appDialog')?.open ? elements.get('dialogContent').innerHTML
+      : [html, ...[...elements.values()].map(el => el.innerHTML)].join('\n');
     const match = [...markup.matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g)]
       .map(m => ({ tag: m[1], attrs: attrs(m[2]) }))
       .find(m => (!tagName || m.tag === tagName) && Object.entries(attributes).every(([key, value]) => m.attrs[key] === value));
@@ -274,10 +278,9 @@ async function boot(options = {}) {
     input.checked = checked; await dispatch('change', input);
   }
   async function press(id) {
-    const target = element(id), event = { target, preventDefault() {} };
-    if (target.onclick) await target.onclick(event);
-    for (const fn of target.events.get('click') || []) await fn(event);
-    await settle();
+    const target = element(id);
+    assert.equal(target.disabled, false, 'Cannot press disabled control #' + id);
+    await dispatch('click', target);
   }
   async function selectImage(scope) {
     await action('menuImageUpload');
@@ -290,6 +293,7 @@ async function boot(options = {}) {
   }
   await settle();
   return { html, element, action, press, dispatch, settle, selectImage, findControl, chooseDate, selectIdentity, toggleCancelled, requests, publicRequests, posted, imageWork,
+    visibilityChange: () => dispatch('visibilitychange', document),
     saved: key => storage.has(key) ? JSON.parse(storage.get(key)) : undefined };
 }
 
@@ -301,10 +305,10 @@ test('기존 다섯 명의 저장값에서 열 멤버를 한 번씩 표시하고
   assert.match(ui.element('identitySelect').innerHTML, /value="jingi">천진기/);
   assert.match(ui.element('membersGrid').innerHTML, /천진기/);
   assert.match(ui.element('membersGrid').innerHTML, /디자인팀/);
-  assert.equal(ui.element('heroCount').textContent, '오늘 함께 6명');
+  assert.equal(ui.element('heroCount').textContent, '오늘 함께 0명');
   assertDailyBoard(ui, monday, {
-    in: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'seongjun'],
-    ceo: ['minjun', 'hyunju', 'juri', 'hyunsu'], out: []
+    in: [], ceo: ['minjun', 'hyunju', 'juri', 'hyunsu'], out: [],
+    pending: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'seongjun']
   });
   const identityGroups = [...ui.element('identitySelect').innerHTML.matchAll(/<optgroup\b[^>]*label="([^"]+)"[^>]*>([\s\S]*?)<\/optgroup>/g)]
     .map(match => [match[1], [...match[2].matchAll(/<option\b[^>]*value="([^"]+)"[^>]*>/g)].map(option => option[1])]);
@@ -328,13 +332,21 @@ test('기존 다섯 명의 저장값에서 열 멤버를 한 번씩 표시하고
   assert.doesNotMatch(visibleText(ui.element('dialogContent').innerHTML), /CEO/);
 });
 
-test('천진기의 선택이 화면과 저장값에 반영되고 화요일에는 참석 변경을 먼저 안내한다', async () => {
+test('함께 먹기를 직접 선택해야 녹색 그룹과 투표에 반영되고 화요일 대표님 일정도 자동 참석하지 않는다', async () => {
   const ui = await boot();
+  await ui.action('vote', 'lunchtime');
+  assert.equal(ui.saved(localKey), undefined);
+  assert.match(ui.element('dialogContent').innerHTML, /함께/);
+  await ui.press('closeDialog');
+  await ui.press('choiceIn');
+  assert.equal(ui.saved(localKey).days[monday].overrides.jingi, 'in');
+  assert.deepEqual(dailyMembers(ui, 'in'), ['jingi']);
+  assert.equal(ui.element('choiceIn').getAttribute('aria-pressed'), 'true');
   await ui.action('vote', 'lunchtime');
   assert.equal(ui.saved(localKey).days[monday].votes.jingi, 'lunchtime');
   assert.match(ui.element('voteResults').innerHTML, /천진기/);
   await ui.chooseDate('2026-10-20');
-  assert.equal(ui.element('heroCount').textContent, '이날 함께 5명');
+  assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
   await ui.action('vote', 'megazone');
   assert.match(ui.element('dialogContent').innerHTML, /대표님과 점심/);
   assert.equal(ui.saved(localKey).days['2026-10-20'], undefined);
@@ -344,26 +356,27 @@ test('새 다섯 명을 화면에서 각각 선택하고 투표하면 해당 이
   const ui = await boot();
   const members = [['minjun','최민준'],['seongeun','오성은'],['yunseok','장윤석'],['jiwoo','서지우'],['hyunju','조현주']];
   await ui.chooseDate('2026-10-22');
-  assert.equal(ui.element('heroCount').textContent, '이날 함께 9명');
-  for (const [id, name] of members) {
+  assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
+  for (const [index, [id, name]] of members.entries()) {
     await ui.selectIdentity(id);
     assert.equal(ui.element('identitySelect').value, id);
     assert.equal(ui.saved('sandsLunch.identity.v1'), id);
     if (id === 'minjun') {
       await ui.action('dailyMember', id, { 'data-date': '2026-10-22' });
       assert.match(ui.element('dialogContent').innerHTML, /대표님과 점심/);
-      await ui.action('setAvailability', 'in');
-      assert.equal(ui.saved(localKey).days['2026-10-22'].overrides.minjun, 'in');
-      assert.equal(ui.element('heroCount').textContent, '이날 함께 10명');
+      await ui.press('closeDialog');
     }
+    await ui.press('choiceIn');
+    assert.equal(ui.saved(localKey).days['2026-10-22'].overrides[id], 'in');
+    assert.equal(ui.element('heroCount').textContent, `이날 함께 ${index + 1}명`);
     await ui.action('vote', 'lunchtime');
     assert.equal(ui.saved(localKey).days['2026-10-22'].votes[id], 'lunchtime');
     assert.ok(ui.element('voteResults').innerHTML.includes(name));
   }
-  assert.match(ui.element('voteSummary').textContent, /10명 중 5명/);
+  assert.match(ui.element('voteSummary').textContent, /5명 중 5명/);
 });
 
-test('중복 주간표 없이 식당 선택 위의 하루 현황에 참석·대표님과 점심·불참 세 그룹을 표시한다', async () => {
+test('하루 현황의 네 그룹 위에 내 선택과 전체 대표님 일정 취소를 구분해서 표시한다', async () => {
   const ui = await boot();
   assert.ok(ui.html.indexOf('id="peopleSection"') < ui.html.indexOf('id="membersGrid"'));
   assert.ok(ui.html.indexOf('id="membersGrid"') < ui.html.indexOf('id="menuSection"'));
@@ -373,14 +386,21 @@ test('중복 주간표 없이 식당 선택 위의 하루 현황에 참석·대�
     assert.ok(ui.html.indexOf('id="peopleSection"') < ui.html.indexOf('id="' + id + '"'));
     assert.ok(ui.html.indexOf('id="' + id + '"') < ui.html.indexOf('id="membersGrid"'));
   }
+  assert.ok(ui.html.indexOf('id="myResponsePanel"') < ui.html.indexOf('id="identitySelect"'));
+  assert.ok(ui.html.indexOf('id="myResponsePanel"') < ui.html.indexOf('id="ceoControls"'));
+  assert.ok(ui.html.indexOf('id="ceoControls"') < ui.html.indexOf('id="membersGrid"'));
+  for (const id of ['choiceIn', 'choiceSeparate', 'choiceOut']) assert.equal(ui.element(id).tagName, 'BUTTON');
+  assert.match(ui.element('myResponseContent').innerHTML, /함께 먹기/);
+  assert.match(ui.element('myResponseContent').innerHTML, /따로 먹기/);
+  assert.match(ui.element('myResponseContent').innerHTML, /안 먹기/);
   assert.match(ui.element('membersGrid').className, /\bdaily-groups\b/);
   assert.doesNotMatch(ui.html + ui.element('membersGrid').innerHTML, /(?:id="(?:weekSection|weekTableScroll|weekHead|weekBody|prevWeek|thisWeek|nextWeek)"|data-action="week[^\"]*"|class="member-card)/);
   await ui.chooseDate('2026-10-20');
   assertDailyBoard(ui, '2026-10-20', {
-    in: ['yunchul', 'seongeun', 'yunseok', 'minjun', 'hyunju'],
-    ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: []
+    in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: [],
+    pending: ['yunchul', 'seongeun', 'yunseok', 'minjun', 'hyunju']
   });
-  assert.equal(ui.element('heroCount').textContent, '이날 함께 5명');
+  assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
   assert.equal(ui.element('ceoCancelled').checked, false);
   assert.match(visibleText(dailyGroup(ui, 'ceo')), /대표님과 점심/);
 });
@@ -406,9 +426,9 @@ test('대표님과 점심 취소·복원은 선택한 하루에만 저장하고 
       assert.equal(saved[tuesday].overrides.juri, 'ceo');
       if (date === tuesday) {
         assertDailyBoard(ui, date, checked ? {
-          in: ['seongeun', 'yunseok', 'jiwoo', 'jingi', 'minjun', 'hyunju', 'hyunsu', 'seongjun'], ceo: ['juri'], out: ['yunchul']
+          in: [], ceo: ['juri'], out: ['yunchul'], pending: ['seongeun', 'yunseok', 'jiwoo', 'jingi', 'minjun', 'hyunju', 'hyunsu', 'seongjun']
         } : {
-          in: ['seongeun', 'yunseok', 'minjun', 'hyunju'], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: ['yunchul']
+          in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: ['yunchul'], pending: ['seongeun', 'yunseok', 'minjun', 'hyunju']
         });
         await ui.action('dailyMember', 'yunchul', { 'data-date': date });
         assert.match(ui.element('dialogContent').innerHTML, /병원에 가요/);
@@ -423,7 +443,8 @@ test('본인 이름에서 선택일의 불참·참석·기본 복원을 저장�
   await ui.chooseDate(target);
   await ui.action('dailyMember','jingi',{ 'data-date': target });
   assert.match(ui.element('dialogTitle').textContent, /10월 21일/);
-  await ui.action('absence',undefined,{ 'data-date': target });
+  await ui.press('closeDialog');
+  await ui.press('choiceOut');
   assert.equal(ui.element('absenceForm').dataset.date, target);
   assert.equal(ui.element('absenceForm').dataset.member, 'jingi');
   ui.element('absenceReason').value = '병원에 가요';
@@ -439,6 +460,12 @@ test('본인 이름에서 선택일의 불참·참석·기본 복원을 저장�
   assert.equal(ui.saved(localKey).days[target].absenceReasons.jingi, undefined);
   const wednesday = ui.saved(localKey).days[target];
   await ui.chooseDate('2026-10-20');
+  await ui.press('cancelMyCeo');
+  assert.equal(ui.saved(localKey).days['2026-10-20'].overrides.jingi, 'pending');
+  assert.equal(ui.saved(localKey).days['2026-10-20'].ceoCancelled, false);
+  assert.ok(dailyMembers(ui, 'pending').includes('jingi'));
+  assert.ok(dailyMembers(ui, 'ceo').includes('jiwoo'));
+  assert.deepEqual(dailyMembers(ui, 'in'), []);
   await ui.action('dailyMember','jingi',{ 'data-date': '2026-10-20' });
   await ui.action('setAvailability','in',{ 'data-date': '2026-10-20' });
   assert.equal(ui.saved(localKey).days['2026-10-20'].overrides.jingi, 'in');
@@ -453,7 +480,16 @@ test('본인 이름에서 선택일의 불참·참석·기본 복원을 저장�
   assert.doesNotMatch(ui.element('dialogContent').innerHTML, /data-action="(?:setAvailability|absence|chooseIdentity)"/);
   assert.deepEqual(ui.saved(localKey), before);
   assert.equal(ui.element('dateInput').value, '2026-10-20');
+  await ui.press('closeDialog');
+  await ui.action('setAvailability', 'pending', { 'data-date': '2026-10-20' });
+  assert.equal(ui.saved(localKey).days['2026-10-20'].overrides.jingi, 'pending');
+  assert.ok(dailyMembers(ui, 'pending').includes('jingi'));
+  assert.deepEqual(ui.saved(localKey).days[target], wednesday);
   const newcomer = await boot({ identity: null });
+  await newcomer.press('choiceIn');
+  assert.match(newcomer.element('dialogTitle').textContent, /내 이름/);
+  assert.equal(newcomer.saved(localKey), undefined);
+  await newcomer.press('closeDialog');
   await newcomer.chooseDate('2026-10-20');
   await newcomer.action('dailyMember','jiwoo',{ 'data-date': '2026-10-20' });
   assert.equal(newcomer.saved('sandsLunch.identity.v1'), undefined);
@@ -471,48 +507,48 @@ test('상단 이전 날·다음 날·날짜 선택·오늘 이동은 현황판 �
   assert.equal(ui.element('peopleTitle').textContent, '오늘 점심 현황');
   await ui.press('prevDate');
   assert.equal(ui.element('dateInput').value, '2026-10-18');
-  assertDailyBoard(ui, '2026-10-18', { in: [], ceo: [], out: orderedMembers });
+  assertDailyBoard(ui, '2026-10-18', { in: [], ceo: [], out: [], pending: orderedMembers });
   assert.match(ui.element('peopleTitle').textContent, /선택한 날의 점심/);
   await ui.press('nextDate');
   assert.equal(ui.element('dateInput').value, monday);
   await ui.press('nextDate');
   assert.equal(ui.element('dateInput').value, '2026-10-20');
   assertDailyBoard(ui, '2026-10-20', {
-    in: ['yunchul', 'seongeun', 'yunseok', 'minjun', 'hyunju'],
-    ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: []
+    in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: [],
+    pending: ['yunchul', 'seongeun', 'yunseok', 'minjun', 'hyunju']
   });
   await ui.press('nextDate');
   assert.equal(ui.element('dateInput').value, '2026-10-21');
   assertDailyBoard(ui, '2026-10-21', {
-    in: ['jiwoo', 'jingi', 'minjun', 'hyunju', 'juri', 'hyunsu', 'seongjun'],
-    ceo: ['yunchul', 'seongeun', 'yunseok'], out: []
+    in: [], ceo: ['yunchul', 'seongeun', 'yunseok'], out: [],
+    pending: ['jiwoo', 'jingi', 'minjun', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   await ui.press('todayBtn');
   assert.equal(ui.element('dateInput').value, monday);
   await ui.chooseDate('2026-10-22');
   assert.equal(ui.element('dateInput').value, '2026-10-22');
   assertDailyBoard(ui, '2026-10-22', {
-    in: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'hyunju', 'juri', 'hyunsu', 'seongjun'],
-    ceo: ['minjun'], out: []
+    in: [], ceo: ['minjun'], out: [],
+    pending: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   await ui.press('todayBtn');
   assert.equal(ui.element('dateInput').value, monday);
   assert.equal(ui.element('peopleTitle').textContent, '오늘 점심 현황');
-  assert.equal(ui.element('heroCount').textContent, '오늘 함께 6명');
+  assert.equal(ui.element('heroCount').textContent, '오늘 함께 0명');
 });
 
 test('아직 조회하지 않은 날짜는 공유 응답 전까지 현황 확인 중으로 표시하고 응답 후 실제 상태를 정렬한다', async () => {
   const target = '2026-10-26';
-  const record = C.cleanDay({ ceoCancelled: true, overrides: { minjun: 'ceo', jingi: 'out' }, absenceReasons: { jingi: '병원에 가요' } });
+  const record = C.cleanDay({ ceoCancelled: true, overrides: { minjun: 'ceo', jingi: 'out', seongeun: 'in' }, absenceReasons: { jingi: '병원에 가요' } });
   let releaseResponse;
   const responseGate = new Promise(resolve => { releaseResponse = resolve; });
   const ui = await boot({ connected: true, server: async request => {
     assert.equal(request.action, 'state');
     if (request.date === target) await responseGate;
-    return { ok: true, days: stateDaysFor(request.date, { [target]: record }), settings: C.settings(), configRevision: 0,
-      features: { menuImages: true }, menuImages: {} };
+    return { ok: true, serverVersion: 3, days: stateDaysFor(request.date, { [target]: record }), settings: C.settings(), configRevision: 0,
+      features: sharedFeatures, menuImages: {} };
   } });
-  assert.equal(ui.element('heroCount').textContent, '오늘 함께 6명');
+  assert.equal(ui.element('heroCount').textContent, '오늘 함께 0명');
   try {
     await ui.chooseDate(target);
     assert.ok(ui.requests.some(request => request.date === target));
@@ -521,31 +557,112 @@ test('아직 조회하지 않은 날짜는 공유 응답 전까지 현황 확인
     assert.equal(ui.element('ceoCancelled').disabled, true);
     assert.equal(ui.element('membersGrid').getAttribute('aria-busy'), 'true');
     assert.doesNotMatch(ui.element('membersGrid').innerHTML, /data-action="dailyMember"/);
-    for (const kind of ['in', 'ceo', 'out']) {
+    for (const kind of ['in', 'ceo', 'out', 'pending']) {
       assert.deepEqual(dailyMembers(ui, kind), []);
       assert.match(visibleText(dailyGroup(ui, kind)), /–\s*명/);
       assert.match(visibleText(dailyGroup(ui, kind)), /현황 확인 중/);
     }
   } finally { releaseResponse(); }
   await ui.settle();
-  assert.equal(ui.element('heroCount').textContent, '이날 함께 8명');
+  assert.equal(ui.element('heroCount').textContent, '이날 함께 1명');
   assert.equal(ui.element('ceoCancelled').disabled, false);
   assert.equal(ui.element('ceoCancelled').checked, true);
   assert.equal(ui.element('membersGrid').getAttribute('aria-busy'), 'false');
   assertDailyBoard(ui, target, {
-    in: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'hyunju', 'juri', 'hyunsu', 'seongjun'],
-    ceo: ['minjun'], out: ['jingi']
+    in: ['seongeun'], ceo: ['minjun'], out: ['jingi'],
+    pending: ['yunchul', 'yunseok', 'jiwoo', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   assert.match(ui.element('dailyMember-jingi').getAttribute('aria-label'), /병원에 가요/);
   assert.equal(ui.posted.length, 0);
+});
+
+test('따로 먹기 초대는 상대 수락 후에만 두 사람 모임이 되고 나가기·거절·개별 식사를 처리한다', async () => {
+  const target = '2026-10-20', days = {}, receipts = {}, bodies = [];
+  const server = request => {
+    assert.equal(request.action, 'state');
+    return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date, days),
+      settings: C.settings(), configRevision: 0, menuImages: {}, receipt: receipts[request.receipt] };
+  };
+  const post = async (url, init) => {
+    assert.equal(url, connection.url);
+    const body = JSON.parse(init.body); bodies.push(body);
+    days[body.date] = C.applyOperation(days[body.date], body.date, C.settings(), body.op);
+    receipts[body.op.id] = { ok: true }; return { type: 'opaque', status: 0 };
+  };
+  const sender = await boot({ connected: true, server, post });
+  await sender.chooseDate(target);
+  const invite = async () => {
+    await sender.press('choiceSeparate');
+    assert.equal(sender.element('pairInviteForm').dataset.date, target);
+    assert.equal(sender.element('pairInviteForm').dataset.member, 'jingi');
+    sender.element('pairPartner').value = 'jiwoo';
+    await sender.dispatch('submit', sender.element('pairInviteForm'));
+    assert.equal(sender.element('appDialog').open, false);
+    return days[target].pairs[0].id;
+  };
+  const firstPair = await invite();
+  assert.match(firstPair, /^pair_[a-f0-9]{24}$/);
+  assert.equal(days[target].overrides.jingi, 'separate');
+  assert.equal(days[target].overrides.jiwoo, undefined, 'An invitation must preserve the recipient’s choice');
+  assert.equal(days[target].pairs[0].status, 'pending');
+  assert.equal(sender.element('pairBoard').hidden, false);
+  assert.match(sender.element('pairBoard').innerHTML, /lunch-pair is-pending/);
+  assert.ok(dailyMembers(sender, 'ceo').includes('jiwoo'));
+  assert.doesNotMatch(sender.element('membersGrid').innerHTML, /id="dailyMember-jingi"/);
+  await sender.action('pairDetails', 'jingi', { 'data-date': target });
+  assert.match(sender.element('dialogContent').innerHTML, /data-action="pairCancel"/);
+  assert.doesNotMatch(sender.element('dialogContent').innerHTML, /data-action="pairAccept"/);
+  await sender.press('closeDialog');
+
+  const recipient = await boot({ connected: true, server, post, identity: 'jiwoo' });
+  await recipient.chooseDate(target);
+  assert.match(recipient.element('pairInvitations').innerHTML, /천진기/);
+  assert.ok(dailyMembers(recipient, 'ceo').includes('jiwoo'));
+  await recipient.action('pairAccept', firstPair, { 'data-date': target, 'data-member': 'jiwoo' });
+  assert.equal(days[target].pairs[0].status, 'accepted');
+  assert.equal(days[target].overrides.jiwoo, 'separate');
+  assert.match(recipient.element('pairBoard').innerHTML, /lunch-pair is-accepted/);
+  assert.match(visibleText(recipient.element('pairBoard').innerHTML), /서지우\s*·\s*천진기/);
+  assert.doesNotMatch(recipient.element('membersGrid').innerHTML, /id="dailyMember-(?:jingi|jiwoo)"/);
+  assert.equal(['in', 'ceo', 'out', 'pending'].flatMap(kind => dailyMembers(recipient, kind)).length, 8);
+  assert.equal(recipient.element('heroCount').textContent, '이날 함께 0명');
+  assert.equal(recipient.element('pairInvitations').innerHTML, '');
+  await sender.chooseDate(target);
+  assert.match(sender.element('pairBoard').innerHTML, /lunch-pair is-accepted/);
+
+  await recipient.action('pairDetails', 'jiwoo', { 'data-date': target });
+  await recipient.action('pairLeave', firstPair, { 'data-date': target, 'data-member': 'jiwoo' });
+  assert.deepEqual(days[target].pairs, []);
+  assert.equal(days[target].overrides.jiwoo, 'pending');
+  assert.equal(days[target].overrides.jingi, 'separate');
+  await sender.chooseDate(target);
+  assert.match(sender.element('pairBoard').innerHTML, /lunch-pair is-solo/);
+  const secondPair = await invite();
+  await recipient.chooseDate(target);
+  await recipient.action('pairDecline', secondPair, { 'data-date': target, 'data-member': 'jiwoo' });
+  assert.deepEqual(days[target].pairs, []);
+  assert.equal(days[target].overrides.jiwoo, 'pending');
+  await sender.chooseDate(target);
+  await sender.press('choiceSeparate');
+  await sender.action('setAvailability', 'separate', { 'data-date': target, 'data-member': 'jingi' });
+  assert.match(sender.element('pairBoard').innerHTML, /lunch-pair is-solo/);
+  assert.deepEqual(days[target].pairs, []);
+  assert.deepEqual(dailyMembers(sender, 'in'), []);
+  assert.deepEqual(Object.keys(days), [target]);
+  assert.ok(bodies.every(body => body.date === target));
+  assert.deepEqual(bodies.map(body => body.op.type), ['pairInvite', 'pairAccept', 'pairLeave', 'pairInvite', 'pairDecline', 'availability']);
+  for (const body of bodies) {
+    const ui = body.op.actor === 'jingi' ? sender : recipient;
+    assert.ok(ui.requests.some(request => request.receipt === body.op.id && request.date === target));
+  }
 });
 
 test('공유 취소와 본인 일정 수정은 선택일로 POST하고 수신 확인 후 동료 현황에 반영한다', async () => {
   const days = {}, receipts = {}, bodies = [];
   const server = request => {
     assert.equal(request.action, 'state');
-    return { ok: true, days: stateDaysFor(request.date, days), settings: C.settings(), configRevision: 0,
-      features: { menuImages: true }, menuImages: {}, receipt: receipts[request.receipt] };
+    return { ok: true, serverVersion: 3, days: stateDaysFor(request.date, days), settings: C.settings(), configRevision: 0,
+      features: sharedFeatures, menuImages: {}, receipt: receipts[request.receipt] };
   };
   const post = async (url, init) => {
     assert.equal(url, connection.url);
@@ -556,7 +673,8 @@ test('공유 취소와 본인 일정 수정은 선택일로 POST하고 수신 �
   const ui = await boot({ connected: true, server, post });
   await ui.chooseDate('2026-10-20');
   await ui.toggleCancelled(true);
-  assert.equal(ui.element('heroCount').textContent, '이날 함께 10명');
+  assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
+  assert.deepEqual(dailyMembers(ui, 'pending'), orderedMembers);
   await ui.chooseDate('2026-10-21');
   await ui.action('dailyMember','jingi',{ 'data-date': '2026-10-21' });
   await ui.action('setAvailability','ceo',{ 'data-date': '2026-10-21' });
@@ -589,8 +707,8 @@ test('저장 응답을 기다리며 토요일로 이동해도 수정 날짜를 �
     assert.equal(request.action, 'state');
     if (request.date === saturday && !request.receipt) saturdayReads++;
     if (request.receipt) await receiptGate;
-    return { ok: true, days: stateDaysFor(request.date,days), settings: C.settings(), configRevision: 0,
-      features: { menuImages: true }, menuImages: request.date === saturday ? { ['day:' + saturday]: meta } : {},
+    return { ok: true, serverVersion: 3, days: stateDaysFor(request.date,days), settings: C.settings(), configRevision: 0,
+      features: sharedFeatures, menuImages: request.date === saturday ? { ['day:' + saturday]: meta } : {},
       receipt: receipts[request.receipt] };
   };
   const post = async (url, init) => {
@@ -605,7 +723,8 @@ test('저장 응답을 기다리며 토요일로 이동해도 수정 날짜를 �
     await ui.settle();
     assert.equal(bodies[0].date, '2026-10-20');
     assert.ok(ui.requests.some(request => request.receipt === bodies[0].op.id && request.date === '2026-10-20'));
-    assert.equal(ui.element('heroCount').textContent, '이날 함께 5명', 'An opaque POST alone must not confirm the new attendance');
+    assert.equal(ui.element('ceoCancelled').checked, false, 'An opaque POST alone must not confirm cancellation');
+    assert.equal(dailyMembers(ui, 'ceo').length, 5);
     await ui.chooseDate(saturday);
     assert.equal(ui.element('dateInput').value, saturday);
   } finally { releaseReceipt(); }
@@ -615,6 +734,56 @@ test('저장 응답을 기다리며 토요일로 이동해도 수정 날짜를 �
   assert.equal(ui.element('dateInput').value, saturday);
   assert.ok(saturdayReads >= 1);
   assert.match(ui.element('restaurantCards').innerHTML, /data:image\/png;base64,/);
+});
+
+test('저장한 맛집 33곳을 종류·검색·더보기로 찾고 지도와 선택일의 점심 후보에 연결한다', async () => {
+  const ui = await boot();
+  const cardCount = () => (ui.element('guideCards').innerHTML.match(/class="guide-card"/g) || []).length;
+  assert.ok(ui.html.indexOf('id="restaurantCards"') < ui.html.indexOf('id="guideSection"'));
+  assert.ok(ui.html.indexOf('id="guideSection"') < ui.html.indexOf('id="addPlaceBtn"'));
+  assert.match(ui.html, /href="https:\/\/naver\.me\/xSBAzufn"/);
+  assert.equal(cardCount(), 6);
+  assert.equal(ui.element('guideResultCount').textContent, '전체 · 33곳');
+  assert.equal(ui.element('guideMore').hidden, false);
+  await ui.press('guideMore');
+  assert.equal(cardCount(), 12);
+  for (const [category, count] of [['한식', 11], ['중식', 3], ['일식', 8], ['양식', 2], ['분식', 5], ['아시안', 4]]) {
+    await ui.action('guideFilter', category);
+    assert.equal(ui.element('guideResultCount').textContent, `${category} · ${count}곳`);
+    assert.equal(cardCount(), Math.min(6, count));
+    assert.deepEqual([...ui.element('guideCards').innerHTML.matchAll(/class="guide-category">([^<]+)</g)].map(match => match[1]), Array(Math.min(6, count)).fill(category));
+    assert.equal(ui.element('guideMore').hidden, count <= 6);
+  }
+  const search = async value => { ui.element('guideSearch').value = value; await ui.dispatch('input', ui.element('guideSearch')); };
+  await search('꾸아');
+  assert.equal(cardCount(), 1);
+  const place = G.restaurants.find(item => item.name === '꾸아 과천디테크점');
+  assert.ok(place);
+  assert.ok(ui.element('guideCards').innerHTML.includes(`href="${place.url}"`));
+  assert.match(ui.element('guideCards').innerHTML, /rel="noopener noreferrer"/);
+  await search('없는식당테스트');
+  assert.equal(cardCount(), 0);
+  assert.equal(ui.element('guideEmpty').hidden, false);
+  assert.equal(ui.element('guideMore').hidden, true);
+  await search('꾸아');
+  assert.equal(ui.element('guideEmpty').hidden, true);
+  await ui.action('guideAdd', place.id);
+  const choice = ui.saved(localKey).days[monday].extras[0];
+  assert.equal(choice.name, place.name);
+  assert.equal(choice.url, place.url);
+  assert.equal(ui.findControl({ 'data-action': 'guideAdd', 'data-id': place.id }).disabled, true);
+  assert.match(ui.element('restaurantCards').innerHTML, /꾸아 과천디테크점/);
+  assert.deepEqual(dailyMembers(ui, 'in'), []);
+  await ui.press('choiceIn');
+  await ui.action('vote', choice.id);
+  assert.equal(ui.saved(localKey).days[monday].votes.jingi, choice.id);
+  const savedMonday = ui.saved(localKey).days[monday];
+  await ui.chooseDate('2026-10-20');
+  assert.equal(ui.findControl({ 'data-action': 'guideAdd', 'data-id': place.id }).disabled, false);
+  await ui.action('guideAdd', place.id);
+  assert.equal(ui.saved(localKey).days['2026-10-20'].extras[0].name, place.name);
+  assert.deepEqual(ui.saved(localKey).days[monday], savedMonday);
+  assert.equal(ui.requests.length, 0);
 });
 
 test('공유 연결 전에도 메가존 주간 식단 다섯 날짜를 조회하고 선택한 날로 이동한다', async () => {
@@ -648,7 +817,7 @@ test('독립된 두 공유 세션에서 같은 주간 사진을 불러오고 다
   const meta = { id: 'img_test_week', scope: 'week', date: monday, startDate: monday, endDate: '2026-10-25',
     name: '런치타임 주간 식단.png', mimeType: 'image/png', size: 67, uploadedBy: 'jingi', uploadedAt: fixedTime };
   const server = request => {
-    if (request.action === 'state') return { ok: true, serverVersion: 2, features: { menuImages: true },
+    if (request.action === 'state') return { ok: true, serverVersion: 3, features: sharedFeatures,
       days: stateDaysFor(request.date), settings: {}, configRevision: 0, menuImages: { ['week:' + monday]: meta } };
     if (request.action === 'menuImage') return { ok: true, image: { ...meta, dataUrl: png } };
     throw new Error('Unexpected action ' + request.action);
@@ -676,7 +845,7 @@ function sharedImageServer(receiptGate) {
     async read(request) {
       if (request.action === 'state') {
         if (request.receipt && receiptGate) await receiptGate;
-        return { ok: true, serverVersion: 2, features: { menuImages: true }, days: stateDaysFor(request.date), settings: {}, configRevision: 0,
+        return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date), settings: {}, configRevision: 0,
           menuImages: Object.fromEntries(Object.entries(images).map(([slot, image]) => {
             const { dataUrl, ...meta } = image; return [slot, meta];
           })), receipt: request.receipt ? receipts[request.receipt] : undefined };
@@ -762,14 +931,52 @@ test('공유 연결 전 주간·하루 사진은 이 기기에만 저장하고 P
   assert.equal(ui.posted.length, 0); assert.equal(ui.requests.length, 0);
 });
 
-test('공유 이미지 기능이 없는 구버전 서버는 업데이트를 안내하고 업로드하지 않는다', async () => {
+test('설정 폼을 연 뒤 동료가 설정을 바꾸면 오래된 폼 제출을 막고 최신 설정으로 다시 보여준다', async () => {
+  let configRevision = 1, settings = C.settings();
   const ui = await boot({ connected: true, server: request => {
     assert.equal(request.action, 'state');
-    return { ok: true, days: stateDaysFor(request.date), settings: {}, configRevision: 0, features: {} };
+    return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date),
+      settings: C.clone(settings), configRevision, menuImages: {} };
   } });
-  await ui.action('menuImageUpload');
-  assert.match(ui.element('dialogTitle').textContent, /업데이트/);
-  assert.match(ui.element('dialogContent').innerHTML, /setup\.html#update/);
-  assert.doesNotMatch(ui.element('dialogContent').innerHTML, /id="menuImageForm"/);
-  assert.equal(ui.posted.length, 0);
+  await ui.press('settingsBtn');
+  const staleForm = ui.element('scheduleForm');
+  assert.equal(staleForm.dataset.configRevision, '1');
+  staleForm.querySelector('input[name="meetingTime"]').value = '12:10';
+  settings = C.settings({ ...settings, scheduleEnd: '2026-11-30', meetingTime: '12:30', ceoDays: { ...settings.ceoDays, jingi: [] } });
+  configRevision = 2;
+  await ui.visibilityChange();
+  assert.equal(ui.element('scheduleForm'), staleForm);
+  assert.equal(staleForm.querySelector('input[name="meetingTime"]').value, '12:10');
+  await ui.dispatch('submit', staleForm);
+  assert.equal(ui.posted.length, 0, 'An old form must not overwrite the newer shared settings');
+  assert.equal(ui.element('appDialog').open, true);
+  const freshForm = ui.element('scheduleForm');
+  assert.notEqual(freshForm, staleForm);
+  assert.equal(freshForm.dataset.configRevision, '2');
+  assert.equal(freshForm.querySelector('input[name="meetingTime"]').value, '12:30');
+  assert.equal(freshForm.querySelector('input[name="scheduleEnd"]').value, '2026-11-30');
+  assert.ok(freshForm.children.filter(element => element.attributes.name === 'jingi').every(element => !element.checked));
+});
+
+test('구버전 공유 서버는 새 참석 기능 업데이트를 안내하고 지원하지 않는 쓰기를 막는다', async () => {
+  for (const features of [{}, { menuImages: true }]) {
+    const ui = await boot({ connected: true, server: request => {
+      assert.equal(request.action, 'state');
+      return { ok: true, serverVersion: 2, days: stateDaysFor(request.date), settings: {}, configRevision: 0, features };
+    } });
+    assert.match(ui.element('myResponseContent').innerHTML, /setup\.html#update/);
+    for (const id of ['choiceIn', 'choiceSeparate', 'choiceOut', 'ceoCancelled']) assert.equal(ui.element(id).disabled, true);
+    await ui.action('dailyMember', 'jingi', { 'data-date': monday });
+    await ui.action('setAvailability', 'in', { 'data-date': monday });
+    assert.match(ui.element('toast').textContent, /업데이트/);
+    assert.deepEqual(dailyMembers(ui, 'in'), []);
+    await ui.press('closeDialog');
+    if (!features.menuImages) {
+      await ui.action('menuImageUpload');
+      assert.match(ui.element('dialogTitle').textContent, /업데이트/);
+      assert.match(ui.element('dialogContent').innerHTML, /setup\.html#update/);
+      assert.doesNotMatch(ui.element('dialogContent').innerHTML, /id="menuImageForm"/);
+    }
+    assert.equal(ui.posted.length, 0);
+  }
 });
