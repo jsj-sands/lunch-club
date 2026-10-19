@@ -613,6 +613,31 @@ function uploadMenuImage_(properties, all, date, op) {
   // Old binary data is retired only after the new slot has been published successfully.
   if (previous) retireMenuImage_(previous, all);
 }
+function deleteMenuImage_(properties, all, date, op) {
+  const p = op.payload || {}, slot = menuImageSlot_(date, p.scope);
+  if (typeof p.expectedImageId !== 'string' || !MENU_IMAGE_UUID.test(p.expectedImageId)) throw new Error('삭제할 식단 이미지를 새로고침한 뒤 다시 확인해 주세요.');
+  const entry = menuImageEntry_(all, slot);
+  // An empty slot is already in the requested state, including a retry after receipt saving failed.
+  if (!entry) return;
+  if (entry.id !== p.expectedImageId) throw new Error('다른 멤버가 식단 이미지를 먼저 바꿨어요. 새로고침 후 현재 이미지를 확인하고 다시 삭제해 주세요.');
+  let file, wasTrashed;
+  try {
+    const folder = menuImageFolder_(properties, all, false);
+    file = DriveApp.getFileById(entry.fileId);
+    if (!ownsMenuImageFile_(file, entry, folder.getId())) throw new Error('not an owned menu image');
+    wasTrashed = file.isTrashed();
+    if (!wasTrashed) file.setTrashed(true);
+  } catch (_) { throw imageStorageError_(); }
+  try {
+    properties.deleteProperty(slot.property);
+    delete all[slot.property];
+  } catch (_) {
+    // Keep the original visible image when metadata removal fails. If restoration also
+    // fails, a new delete request can finish removing this same, already-trashed image.
+    if (!wasTrashed) { try { file.setTrashed(false); } catch (_) {} }
+    throw new Error('식단 이미지 삭제를 완료하지 못했어요. 새로고침한 뒤 다시 삭제해 주세요. 계속 실패하면 운영자에게 문의해 주세요.');
+  }
+}
 function menuImageResponse_(date, scope, imageId) {
   if (!MENU_IMAGE_UUID.test(imageId || '')) throw new Error('식단 이미지를 새로고침한 뒤 다시 열어 주세요.');
   const slot = menuImageSlot_(date, scope), lock = LockService.getScriptLock();
@@ -700,7 +725,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 3, features: { menuImages: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 3, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
   const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;
@@ -745,6 +770,7 @@ function doPost(e) {
     let receipt;
     try {
       if (body.op.type === 'menuImageUpload') uploadMenuImage_(properties, all, body.date, body.op);
+      else if (body.op.type === 'menuImageDelete') deleteMenuImage_(properties, all, body.date, body.op);
       else if (body.op.type === 'settings') {
         const p = body.op.payload || {};
         if (body.configRevision !== cfg.revision) throw new Error('다른 멤버가 기본 일정을 먼저 바꿨어요. 설정을 다시 열어 저장해 주세요.');
@@ -756,7 +782,8 @@ function doPost(e) {
     } catch (error) { receipt = { ok: false, error: String(error.message).slice(0, 160), at: new Date().toISOString() }; }
     const ids = Object.keys(record.receipts); while (ids.length >= 16) delete record.receipts[ids.shift()];
     record.receipts[body.op.id] = receipt;
-    prune_(properties, all, body.date);
+    // A confirmed image deletion must affect only that image, even if other slots are old.
+    if (body.op.type !== 'menuImageDelete') prune_(properties, all, body.date);
     saveRecord_(properties, all, body.date, record);
     return output_({ ok: true, accepted: true });
   } catch (error) { return output_({ ok: false, error: error.message || '저장하지 못했어요. 다시 시도해 주세요.' }); }

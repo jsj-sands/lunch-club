@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const M = require('../menu-source.js');
 // Live, public MCP responses fetched 2026-10-19. Only unused nutrition was removed.
+// Today's fixture was refreshed after course photos were published, retaining imageUrl.
 // Endpoint/schema: https://welplan.pmh.codes/docs/api
 const today = require('./fixtures/welplan-20261019.json');
 const friday = require('./fixtures/welplan-20261023.json');
@@ -17,6 +18,14 @@ test('검증된 오늘의 점심 코스만 표시하고 반찬 정보와 날짜 
     '나주곰탕*당면사리', '눈꽃치즈김치볶음밥', '[오늘의데일리팩] 치킨텐더포케'
   ]);
   assert.ok(result.courses[0].components.includes('데리야끼고기경단조림'));
+  assert.deepEqual(result.courses.map(course => course.components.length), [6, 5, 2]);
+  assert.deepEqual(result.courses[0].components, [
+    '나주곰탕*당면사리', '데리야끼고기경단조림', '건파래볶음', '오복지무침', '깍두기', '흑미밥'
+  ]);
+  assert.ok(result.courses[1].components.includes('온육수'));
+  assert.ok(result.courses[2].components.includes('[오늘의샐러드] New 차돌유자포테이토샐러드)'));
+  assert.equal(result.courses[0].imageUrl, 'https://img-welmenu.welstory.com/data/manager/recipe/E5Z5/20261019/s20261019103924.jpg');
+  for (const course of result.courses) assert.equal(M.validImageURL(course.imageUrl), true);
   assert.ok(result.source.endsWith('/20261019'));
   assert.ok(Number.isFinite(Date.parse(result.fetchedAt)));
 });
@@ -28,6 +37,54 @@ test('오늘이 아닌 금요일의 사전 공개 식단을 해당 날짜에 반
   ]);
   assert.equal(result.date, '2026-10-23');
   assert.ok(result.source.endsWith('/20261023'));
+  assert.ok(result.courses.every(course => !Object.prototype.hasOwnProperty.call(course, 'imageUrl')));
+});
+
+test('사진은 검증된 HTTPS 웰스토리 레시피 경로만 허용하고 주소를 추측하지 않는다', () => {
+  const actual = today.result.structuredContent.meals[1].menus[0].imageUrl;
+  assert.equal(M.validImageURL(actual), true);
+  assert.equal(M.validImageURL(actual + '?width=688&format=jpeg'), true);
+  for (const url of [
+    actual.replace('https:', 'http:'), actual.replace('https:', ''),
+    actual.replace('img-welmenu.welstory.com', 'img-welmenu.welstory.com.evil.example'),
+    actual.replace('img-welmenu.welstory.com', 'img-welmenu.welstory.com@evil.example'),
+    actual.replace('img-welmenu.welstory.com', 'user@img-welmenu.welstory.com'),
+    actual.replace('img-welmenu.welstory.com', 'img-welmenu.welstory.com:443'),
+    actual.replace('/recipe/E5Z5/', '/recipe/../'),
+    actual.replace('/recipe/E5Z5/', '/recipe/%2e%2e/'),
+    actual.replace('/data/manager/recipe/', '/redirect/'),
+    actual.replace('.jpg', '.svg'), actual + '#fragment', actual + '\n',
+    actual + '" onerror="alert(1)', 'javascript:alert(1)', 'data:image/png;base64,abc',
+    'https://evil.example/menu.jpg', '', null, 1
+  ]) assert.equal(M.validImageURL(url), false, String(url));
+});
+
+test('누락되거나 잘못된 사진 하나는 검증된 메뉴와 나머지 사진을 가리지 않는다', () => {
+  for (const imageUrl of [undefined, null, '', 1, {}, 'https://evil.example/menu.jpg']) {
+    const partial = clone(today);
+    partial.result.structuredContent.meals[1].menus[0].imageUrl = imageUrl;
+    const result = M.parseResponse(partial, '2026-10-19');
+    assert.deepEqual(result.dishes, M.parseResponse(today, '2026-10-19').dishes);
+    assert.ok(!Object.prototype.hasOwnProperty.call(result.courses[0], 'imageUrl'));
+    assert.equal(result.courses[0].components.length, 6);
+    assert.equal(result.courses[1].imageUrl, today.result.structuredContent.meals[1].menus[1].imageUrl);
+  }
+});
+
+test('반찬 상세의 부분 오류는 유효한 구성과 대표 메뉴를 유지한다', () => {
+  const partial = clone(today);
+  partial.result.structuredContent.meals[1].menus[0].components = [
+    { name: '나주곰탕*당면사리' }, null, { name: '' }, { name: 1 }, '잘못된 구조',
+    { name: '  흑미밥  ' }, { name: '깍두기', nutrition: { calories: 'invalid' } }
+  ];
+  const result = M.parseResponse(partial, '2026-10-19');
+  assert.deepEqual(result.courses[0].components, ['나주곰탕*당면사리', '흑미밥', '깍두기']);
+  assert.equal(result.courses[0].imageUrl, today.result.structuredContent.meals[1].menus[0].imageUrl);
+  assert.deepEqual(result.dishes, M.parseResponse(today, '2026-10-19').dishes);
+  for (const components of [undefined, null, {}, 'not an array']) {
+    partial.result.structuredContent.meals[1].menus[0].components = components;
+    assert.deepEqual(M.parseResponse(partial, '2026-10-19').courses[0].components, []);
+  }
 });
 
 test('동일 식당과 날짜에서 명시적인 빈 점심 메뉴만 미등록 결과가 된다', () => {

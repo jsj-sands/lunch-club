@@ -24,7 +24,7 @@ test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요
 });
 test('버전 3 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,3);assert.deepEqual(state.features,{menuImages:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true});
+ assert.equal(state.serverVersion,3);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);

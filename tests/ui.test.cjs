@@ -6,6 +6,8 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const C = require('../core.js');
 const G = require('../restaurant-guide.js');
+const M = require('../menu-source.js');
+const richMenuFixture = require('./fixtures/welplan-20261019.json');
 
 const root = path.resolve(__dirname, '..');
 const monday = '2026-10-19';
@@ -16,7 +18,7 @@ const kakaoKey = 'sandsLunch.kakaoProfile.v1';
 const kakaoChannel = 'https://pf.kakao.com/_xbbMPn';
 const kakaoImage = 'https://k.kakaocdn.net/dn/lunch-profile/fixture/img_m.jpg';
 const connection = { url: 'https://script.google.com/macros/s/test_deployment/exec', key: 'a'.repeat(64) };
-const sharedFeatures = { menuImages: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true };
+const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNQAAAABJRU5ErkJggg==';
 // A valid 2 x 2 JPEG returned by the canvas fixture. Pixel rendering is not tested.
 const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7CooorID/2Q==';
@@ -138,7 +140,10 @@ async function boot(options = {}) {
     focus() { document.activeElement = this; }
     select() {}
     showModal() { this.open = true; }
-    close() { this.open = false; }
+    close() {
+      const wasOpen = this.open; this.open = false;
+      if (wasOpen) for (const fn of this.events.get('close') || []) fn({ target: this });
+    }
     getBoundingClientRect() { return { left: 0, top: 0, right: 800, bottom: 800 }; }
     setAttribute(name, value) { this.attributes[name] = String(value); }
     getAttribute(name) { return this.attributes[name] ?? null; }
@@ -256,9 +261,13 @@ async function boot(options = {}) {
       throw new Error('Unexpected real fetch in UI test');
     },
     LunchMenuSource: {
+      validImageURL: M.validImageURL,
       fetchDay: async date => {
         publicRequests.push(date);
-        return { date, dishes: (options.menus || menuData)[date] || [], fetchedAt: fixedTime, source: 'https://welplan.pmh.codes/', ok: true };
+        const value = (options.menus || menuData)[date];
+        const response = Array.isArray(value) ? { dishes: value } : value || { dishes: [] };
+        return C.clone({ ...response, ...(options.courseDetails?.[date] ? { courses: options.courseDetails[date] } : {}),
+          date, fetchedAt: fixedTime, source: 'https://welplan.pmh.codes/', ok: true });
       }
     }
   });
@@ -328,7 +337,8 @@ async function boot(options = {}) {
       for (const interval of selected) await interval.fn();
       await settle();
     },
-    saved: key => storage.has(key) ? JSON.parse(storage.get(key)) : undefined };
+    saved: key => storage.has(key) ? JSON.parse(storage.get(key)) : undefined,
+    storeFromOtherTab: (key, value) => storage.set(key, JSON.stringify(value)) };
 }
 
 test('기존 다섯 명의 저장값에서 열 멤버를 한 번씩 표시하고 이름 선택과 설정을 팀·이름 순으로 정렬한다', async () => {
@@ -837,6 +847,52 @@ test('공유 연결 전에도 메가존 주간 식단 다섯 날짜를 조회하
   assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /월요일 곰탕/);
 });
 
+test('실제 메가존 사진·전체 반찬을 중복 없이 펼치고 확대하며 사진 실패·미등록도 참석 저장을 막지 않는다', async () => {
+  const rich = M.parseResponse(richMenuFixture, monday);
+  const ui = await boot({ menus: { ...menuData, [monday]: rich } });
+  await ui.press('choiceIn');
+  assert.equal(ui.element('heroCount').textContent, '오늘 함께 1명');
+  const markup = ui.element('restaurantCards').innerHTML;
+  assert.equal((markup.match(/data-mega-photo="true"/g) || []).length, 3);
+  const lists = [...markup.matchAll(/<ul class="mega-meal-components"[^>]*>([\s\S]*?)<\/ul>/g)].map(match => visibleText(match[1]));
+  assert.equal(lists.length, rich.courses.length);
+  for (let i = 0; i < rich.courses.length; i++) {
+    const course = rich.courses[i];
+    assert.ok(markup.includes('src="' + course.imageUrl + '"'));
+    assert.equal(lists[i].includes(course.name), false, 'The main belongs in the heading, not again in the side-dish list');
+    for (const side of course.components.filter(name => name !== course.name)) assert.ok(lists[i].includes(side), side);
+  }
+  assert.match(markup, /loading="lazy"/);
+  await ui.action('viewMegaMeal', '0', { 'data-date': monday });
+  assert.equal(ui.element('dialogTitle').textContent, rich.courses[0].name);
+  assert.equal(ui.element('megaMealFull').getAttribute('src'), rich.courses[0].imageUrl);
+  assert.match(visibleText(ui.element('dialogContent').innerHTML), /데리야끼고기경단조림.*흑미밥/);
+  assert.ok(ui.element('dialogContent').innerHTML.includes(C.menuUrl(monday)));
+  await ui.dispatch('error', ui.element('megaMealFull'));
+  assert.equal(ui.element('megaMealFull').hidden, true);
+  assert.equal(ui.element('megaMealFullError').hidden, false);
+  await ui.press('closeDialog');
+  await ui.dispatch('error', ui.findControl({ 'data-mega-photo': 'true', src: rich.courses[0].imageUrl }, 'img'));
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /사진을 불러오지 못했어요/);
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /나주곰탕\*당면사리.*데리야끼고기경단조림/);
+  assert.equal(ui.element('heroCount').textContent, '오늘 함께 1명');
+  await ui.action('menuView', 'week');
+  const detail = ui.findControl({ 'data-meal-details-date': monday }, 'details');
+  assert.equal(detail.open, false);
+  detail.open = true; await ui.dispatch('toggle', detail);
+  await ui.press('refreshMenu');
+  assert.equal(ui.findControl({ 'data-meal-details-date': monday }, 'details').open, true, 'An expanded day survives a data refresh');
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /사진·반찬 보기/);
+  await ui.action('menuDate', '2026-10-20');
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /화요일 제육볶음/);
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /사진 미등록/);
+  assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /data-mega-photo="true"/);
+  await ui.chooseDate(monday);
+  assert.deepEqual(dailyMembers(ui, 'in'), ['jingi']);
+  assert.equal(ui.saved(localKey).days[monday].overrides.jingi, 'in');
+  assert.equal(ui.posted.length, 0);
+});
+
 test('공유 연결 전에는 카카오 자동 조회 연결 안내와 원문 링크·사진 업로드를 제공한다', async () => {
   const ui = await boot();
   assert.match(ui.element('restaurantCards').innerHTML, /href="https:\/\/pf\.kakao\.com\/_xbbMPn"/);
@@ -1120,7 +1176,16 @@ test('독립된 두 공유 세션에서 같은 주간 사진을 불러오고 다
   assert.doesNotMatch(second.element('restaurantCards').innerHTML, /data:image\/png;base64,/);
 });
 
-function sharedImageServer(receiptGate) {
+function fixtureMenuImage(scope, date, id, dataUrl = png) {
+  const startDate = scope === 'week' ? C.weekDates(date)[0] : date;
+  return { id, scope, date: startDate, startDate,
+    endDate: scope === 'week' ? C.shiftDate(startDate, 6) : date,
+    name: id + (dataUrl === jpeg ? '.jpg' : '.png'), mimeType: dataUrl === jpeg ? 'image/jpeg' : 'image/png',
+    size: Buffer.from(dataUrl.split(',')[1], 'base64').length,
+    uploadedBy: 'jingi', uploadedAt: fixedTime, dataUrl };
+}
+
+function sharedImageServer(receiptGate, options = {}) {
   const images = {}, receipts = {}, bodies = [];
   return {
     images, bodies,
@@ -1141,11 +1206,18 @@ function sharedImageServer(receiptGate) {
     async post(url, init) {
       assert.equal(url, connection.url); assert.equal(init.method, 'POST'); assert.equal(init.mode, 'no-cors');
       const body = JSON.parse(init.body), { op } = body, { scope, dataUrl, name, expectedImageId } = op.payload;
-      assert.equal(body.key, connection.key); assert.equal(op.type, 'menuImageUpload'); assert.equal(op.actor, 'jingi');
-      assert.ok(C.validDate(body.date)); assert.ok(['week', 'day'].includes(scope)); assert.equal(dataUrl, jpeg);
+      assert.equal(body.key, connection.key); assert.ok(['menuImageUpload', 'menuImageDelete'].includes(op.type)); assert.equal(op.actor, 'jingi');
+      assert.ok(C.validDate(body.date)); assert.ok(['week', 'day'].includes(scope));
       const startDate = scope === 'week' ? C.weekDates(body.date)[0] : body.date, slot = scope + ':' + startDate;
-      assert.equal(expectedImageId, images[slot]?.id || '');
       bodies.push(body);
+      if (op.type === 'menuImageDelete') {
+        if (options.deleteError) receipts[op.id] = { ok: false, error: options.deleteError };
+        else if (!images[slot] || images[slot].id !== expectedImageId) receipts[op.id] = { ok: false, error: '다른 멤버가 식단 이미지를 교체했어요. 현재 이미지를 다시 확인해 주세요.' };
+        else { delete images[slot]; receipts[op.id] = { ok: true }; }
+        return { type: 'opaque', status: 0 };
+      }
+      assert.equal(dataUrl, jpeg);
+      assert.equal(expectedImageId, images[slot]?.id || '');
       images[slot] = { id: 'image_' + bodies.length, scope, date: startDate, startDate,
         endDate: scope === 'week' ? C.shiftDate(startDate, 6) : body.date, name, mimeType: 'image/jpeg',
         size: Buffer.from(dataUrl.split(',')[1], 'base64').length, uploadedBy: op.actor, uploadedAt: fixedTime, dataUrl };
@@ -1211,6 +1283,195 @@ test('공유 연결 전 주간·하루 사진은 이 기기에만 저장하고 P
     assert.match(ui.element('toast').textContent, /이 기기에 미리보기를 저장했어요/);
   }
   assert.equal(ui.posted.length, 0); assert.equal(ui.requests.length, 0);
+});
+
+test('기기 사진 삭제는 확인한 슬롯에만 적용하고 다른 탭의 추가·교체와 카카오 사진을 보존한다', async () => {
+  const daySlot = 'day:' + monday, weekSlot = 'week:' + monday;
+  const day = fixtureMenuImage('day', monday, 'local-day');
+  const week = fixtureMenuImage('week', monday, 'local-week', jpeg);
+  const other = fixtureMenuImage('day', '2026-10-20', 'local-other');
+  const initial = { [daySlot]: day, [weekSlot]: week, 'day:2026-10-20': other };
+  const ui = await boot({ storage: { [imageKey]: initial, [kakaoKey]: profileData() } });
+  await ui.press('choiceIn');
+  await ui.action('menuImageDelete', day.id, { 'data-date': monday, 'data-scope': 'day' });
+  assert.deepEqual(ui.saved(imageKey), initial, 'Opening the confirmation must not delete anything');
+  assert.match(visibleText(ui.element('dialogContent').innerHTML), /하루 이미지를 삭제하면.*주간 식단/);
+  await ui.action('cancelMenuImageDelete');
+  assert.equal(ui.element('appDialog').open, false);
+  assert.deepEqual(ui.saved(imageKey), initial);
+
+  await ui.action('menuImageDelete', day.id, { 'data-date': monday, 'data-scope': 'day' });
+  const added = fixtureMenuImage('day', '2026-10-21', 'other-tab-addition');
+  ui.storeFromOtherTab(imageKey, { ...initial, 'day:2026-10-21': added });
+  await ui.dispatch('submit', ui.element('menuImageDeleteForm'));
+  const kept = { [weekSlot]: week, 'day:2026-10-20': other, 'day:2026-10-21': added };
+  assert.deepEqual(ui.saved(imageKey), kept, 'Only the confirmed day is removed from the latest stored map');
+  assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, week.id);
+  assert.ok(ui.element('restaurantCards').innerHTML.includes(jpeg), 'Deleting a day reveals the saved week');
+  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+
+  await ui.action('menuImageDelete', week.id, { 'data-date': monday, 'data-scope': 'week' });
+  const replaced = fixtureMenuImage('week', monday, 'other-tab-replacement', jpeg);
+  ui.storeFromOtherTab(imageKey, { ...kept, [weekSlot]: replaced });
+  await ui.dispatch('submit', ui.element('menuImageDeleteForm'));
+  assert.equal(ui.element('appDialog').open, false);
+  assert.match(ui.element('toast').textContent, /이미지가 바뀌었어요/);
+  assert.deepEqual(ui.saved(imageKey), { ...kept, [weekSlot]: replaced });
+  assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, replaced.id);
+  await ui.action('menuImageDelete', replaced.id, { 'data-date': monday, 'data-scope': 'week' });
+  await ui.dispatch('submit', ui.element('menuImageDeleteForm'));
+  assert.deepEqual(ui.saved(imageKey), { 'day:2026-10-20': other, 'day:2026-10-21': added });
+  assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /data-action="menuImageDelete"/);
+  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+  assert.deepEqual(ui.saved(kakaoKey), profileData());
+  assert.deepEqual(dailyMembers(ui, 'in'), ['jingi']);
+  assert.equal(ui.posted.length, 0); assert.equal(ui.requests.length, 0);
+});
+
+for (const scope of ['day', 'week']) {
+  test(`공유 ${scope === 'day' ? '하루' : '주간'} 사진 삭제는 원래 날짜·ID의 수신 확인 뒤 완료하고 동료의 다음 조회에 반영한다`, async () => {
+    let releaseReceipt;
+    const receiptGate = new Promise(resolve => { releaseReceipt = resolve; });
+    const server = sharedImageServer(receiptGate);
+    const selectedDate = '2026-10-20', nextDate = '2026-10-21';
+    const week = fixtureMenuImage('week', selectedDate, 'shared-week', jpeg);
+    const other = fixtureMenuImage('day', nextDate, 'shared-other');
+    server.images['week:' + monday] = week;
+    server.images['day:' + nextDate] = other;
+    const target = scope === 'day' ? fixtureMenuImage('day', selectedDate, 'shared-day') : week;
+    const targetSlot = scope + ':' + (scope === 'week' ? monday : selectedDate);
+    server.images[targetSlot] = target;
+    const ui = await boot({ connected: true, server: server.read, post: server.post });
+    const peer = await boot({ connected: true, server: server.read, identity: 'yunchul' });
+    await ui.chooseDate(selectedDate); await peer.chooseDate(selectedDate);
+    await ui.action('menuImageDelete', target.id, { 'data-date': selectedDate, 'data-scope': scope });
+    assert.equal(ui.posted.length, 0);
+    assert.ok(server.images[targetSlot]);
+    const form = ui.element('menuImageDeleteForm');
+    const saving = ui.dispatch('submit', form);
+    try {
+      await ui.settle();
+      assert.equal(ui.posted.length, 1);
+      const body = server.bodies[0];
+      assert.equal(body.date, selectedDate);
+      assert.equal(body.op.type, 'menuImageDelete');
+      assert.equal(body.op.actor, 'jingi');
+      assert.deepEqual(body.op.payload, { scope, expectedImageId: target.id });
+      assert.ok(ui.requests.some(request => request.action === 'state' && request.receipt === body.op.id && request.date === selectedDate));
+      assert.equal(server.images[targetSlot], undefined, 'The fixture has applied the opaque POST');
+      assert.equal(ui.element('appDialog').open, true, 'The UI must still await the server receipt');
+      assert.equal(ui.element('confirmMenuImageDelete').disabled, true);
+      assert.equal(ui.element('cancelMenuImageDelete').disabled, true);
+      assert.match(ui.element('menuImageDeleteStatus').textContent, /삭제하고 있어요/);
+      assert.doesNotMatch(ui.element('toast').textContent, /이미지를 삭제했어요/);
+      assert.ok(ui.element('restaurantCards').innerHTML.includes('data-id="' + target.id + '"'));
+      await ui.press('closeDialog');
+      assert.equal(ui.element('appDialog').open, true);
+      await ui.chooseDate(nextDate);
+      assert.equal(form.dataset.date, selectedDate, 'A date change must not retarget the pending operation');
+    } finally { releaseReceipt(); }
+    await saving;
+    assert.equal(ui.element('appDialog').open, false);
+    assert.equal(ui.element('dateInput').value, nextDate);
+    assert.match(ui.element('toast').textContent, /올린 식단 이미지를 삭제했어요/);
+    assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, other.id);
+    assert.deepEqual(server.images['day:' + nextDate], other);
+    assert.equal(peer.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, target.id, 'A second session retains its view until polling');
+    await peer.runIntervals(30000);
+    if (scope === 'day') {
+      assert.deepEqual(server.images['week:' + monday], week);
+      assert.equal(peer.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, week.id);
+      assert.ok(peer.element('restaurantCards').innerHTML.includes(jpeg));
+    } else assert.doesNotMatch(peer.element('restaurantCards').innerHTML, /data-action="menuImageDelete"/);
+    await ui.chooseDate(monday);
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+    assert.deepEqual(ui.saved(kakaoKey), profileData());
+    assert.equal(ui.saved(imageKey), undefined);
+    assert.equal(ui.posted.length, 1); assert.equal(peer.posted.length, 0);
+  });
+}
+
+test('삭제 미지원 서버는 쓰기를 막고 교체 충돌·저장 실패는 현재 사진과 다른 슬롯을 보존한다', async () => {
+  const daySlot = 'day:' + monday, weekSlot = 'week:' + monday;
+  const day = fixtureMenuImage('day', monday, 'delete-original');
+  const week = fixtureMenuImage('week', monday, 'delete-keep-week', jpeg);
+  const legacy = sharedImageServer(); legacy.images[daySlot] = day;
+  const old = await boot({ connected: true, server: async request => {
+    const result = await legacy.read(request);
+    return request.action === 'state' ? { ...result, features: { ...sharedFeatures, menuImageDelete: false } } : result;
+  }, post: legacy.post });
+  await old.action('menuImageDelete', day.id, { 'data-date': monday, 'data-scope': 'day' });
+  assert.match(old.element('dialogTitle').textContent, /업데이트/);
+  assert.match(old.element('dialogContent').innerHTML, /setup\.html#update/);
+  assert.doesNotMatch(old.element('dialogContent').innerHTML, /id="menuImageDeleteForm"/);
+  assert.equal(old.posted.length, 0); assert.deepEqual(legacy.images[daySlot], day);
+
+  for (const kind of ['conflict', 'failure']) {
+    const server = sharedImageServer(undefined, kind === 'failure' ? { deleteError: '삭제 작업을 저장하지 못했어요.' } : {});
+    server.images[daySlot] = day; server.images[weekSlot] = week;
+    const replacement = fixtureMenuImage('day', monday, 'delete-replacement', jpeg);
+    const ui = await boot({ connected: true, server: server.read, post: async (url, init) => {
+      if (kind === 'conflict') server.images[daySlot] = replacement;
+      return server.post(url, init);
+    } });
+    await ui.action('menuImageDelete', day.id, { 'data-date': monday, 'data-scope': 'day' });
+    const form = ui.element('menuImageDeleteForm');
+    await ui.dispatch('submit', form);
+    assert.equal(ui.element('appDialog').open, true);
+    assert.match(ui.element('menuImageDeleteStatus').textContent, kind === 'conflict' ? /교체했어요/ : /저장하지 못했어요/);
+    assert.equal(ui.element('confirmMenuImageDelete').disabled, false);
+    assert.equal(ui.element('cancelMenuImageDelete').disabled, false);
+    assert.doesNotMatch(ui.element('toast').textContent, /이미지를 삭제했어요/);
+    const kept = kind === 'conflict' ? replacement : day;
+    assert.deepEqual(server.images, { [daySlot]: kept, [weekSlot]: week });
+    assert.equal(ui.posted.length, 1);
+    if (kind === 'conflict') {
+      await ui.dispatch('submit', form);
+      assert.equal(ui.posted.length, 1, 'The stale confirmation must not delete the replacement in a second request');
+      assert.equal(ui.element('appDialog').open, false);
+      assert.match(ui.element('toast').textContent, /이미지가 바뀌었어요/);
+    } else await ui.action('cancelMenuImageDelete');
+    assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, kept.id);
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+    assert.deepEqual(ui.saved(kakaoKey), profileData());
+  }
+});
+
+test('삭제 전에 시작한 현황 조회와 늦은 이미지 응답은 삭제 완료 후 사진을 되살리지 않는다', async () => {
+  let releasePoll, releaseImage, stateReads = 0;
+  const pollGate = new Promise(resolve => { releasePoll = resolve; });
+  const imageGate = new Promise(resolve => { releaseImage = resolve; });
+  const server = sharedImageServer();
+  const day = fixtureMenuImage('day', monday, 'late-day');
+  const week = fixtureMenuImage('week', monday, 'late-keep-week', jpeg);
+  server.images['day:' + monday] = day; server.images['week:' + monday] = week;
+  const ui = await boot({ connected: true, post: server.post, server: async request => {
+    const response = C.clone(await server.read(request));
+    if (request.action === 'state' && !request.receipt && ++stateReads === 2) await pollGate;
+    if (request.action === 'menuImage' && request.imageId === day.id) await imageGate;
+    return response;
+  } });
+  assert.ok(ui.requests.some(request => request.action === 'menuImage' && request.imageId === day.id));
+  const polling = ui.runIntervals(30000);
+  try {
+    await ui.settle();
+    assert.equal(stateReads, 2, 'The old poll must be in flight before deletion');
+    await ui.action('menuImageDelete', day.id, { 'data-date': monday, 'data-scope': 'day' });
+    await ui.dispatch('submit', ui.element('menuImageDeleteForm'));
+    assert.equal(ui.element('appDialog').open, false);
+    assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, week.id);
+    assert.ok(ui.element('restaurantCards').innerHTML.includes(jpeg));
+    releasePoll(); await polling;
+    assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, week.id, 'A pre-delete snapshot cannot restore old metadata');
+    releaseImage(); await ui.settle();
+    assert.equal(ui.findControl({ 'data-action': 'menuImageDelete' }).dataset.id, week.id, 'A late body cannot restore a removed image ID');
+    assert.ok(ui.element('restaurantCards').innerHTML.includes(jpeg));
+    assert.equal(ui.element('restaurantCards').innerHTML.includes(png), false);
+    assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'), kakaoImage);
+    assert.deepEqual(server.images, { ['week:' + monday]: week });
+    assert.equal(ui.posted.length, 1);
+  } finally { releasePoll(); releaseImage(); }
+  await polling; await ui.settle();
 });
 
 test('설정 폼을 연 뒤 동료가 설정을 바꾸면 오래된 폼 제출을 막고 최신 설정으로 다시 보여준다', async () => {

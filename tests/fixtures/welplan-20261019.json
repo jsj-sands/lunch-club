@@ -51,7 +51,8 @@
                   "isMain": false
                 }
               ],
-              "isTakeOut": false
+              "isTakeOut": false,
+              "imageUrl": "https://img-welmenu.welstory.com/data/manager/recipe/E5Z5/20261019/s20261019103924.jpg"
             },
             {
               "id": "20261019-REST007327-E5Z5-CC",
@@ -63,10 +64,6 @@
                 },
                 {
                   "name": "돼지고기육전*부추무침",
-                  "isMain": false
-                },
-                {
-                  "name": "떠먹는요구르트(딸기맛)",
                   "isMain": false
                 },
                 {
@@ -82,7 +79,8 @@
                   "isMain": false
                 }
               ],
-              "isTakeOut": false
+              "isTakeOut": false,
+              "imageUrl": "https://img-welmenu.welstory.com/data/manager/recipe/E5Z5/20261019/s20261019104145.jpg"
             },
             {
               "id": "20261019-REST007327-E5Z5-DD",
@@ -97,7 +95,8 @@
                   "isMain": false
                 }
               ],
-              "isTakeOut": false
+              "isTakeOut": false,
+              "imageUrl": "https://img-welmenu.welstory.com/data/manager/recipe/E5Z5/20261019/s20261019103631.jpg"
             }
           ]
         },

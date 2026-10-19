@@ -1,4 +1,4 @@
-/* Welplan's documented, unauthenticated MCP API. No copied menu images.
+/* Welplan's documented, unauthenticated MCP API. Photos use provider URLs only.
  * API: https://welplan.pmh.codes/docs/api
  * Empty dishes mean a matching date/location explicitly returned no lunch menus.
  * Transport failures and an unexpected provider response always reject.
@@ -54,6 +54,15 @@
     return value.trim();
   }
 
+  function validImageURL(value) {
+    if (typeof value !== 'string' || !value || value.length > 2048 || /[\s\\<>"']/.test(value)) return false;
+    const match = /^https:\/\/([^/?#]+)(\/[^?#]*)(?:\?([^#]*))?$/i.exec(value);
+    if (!match || match[1].toLowerCase() !== 'img-welmenu.welstory.com') return false;
+    // Verified Welstory recipe-photo host and path; no credentials, ports or traversal.
+    if (!/^\/data\/manager\/recipe\/(?:[a-z0-9_-]+\/)+[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(match[2])) return false;
+    return match[3] === undefined || /^[a-z0-9._~!$&()*+,;=:@%/?-]*$/i.test(match[3]);
+  }
+
   function parseResponse(envelope, requestedDate, expectedId) {
     const date = dateKey(requestedDate);
     if (!object(envelope) || envelope.jsonrpc !== '2.0') throw invalid();
@@ -91,15 +100,14 @@
     const courses = lunches[0].menus.map(function (menu) {
       if (!object(menu)) throw invalid();
       const name = menuName(menu.name);
-      let components = [];
-      if (menu.components !== undefined) {
-        if (!Array.isArray(menu.components)) throw invalid();
-        components = menu.components.map(function (component) {
-          if (!object(component)) throw invalid();
-          return menuName(component.name);
-        });
-      }
-      return { name: name, components: components };
+      // Composition and photos are optional details: a broken detail must not hide
+      // an otherwise verified course. Keep all valid source names, including its main.
+      const components = Array.isArray(menu.components) ? menu.components.filter(function (component) {
+        return object(component) && typeof component.name === 'string' && component.name.trim();
+      }).map(function (component) { return component.name.trim(); }) : [];
+      const course = { name: name, components: components };
+      if (validImageURL(menu.imageUrl)) course.imageUrl = menu.imageUrl;
+      return course;
     });
     return {
       ok: true,
@@ -168,5 +176,5 @@
     }
   }
 
-  return Object.freeze({ fetchDay: fetchDay, parseResponse: parseResponse, sourceUrl: sourceUrl });
+  return Object.freeze({ fetchDay: fetchDay, parseResponse: parseResponse, sourceUrl: sourceUrl, validImageURL: validImageURL });
 });
