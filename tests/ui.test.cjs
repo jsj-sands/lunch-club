@@ -847,17 +847,23 @@ test('공유 연결 전에도 메가존 주간 식단 다섯 날짜를 조회하
   assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /월요일 곰탕/);
 });
 
-test('실제 메가존 사진·전체 반찬을 중복 없이 펼치고 확대하며 사진 실패·미등록도 참석 저장을 막지 않는다', async () => {
+test('메가존 일반식 두 메뉴의 사진·반찬만 오늘과 주간에 표시하고 확대·사진 오류·참석 저장을 지원한다', async () => {
   const rich = M.parseResponse(richMenuFixture, monday);
-  const ui = await boot({ menus: { ...menuData, [monday]: rich } });
+  const regularMeals = [rich.courses[0], rich.courses[1]], takeout = rich.courses[2];
+  const ui = await boot({ menus: { ...menuData, [monday]: rich,
+    '2026-10-20': ['[오늘의 데일리 팩] 샌드위치', '화요일 제육볶음', '화요일 우동', '추가 코스'],
+    '2026-10-21': ['간편식 샌드위치', 'TAKE OUT 샐러드', '테이크아웃 포케'] } });
   await ui.press('choiceIn');
   assert.equal(ui.element('heroCount').textContent, '오늘 함께 1명');
   const markup = ui.element('restaurantCards').innerHTML;
-  assert.equal((markup.match(/data-mega-photo="true"/g) || []).length, 3);
+  assert.equal((markup.match(/data-mega-photo="true"/g) || []).length, 2);
+  assert.equal(markup.includes(takeout.name), false);
+  assert.equal(markup.includes(takeout.imageUrl), false);
+  assert.deepEqual([...markup.matchAll(/class="mega-meal-kind">([^<]+)/g)].map(match => match[1]), ['메뉴 1', '메뉴 2']);
   const lists = [...markup.matchAll(/<ul class="mega-meal-components"[^>]*>([\s\S]*?)<\/ul>/g)].map(match => visibleText(match[1]));
-  assert.equal(lists.length, rich.courses.length);
-  for (let i = 0; i < rich.courses.length; i++) {
-    const course = rich.courses[i];
+  assert.equal(lists.length, regularMeals.length);
+  for (let i = 0; i < regularMeals.length; i++) {
+    const course = regularMeals[i];
     assert.ok(markup.includes('src="' + course.imageUrl + '"'));
     assert.equal(lists[i].includes(course.name), false, 'The main belongs in the heading, not again in the side-dish list');
     for (const side of course.components.filter(name => name !== course.name)) assert.ok(lists[i].includes(side), side);
@@ -883,10 +889,19 @@ test('실제 메가존 사진·전체 반찬을 중복 없이 펼치고 확대�
   await ui.press('refreshMenu');
   assert.equal(ui.findControl({ 'data-meal-details-date': monday }, 'details').open, true, 'An expanded day survives a data refresh');
   assert.match(visibleText(ui.element('restaurantCards').innerHTML), /사진·반찬 보기/);
+  const weekMarkup = ui.element('restaurantCards').innerHTML;
+  assert.equal(weekMarkup.includes(takeout.name), false, 'Neither the week summary nor its details expose takeout');
+  assert.equal(weekMarkup.includes(takeout.imageUrl), false);
+  assert.doesNotMatch(weekMarkup, /데일리|간편식|샌드위치|TAKE OUT|테이크아웃|추가 코스/);
   await ui.action('menuDate', '2026-10-20');
   assert.match(visibleText(ui.element('restaurantCards').innerHTML), /화요일 제육볶음/);
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /화요일 우동/);
+  assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /데일리|샌드위치|추가 코스|메뉴 3/);
   assert.match(visibleText(ui.element('restaurantCards').innerHTML), /사진 미등록/);
   assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /data-mega-photo="true"/);
+  await ui.chooseDate('2026-10-21');
+  assert.match(visibleText(ui.element('restaurantCards').innerHTML), /아직 공개된 일반식 메뉴가 없어요/);
+  assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /mega-meal-card|샌드위치|샐러드|포케/);
   await ui.chooseDate(monday);
   assert.deepEqual(dailyMembers(ui, 'in'), ['jingi']);
   assert.equal(ui.saved(localKey).days[monday].overrides.jingi, 'in');

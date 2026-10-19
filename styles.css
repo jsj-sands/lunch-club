@@ -923,7 +923,7 @@ dialog{padding:21px}
 }
 
 /* Megazone meal photos and complete side dishes, without nutrition tables. */
-.mega-meals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0;margin:13px 0 16px}
+.mega-meals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0;margin:13px 0 16px}
 .mega-meal-card{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr;align-content:start;min-width:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
 .mega-meal-photo{position:relative;display:block;min-width:0;width:100%;aspect-ratio:4/3;margin:0;padding:0;overflow:hidden;border:0;border-bottom:1px solid var(--line);background:var(--surface)}
 .mega-meal-photo img{display:block;min-width:0;width:100%;height:100%;object-fit:contain}
@@ -965,9 +965,6 @@ button.mega-meal-photo:not(:disabled):hover{background:var(--brand-pale)}
 .primary-button.danger-button:not(:disabled):hover{border-color:var(--brand-accent);background:var(--brand-accent)}
 #dialogContent>.note{margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);font-size:12px;line-height:1.8;word-break:keep-all;overflow-wrap:anywhere}
 
-@media(max-width:1100px){
-  .mega-meals:not(.is-week){grid-template-columns:repeat(2,minmax(0,1fr))}
-}
 @media(max-width:900px){
   .mega-meals:not(.is-week){grid-template-columns:minmax(0,1fr)}
   .mega-meals:not(.is-week) .mega-meal-card{grid-template-columns:96px minmax(0,1fr);grid-template-rows:auto auto;gap:10px;padding:12px}

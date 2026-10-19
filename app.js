@@ -129,7 +129,9 @@
   function menuCourses(menu) {
     if (!menu) return [];
     const courses = Array.isArray(menu.courses) ? menu.courses : (Array.isArray(menu.dishes) ? menu.dishes.map(name => ({ name })) : []);
-    return courses.filter(course => course && typeof course.name === 'string' && course.name.trim()).map(course => ({
+    // Every date and data source uses the same two regular meals; takeout courses stay hidden.
+    return courses.filter(course => course && typeof course.name === 'string' && course.name.trim()
+      && !/간편\s*식|데일리\s*팩|take[\s-]*out|테이크\s*아웃/i.test(course.name.normalize('NFKC'))).slice(0, 2).map(course => ({
       name: course.name.trim(), components: Array.isArray(course.components) ? course.components.filter(name => typeof name === 'string' && name.trim()) : [],
       imageUrl: typeof window.LunchMenuSource?.validImageURL === 'function' && window.LunchMenuSource.validImageURL(course.imageUrl) ? course.imageUrl : ''
     }));
@@ -143,9 +145,8 @@
     return sides.length ? `<ul class="mega-meal-components" aria-label="함께 나오는 메뉴">${sides.map(name => `<li>${esc(name)}</li>`).join('')}</ul>` : '<p class="mega-meal-components is-empty">추가 구성 정보가 없어요.</p>';
   }
   function menuDishesHTML(menu, currentDate = date, compact = false) {
-    let courseNumber = 0;
     return `<div class="mega-meals${compact ? ' is-week' : ''}">${menuCourses(menu).map((course, ix) => {
-      const kind = /데일리팩|takeout|테이크/i.test(course.name) ? '간편식' : `메뉴 ${++courseNumber}`;
+      const kind = `메뉴 ${ix + 1}`;
       const available = course.imageUrl && !mealImageErrors.has(course.imageUrl);
       const photo = available ? `<button class="mega-meal-photo" data-action="viewMegaMeal" data-date="${currentDate}" data-id="${ix}" aria-label="${esc(course.name)} 사진 크게 보기"><img src="${esc(course.imageUrl)}" alt="${esc(course.name)} 식단 사진" data-mega-photo="true" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span class="mega-meal-zoom">확대 ↗</span></button>` : `<div class="mega-meal-photo is-empty"><span>${course.imageUrl ? '사진을 불러오지 못했어요' : '사진 미등록'}</span></div>`;
       return `<article class="mega-meal-card">${photo}<div class="mega-meal-heading"><span class="mega-meal-kind">${kind}</span><h4>${esc(course.name)}</h4></div>${mealComponentsHTML(course)}</article>`;
@@ -159,10 +160,10 @@
   function renderMegaDay() {
     const menu = menus[date], source = C.menuUrl(date), loading = menuLoadingDates.has(date);
     let content = `<p class="menu-date-label">${esc(dateText(date))} · 점심</p>`;
-    if (menu && Array.isArray(menu.dishes) && menu.dishes.length) {
+    if (menuCourses(menu).length) {
       content += menuDishesHTML(menu) + `<div class="menu-meta"><span>${menu.initial ? '미리 확인한 식단' : menu.error ? '최근 확인한 식단 · 재조회 실패' : '자동 조회'} · ${esc(timeText(menu.fetchedAt))}</span><a href="${source}" target="_blank" rel="noopener noreferrer">Welplan 원문 ↗</a></div>`;
-    } else if (menu && menu.ok && !menu.error) {
-      content += `<div class="empty-menu"><strong>아직 공개된 점심 식단이 없어요</strong><p>선택한 날짜의 메뉴가 올라오면 여기서 확인할 수 있어요.</p></div>`;
+    } else if (menu && !menu.error && (menu.ok || Array.isArray(menu.dishes))) {
+      content += `<div class="empty-menu"><strong>아직 공개된 일반식 메뉴가 없어요</strong><p>선택한 날짜의 메뉴가 올라오면 여기서 확인할 수 있어요.</p></div>`;
     } else {
       content += `<div class="empty-menu"><strong>${loading ? '선택한 날짜의 식단을 확인하고 있어요' : '식단을 불러오지 못했어요'}</strong><p>${loading ? '공개된 점심 메뉴를 가져오는 중이에요.' : '잠시 후 새로고침하거나 원문에서 확인해 주세요.'}</p><a class="menu-source-link" href="${source}" target="_blank" rel="noopener noreferrer">선택한 날 원문 보기 ↗</a></div>`;
     }
@@ -171,12 +172,12 @@
   function renderMegaWeek() {
     const dates = C.weekDates(date), today = C.today(), thisWeek = dates[0] === C.weekDates(today)[0];
     return `<div class="week-menu-heading"><strong>${thisWeek ? '이번 주' : '선택한 주'} 식단 미리보기</strong><span>${dates[0].slice(5).replace('-', '.')} – ${dates[4].slice(5).replace('-', '.')}</span></div><div class="week-menu-list">${dates.map(d => {
-      const menu = menus[d], loading = menuLoadingDates.has(d), hasDishes = menu && Array.isArray(menu.dishes) && menu.dishes.length;
+      const menu = menus[d], loading = menuLoadingDates.has(d), courses = menuCourses(menu);
       let content;
-      if (hasDishes) content = `<ul>${menu.dishes.map(dish => `<li>${esc(dish)}</li>`).join('')}</ul><details class="week-menu-details" data-meal-details-date="${d}" ${expandedMenuDates.has(d) ? 'open' : ''}><summary>사진·반찬 보기</summary>${menuDishesHTML(menu, d, true)}</details>${menu.error ? '<p class="week-menu-status">최근 확인한 식단 · 재조회 실패</p>' : ''}`;
-      else content = `<p class="week-menu-status">${loading ? '식단 확인 중…' : menu?.error ? '조회 실패 · 원문에서 확인해 주세요' : menu?.ok ? '아직 공개된 점심 식단이 없어요' : '식단을 확인하고 있어요…'}</p>`;
+      if (courses.length) content = `<ul>${courses.map(course => `<li>${esc(course.name)}</li>`).join('')}</ul><details class="week-menu-details" data-meal-details-date="${d}" ${expandedMenuDates.has(d) ? 'open' : ''}><summary>사진·반찬 보기</summary>${menuDishesHTML(menu, d, true)}</details>${menu.error ? '<p class="week-menu-status">최근 확인한 식단 · 재조회 실패</p>' : ''}`;
+      else content = `<p class="week-menu-status">${loading ? '식단 확인 중…' : menu?.error ? '조회 실패 · 원문에서 확인해 주세요' : menu?.ok || Array.isArray(menu?.dishes) ? '아직 공개된 일반식 메뉴가 없어요' : '식단을 확인하고 있어요…'}</p>`;
       return `<article class="week-menu-day${d === date ? ' selected-day' : ''}"><div class="week-menu-date"><button data-action="menuDate" data-id="${d}" aria-label="${esc(dateText(d))} 선택">${'일월화수목금토'[C.weekday(d)]}<strong>${Number(d.slice(5, 7))}.${Number(d.slice(8))}</strong>${d === today ? '<small>오늘</small>' : ''}</button></div><div class="week-menu-content">${content}<a href="${C.menuUrl(d)}" target="_blank" rel="noopener noreferrer">원문 ↗</a></div></article>`;
-    }).join('')}</div><p class="tiny-note">공개된 식단만 표시해요. 날짜를 누르면 그날의 점심을 선택할 수 있어요.</p>`;
+    }).join('')}</div><p class="tiny-note">공개된 일반식 메뉴만 표시해요. 날짜를 누르면 그날의 점심을 선택할 수 있어요.</p>`;
   }
   function imageSlot(scope, d = date) { return scope + ':' + (scope === 'week' ? C.weekDates(d)[0] : d); }
   function selectedMenuImage(d = date) {
