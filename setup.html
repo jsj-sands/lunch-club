@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>처음 설정하기 · 오늘 점심</title><link rel="icon" href="assets/favicon.svg"><style>
+:root{font-family:Pretendard,"Noto Sans KR",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#29362b;background:#f7f5ef}*{box-sizing:border-box}body{margin:0;line-height:1.8}main{max-width:860px;margin:auto;padding:36px 22px 65px}h1{font-size:34px;letter-spacing:-1.3px;line-height:1.35;margin:25px 0 16px}h2{font-size:23px;letter-spacing:-.5px;margin:0 0 16px}h3{font-size:17px;margin:8px 0}p{margin:8px 0 16px;color:#697361;font-size:14px}a{color:#356d4c;text-underline-offset:3px}header{display:flex;justify-content:space-between;gap:12px;font-size:12px;align-items:center}.brand{font-weight:800;letter-spacing:1px;display:flex;align-items:center;gap:9px;text-decoration:none}.brand img{width:30px;height:30px}.tag{font-size:10px;color:#e45e34;font-weight:700;letter-spacing:1.5px}.intro{padding-bottom:20px}section{background:#fffefa;border:1px solid #e2e5d8;border-radius:19px;padding:26px 29px;margin:18px 0}.step{display:flex;gap:16px;padding:21px 0;border-top:1px solid #e9eade}.step:first-of-type{border-top:0}.number{background:#edf2e5;color:#60814b;width:29px;height:29px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:50%;font-weight:750;margin-top:4px}.step-body{min-width:0;flex:1}.step p{font-size:13px;margin:5px 0 12px}code{font-family:ui-monospace,monospace;background:#eeefe7;padding:2px 6px;border-radius:5px;font-size:12px;overflow-wrap:anywhere}.button,button{font:inherit;font-size:13px;background:#285b43;border:0;color:#fff;border-radius:10px;padding:12px 17px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-weight:650}.secondary{background:#edf2e7;color:#496a39;border:1px solid #d8e1cc}.note{background:#f1f4e9;border-radius:10px;padding:13px 16px;color:#6e805b;font-size:12px;margin:14px 0}.warn{background:#fff2e1;color:#927044}input,textarea{font:inherit;width:100%;padding:11px 13px;border:1px solid #d8ddce;border-radius:9px;margin:6px 0 13px;background:#fff;font-size:13px}label{font-size:13px;font-weight:650}textarea{height:210px;font-family:ui-monospace,monospace;font-size:11px}details{margin:12px 0}summary{cursor:pointer;font-size:12px;color:#78886b}table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0}td,th{border-bottom:1px solid #e7e9de;padding:10px;text-align:left}.row{display:flex;gap:10px;flex-wrap:wrap}.status{font-size:12px;color:#486c37;white-space:pre-wrap}.error{color:#a9432e}ul,ol{padding-left:20px;font-size:13px;color:#697361}strong{color:#32422c}footer{font-size:11px;color:#8e9686;padding:16px 0;line-height:2}.path{font-size:12px;padding:12px;background:#f4f2e9;border-radius:9px;margin:10px 0;line-height:2}button:disabled{opacity:.6;cursor:wait}:focus-visible{outline:3px solid #e45e3470;outline-offset:3px}[hidden]{display:none!important}@media(max-width:550px){h1{font-size:28px}section{padding:22px 18px}.step{gap:11px}main{padding:24px 16px 45px}h2{font-size:21px}table{font-size:11px}td,th{padding:8px 4px}.row>*{width:100%}}
+</style></head><body><main>
+<header><a class="brand" href="./"><img src="assets/favicon.svg" alt="">SANDS LUNCH CLUB</a><a href="index.html">점심판 열기 ↗</a></header>
+<div class="intro"><p class="tag">ONE-TIME SETUP</p><h1>코딩은 끝났어요.<br>이제 우리 점심판을 열어볼까요?</h1><p>파일을 GitHub에 올리면 화면이 열립니다. 동료와 선택을 공유하려면 Google 연결을 한 번 더 진행해 주세요. 코드 작성 없이 복사·붙여넣기로 설정할 수 있습니다.</p></div>
+<section id="update"><h2>이번 수정본 적용하기</h2><p><strong>천진기(디자인팀) 추가 · 대표님과 점심 · 메가존 주간 식단 · 런치타임 공용 이미지</strong>가 반영되었습니다.</p><div class="note">아직 index.html만 열어보셨다면 아래 설치 순서를 처음부터 진행하면 됩니다. 기존 공유 서버가 있다면 아래 네 단계만 진행해 주세요.</div><ol><li>GitHub의 기존 <code>lunch-club</code> 저장소에 이번 압축 파일의 <strong>내용물을 전부 덮어쓰기</strong>합니다. <code>index.html</code> 외에 <code>app.js</code>, <code>core.js</code>, <code>menu-source.js</code>, <code>styles.css</code>, <code>setup.html</code>도 함께 바뀌었습니다.</li><li>평소 연결해 쓰던 브라우저에서 공개된 <code>setup.html</code>을 열고 아래 <strong>공유 서버 코드 전체 복사</strong>를 누릅니다. 기존 연결의 팀 키를 자동으로 유지합니다. 다른 브라우저라면 먼저 아래 팀 키에 기존 키를 입력해 주세요.</li><li>기존 Apps Script 프로젝트의 <code>Code.gs</code> 전체를 새 코드로 바꾸고 저장한 뒤, <code>initializeLunchClub</code>을 실행해 식단 이미지 저장에 필요한 <strong>Google Drive 권한</strong>을 허용합니다.</li><li><strong>배포 → 배포 관리 → 수정(연필) → 버전: 새 버전 → 배포</strong>로 갱신합니다. 기존 웹 앱 주소와 팀 키를 유지하면 동료 초대 링크도 그대로 사용할 수 있습니다. 점심판을 새로고침해 주세요.</li></ol><p>공유 연결 전에는 이미지가 이 기기에만 저장됩니다. 서버 업데이트까지 마치고 <strong>모두에게 식단 공유하기</strong>로 올린 이미지부터 동료들에게 표시됩니다.</p></section>
+<section><h2>1. GitHub에 점심판 올리기</h2>
+<div class="step"><span class="number">1</span><div class="step-body"><h3>압축을 풀어 주세요</h3><p><code>SANDS_Lunch_Club_GitHub.zip</code>을 압축 해제합니다. <code>index.html</code>을 더블클릭하면 먼저 화면을 확인할 수 있습니다.</p></div></div>
+<div class="step"><span class="number">2</span><div class="step-body"><h3>새 저장소를 만드세요</h3><p><a href="https://github.com/new" target="_blank" rel="noopener noreferrer">GitHub 새 저장소 만들기 ↗</a>에서 아래처럼 입력합니다. 기존 오키나와 여행 저장소는 그대로 두세요.</p><table><tr><th>항목</th><th>입력 / 선택</th></tr><tr><td>Owner</td><td>jsj-sands</td></tr><tr><td>Repository name</td><td><code>lunch-club</code></td></tr><tr><td>Visibility</td><td>Public</td></tr><tr><td>마지막 버튼</td><td>Create repository</td></tr></table><p>GitHub Pages 주소는 공개됩니다. 선택·불참 사유는 연결 후 별도의 공유 서버에 저장하고, 초대 링크의 팀 키로 접근합니다.</p></div></div>
+<div class="step"><span class="number">3</span><div class="step-body"><h3>압축을 푼 내용물을 전부 올리세요</h3><p>빈 저장소의 <strong>uploading an existing file</strong> 또는 <strong>Add file → Upload files</strong>를 누릅니다. 압축 파일이 아닌, 압축을 푼 폴더 <strong>안의 파일과 하위 폴더</strong>를 모두 끌어놓고 <strong>Commit changes</strong>를 누르세요.</p><div class="note"><code>index.html</code>이 저장소 첫 화면에 바로 보여야 합니다. <code>lunch-club/index.html</code>처럼 한 단계 더 들어가 있으면 파일을 바깥으로 다시 올려 주세요.</div></div></div>
+<div class="step"><span class="number">4</span><div class="step-body"><h3>페이지 공개를 켜세요</h3><div class="path">Settings → Pages → Build and deployment<br>Source: <strong>Deploy from a branch</strong><br>Branch: <strong>main</strong> / Folder: <strong>/(root)</strong> → Save</div><p>배포가 완료되면 아래 주소가 열립니다. 처음에는 수 분 걸릴 수 있습니다.</p><p><code>https://jsj-sands.github.io/lunch-club/</code></p><div class="note">여기까지만 해도 식단 원문, 요일별 참석 인원, 이 기기에서의 식당 선택을 사용할 수 있어요. 각자 누른 선택을 공유하려면 아래 연결을 마저 진행해 주세요.</div></div></div>
+</section>
+<section><h2>2. 다섯 사람의 선택 연결하기</h2><p>Google 계정 하나로 한 번만 연결합니다. 별도 스프레드시트를 직접 만들 필요는 없습니다. 런치타임 식단 이미지를 보관할 비공개 Google Drive 폴더는 초기 실행 시 자동으로 만듭니다.</p>
+<div class="step"><span class="number">1</span><div class="step-body"><h3>설정 안내를 공개된 주소에서 여세요</h3><p>GitHub에 올린 뒤 <code>https://jsj-sands.github.io/lunch-club/setup.html</code>을 열어 이 단계를 진행해 주세요. 이 브라우저에 팀 키를 보관합니다.</p><p id="localNotice" class="note warn" hidden>지금은 다운로드한 파일을 보고 있습니다. GitHub Pages 배포 후 그 주소의 setup.html에서 연결해 주세요.</p></div></div>
+<div class="step"><span class="number">2</span><div class="step-body"><h3>공유 서버 코드를 복사하세요</h3><p>아래 버튼은 이 점심판만의 무작위 팀 키가 들어간 코드를 복사합니다. 코드 내용을 수정할 필요가 없습니다.</p><div class="row"><button id="copyCode">공유 서버 코드 전체 복사</button><button id="downloadCode" class="secondary">복사가 안 되면 코드 파일 받기</button></div><p id="codeStatus" class="status" aria-live="polite"></p><details><summary>코드 직접 선택해서 복사하기</summary><textarea id="generatedCode" readonly aria-label="전체 공유 서버 코드"></textarea></details><p class="note">이 단계에서 복사한 코드와 팀 키는 GitHub에 올리지 마세요. Google Apps Script에만 붙여넣습니다. ZIP에 들어 있는 기본 소스에는 실제 팀 키가 없습니다.</p></div></div>
+<div class="step"><span class="number">3</span><div class="step-body"><h3>Google Apps Script에 붙여넣으세요</h3><p><a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer">Google Apps Script 열기 ↗</a> → <strong>새 프로젝트</strong>를 누릅니다. 프로젝트 이름은 <strong>SANDS 점심판</strong>으로 바꿔 주세요.</p><p>처음 보이는 <code>Code.gs</code>의 내용을 전부 지운 뒤 복사한 코드를 붙여넣고 저장합니다. 코드를 일부분만 붙이지 않도록 주의해 주세요.</p></div></div>
+<div class="step"><span class="number">4</span><div class="step-body"><h3>초기 실행을 한 번 해주세요</h3><p>상단 실행 함수 목록에서 <code>initializeLunchClub</code>을 선택하고 <strong>실행</strong>을 누릅니다. 권한 검토 화면이 뜨면 본인이 방금 만든 프로젝트와 계정이 맞는지 확인하고 승인합니다.</p><p>이 코드는 점심 선택 저장, 공개 식단 조회, 런치타임 식단 이미지 보관을 사용합니다. Google Drive에 식단 전용 폴더를 만들기 위한 권한이 추가되었습니다. 실행 로그에 <strong>점심판 준비 완료</strong>가 뜨면 성공입니다.</p><details><summary>본인이 만든 앱의 확인 안내가 나와요</summary><p>직접 만든 미검증 Apps Script에 Google의 경고 화면이 나올 수 있습니다. 프로젝트가 방금 만든 <strong>SANDS 점심판</strong>인지 확인한 뒤 고급 메뉴의 프로젝트 이동 항목으로 진행하세요. 회사 계정의 관리자가 허용하지 않은 경우에는 관리자에게 허용 가능한 연결 방식을 확인해야 합니다.</p></details></div></div>
+<div class="step"><span class="number">5</span><div class="step-body"><h3>웹 앱으로 배포하세요</h3><div class="path">오른쪽 위 <strong>배포 → 새 배포</strong><br>유형 선택(톱니바퀴) → <strong>웹 앱</strong><br>다음 사용자 인증 정보로 실행: <strong>나</strong><br>액세스 권한이 있는 사용자: <strong>모든 사용자 / Anyone</strong><br>마지막으로 <strong>배포</strong></div><p>표시되는 <strong>웹 앱 URL</strong>을 복사하세요. <code>https://script.google.com/macros/s/…/exec</code> 형태입니다. 배포 ID나 <code>/dev</code> 테스트 주소가 아닙니다.</p><p class="note">공유 서버는 팀 키가 있는 요청만 처리합니다. 초대 링크를 가진 사람은 이름을 선택해 기록을 수정할 수 있는, 다섯 사람용 간단한 공유판입니다.</p></div></div>
+<div class="step"><span class="number">6</span><div class="step-body"><h3>주소를 붙여넣고 연결하세요</h3><form id="connectForm"><label for="endpoint">방금 복사한 웹 앱 URL</label><input id="endpoint" type="url" required placeholder="https://script.google.com/macros/s/…/exec"><details><summary>다른 브라우저에서 설정했거나 기존 팀 키가 있어요</summary><label for="teamKey">팀 키</label><input id="teamKey" type="password" autocomplete="off"><p>처음 코드를 복사한 브라우저에서는 자동 입력됩니다. 기존 연결의 키를 쓸 때만 변경하세요.</p></details><button type="submit" id="connectButton">연결 확인하고 점심판 열기 →</button><p id="connectStatus" class="status" aria-live="polite"></p></form></div></div>
+<div class="step"><span class="number">7</span><div class="step-body"><h3>동료에게 초대 링크를 보내세요</h3><p>점심판 상단에 <strong>팀 공유 연결됨</strong>이 표시되면 <strong>동료 초대</strong>를 누릅니다. 복사된 링크를 손주리·윤현수·김윤철·천진기 님에게 전달하세요. 각자 본인 이름을 선택하면 준비 끝입니다.</p><p>선택 결과는 약 30초마다 확인합니다. 팀 공유에 연결하기 전 이 기기에 저장했던 선택은 자동으로 업로드하지 않습니다.</p></div></div>
+</section>
+<section><h2>매일은 이렇게 사용해요</h2><ol><li>상단에서 내 이름을 고릅니다. 다음에는 기억합니다.</li><li>요일별 대표님과 점심 일정에 맞춰 함께 먹는 멤버가 표시됩니다.</li><li>안 먹는 날은 내 카드의 <strong>일정 변경 → 오늘 점심 안 먹어요</strong>를 선택합니다. 속이 안 좋음·선약·병원 등 사유는 선택사항입니다.</li><li>대표님과 점심 일정이 취소됐다면 <strong>오늘 대표님과 점심 취소</strong>를 켭니다. 개인 불참은 그대로 유지됩니다.</li><li>메가존 카드에서 <strong>오늘 식단 / 이번 주 식단</strong>을 눌러 비교합니다. 런치타임은 카카오 채널을 열어 프로필의 식단을 확인합니다.</li><li>런치타임의 <strong>식단 이미지 올리기</strong>에서 주간용 또는 하루용을 고르고 이미지를 올립니다. 팀 공유 연결 후 올리면 동료들도 같은 이미지를 봅니다. 이미지를 누르면 크게 열립니다.</li><li>함께 정한 식당과 만날 시간을 선택해 <strong>오늘 점심 확정하기</strong>를 누릅니다.</li></ol><div class="note">개인 불참과 대표님과 점심 취소는 해당 날짜에만 적용됩니다. 이미 골랐던 식당은 불참 중 집계에서 빠지고, 다시 함께 먹는 상태가 되면 집계에 돌아옵니다.</div></section>
+<section><h2>식단과 일정에 대해 알아둘 점</h2><ul><li><strong>메가존:</strong> 공유 연결 전에도 공개된 날짜별 점심 메뉴를 직접 조회합니다. 오늘과 이번 주 월~금 식단을 볼 수 있습니다. 날짜가 맞는 식단만 표시하며, 미등록과 조회 실패를 구분합니다. 메뉴 사진과 상세 내용은 Welplan 원문에서 확인합니다.</li><li><strong>런치타임:</strong> 카카오 채널 친구 추가 후 프로필에 올라온 식단을 확인합니다. 저장하거나 캡처한 JPG·PNG·WebP 이미지를 한 명이 올리면, 같은 팀 공유 연결을 사용하는 동료들에게 표시됩니다.</li><li><strong>식단 이미지 기간:</strong> 주간용은 월~일, 하루용은 지정한 날짜에 표시합니다. 같은 날짜에 하루용과 주간용이 모두 있으면 하루용을 우선 표시합니다. 다음 주에는 지난 주 이미지가 표시되지 않습니다.</li><li><strong>이미지 공유:</strong> 원본 선택은 15MB까지 가능하며 업로드 전 크기를 조정합니다. 이미지는 전용 비공개 Drive 폴더에 저장하고 팀 키로 조회합니다. 이미지 자체를 인터넷 공개 링크로 만들지 않습니다. 공유 연결 전 미리보기는 이 브라우저에만 보관하며 공유 연결 후 다시 올려야 합니다.</li><li><strong>대표님과 점심 기본 일정:</strong> 조성준 화·금 / 손주리·윤현수 월·화·금 / 김윤철 수 / 천진기 화. 첨부 공지를 반영해 2026년 12월 31일까지 적용하며, 설정에서 기간과 요일을 바꿀 수 있습니다.</li><li><strong>주말·공휴일:</strong> 주말은 기본 불참입니다. 공휴일은 자동 판정하지 않으므로 개인별 상태를 바꿔 주세요.</li><li><strong>기록 보관:</strong> 공유 기록과 전용 식단 이미지는 최근 90일을 기준으로 정리합니다. 이 기기의 점심 기록은 최근 120일, 이미지 미리보기는 최근 3개를 보관합니다.</li></ul></section>
+<section><h2>잘 안 될 때</h2><table><tr><th>상황</th><th>확인할 것</th></tr><tr><td>GitHub 주소가 404예요</td><td>저장소 첫 화면에 index.html이 있는지, Pages가 main / (root)인지 확인합니다.</td></tr><tr><td>동료와 선택이 달라요</td><td>양쪽 모두 ‘팀 공유 연결됨’인지 확인합니다. 일반 주소 대신 ‘동료 초대’로 복사한 링크를 전달하세요.</td></tr><tr><td>팀 키 오류예요</td><td>코드를 복사했던 브라우저에서 다시 연결합니다. 새 코드를 넣었다면 새 버전으로 재배포해야 합니다.</td></tr><tr><td>연결 응답이 없어요</td><td>웹 앱 실행 사용자 ‘나’, 접근 권한 ‘모든 사용자’, 주소 끝 /exec를 확인합니다. Workspace에서 익명 배포가 금지되어 있으면 관리자 확인이 필요합니다.</td></tr><tr><td>식단이 안 떠요</td><td>원문 서비스 또는 네트워크 문제일 수 있습니다. 카드의 ‘실시간 식단’ / 채널 원문을 확인합니다. 이전 날짜 메뉴를 오늘 것으로 표시하지 않습니다.</td></tr><tr><td>이미지를 올릴 수 없어요</td><td>이번 버전의 서버 코드를 넣고 initializeLunchClub을 다시 실행해 Drive 권한을 허용했는지 확인하세요. 새 버전 배포까지 해야 반영됩니다.</td></tr><tr><td>공유 서버 코드를 수정했어요</td><td>배포 → 배포 관리 → 수정(연필) → 버전 ‘새 버전’ → 배포. 기존 주소를 유지하면 팀 연결을 바꿀 필요가 없습니다.</td></tr></table></section>
+<footer>공식 설정 참고: <a href="https://docs.github.com/ko/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site" target="_blank" rel="noopener noreferrer">GitHub Pages</a> · <a href="https://developers.google.com/apps-script/guides/web?hl=ko" target="_blank" rel="noopener noreferrer">Google Apps Script</a> · <a href="https://welplan.pmh.codes/docs/api" target="_blank" rel="noopener noreferrer">Welplan 공개 API</a><br>이 패키지는 업로드용 소스입니다. GitHub 공개와 Google 계정 연결은 위 순서로 진행해야 완료됩니다.</footer>
+<script type="text/plain" id="codeTemplate">// SANDS Lunch Club — generated single-file Apps Script
+// Paste the entire code copied from setup.html into Code.gs.
+
+/* Shared, dependency-free rules used by the page and the Apps Script server. */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.LunchCore = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+  const MEMBERS = [
+    { id: 'seongjun', name: '조성준', team: '커뮤니케이션팀', days: [2, 5], color: 'coral' },
+    { id: 'juri', name: '손주리', team: '전략사업팀', days: [1, 2, 5], color: 'purple' },
+    { id: 'hyunsu', name: '윤현수', team: '전략사업팀', days: [1, 2, 5], color: 'blue' },
+    { id: 'yunchul', name: '김윤철', team: '경영지원팀', days: [3], color: 'green' },
+    { id: 'jingi', name: '천진기', team: '디자인팀', days: [2], color: 'amber' }
+  ];
+  const DEFAULT_SETTINGS = {
+    scheduleEnd: '2026-12-31',
+    ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
+    meetingTime: '12:00'
+  };
+  const WELPLAN = 'https://welplan.pmh.codes/restaurants/welstory/REST007327/' + encodeURIComponent('메가존산학연센터');
+  const PLACES = [
+    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: WELPLAN, type: 'cafeteria' },
+    { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' }
+  ];
+  function clone(v) { return JSON.parse(JSON.stringify(v)); }
+  function validDate(date) {
+    if (typeof date !== 'string' || !/^20\d{2}-\d{2}-\d{2}$/.test(date)) return false;
+    const d = new Date(date + 'T12:00:00Z');
+    return !isNaN(d) && d.toISOString().slice(0, 10) === date;
+  }
+  function today(now) {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now || new Date());
+    const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+  function weekday(date) { if (!validDate(date)) throw new Error('날짜를 확인해 주세요.'); return new Date(date + 'T12:00:00Z').getUTCDay(); }
+  function shiftDate(date, n) {
+    if (!validDate(date)) throw new Error('날짜를 확인해 주세요.');
+    const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
+  }
+  function weekDates(date) { const w = weekday(date); const mon = shiftDate(date, -(w === 0 ? 6 : w - 1)); return [0, 1, 2, 3, 4].map(n => shiftDate(mon, n)); }
+  function settings(value) {
+    const v = value || {}; const out = clone(DEFAULT_SETTINGS);
+    if (validDate(v.scheduleEnd)) out.scheduleEnd = v.scheduleEnd;
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(v.meetingTime || '')) out.meetingTime = v.meetingTime;
+    MEMBERS.forEach(m => { if (v.ceoDays && Array.isArray(v.ceoDays[m.id])) out.ceoDays[m.id] = [...new Set(v.ceoDays[m.id].filter(n => Number.isInteger(n) && n >= 1 && n <= 5))]; });
+    return out;
+  }
+  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, notes: {}, revision: 0, updatedAt: null }; }
+  function safeUrl(url) {
+    if (!url) return '';
+    const value = String(url).trim();
+    if (!/^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/i.test(value) || /[\u0000-\u0020<>"'\\]/.test(value)) return '';
+    if (typeof URL === 'undefined') return value;
+    try { const u = new URL(value); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch (_) { return ''; }
+  }
+  function cleanDay(value) {
+    const v = value || {}, d = emptyDay(); d.ceoCancelled = v.ceoCancelled === true;
+    MEMBERS.forEach(m => {
+      if (['in', 'out', 'ceo'].includes(v.overrides && v.overrides[m.id])) d.overrides[m.id] = v.overrides[m.id];
+      if (d.overrides[m.id] === 'out' && typeof (v.absenceReasons && v.absenceReasons[m.id]) === 'string') d.absenceReasons[m.id] = v.absenceReasons[m.id].trim().slice(0, 60);
+      if (typeof (v.votes && v.votes[m.id]) === 'string') d.votes[m.id] = v.votes[m.id].slice(0, 70);
+    });
+    const seen = new Set();
+    (Array.isArray(v.extras) ? v.extras : []).slice(0, 8).forEach(p => {
+      if (!p || !/^extra_[a-zA-Z0-9_-]{1,50}$/.test(p.id) || seen.has(p.id) || !String(p.name || '').trim()) return;
+      seen.add(p.id); d.extras.push({ id: p.id, name: String(p.name).trim().slice(0, 30), subtitle: String(p.subtitle || '').slice(0, 60), url: safeUrl(p.url) });
+    });
+    PLACES.concat(d.extras).forEach(p => { if (v.notes && typeof v.notes[p.id] === 'string') d.notes[p.id] = v.notes[p.id].slice(0, 300); });
+    if (v.decision && PLACES.concat(d.extras).some(p => p.id === v.decision.placeId)) {
+      d.decision = { placeId: v.decision.placeId, time: /^([01]\d|2[0-3]):[0-5]\d$/.test(v.decision.time || '') ? v.decision.time : '12:00', actor: MEMBERS.some(m => m.id === v.decision.actor) ? v.decision.actor : '', at: String(v.decision.at || '') };
+    }
+    d.revision = Number.isInteger(v.revision) ? Math.max(0, v.revision) : 0; d.updatedAt = v.updatedAt || null;
+    return d;
+  }
+  function memberStatus(id, date, day, config) {
+    const m = MEMBERS.find(x => x.id === id); if (!m) throw new Error('멤버를 확인해 주세요.');
+    const d = day || emptyDay(), s = settings(config), over = d.overrides[id];
+    if (over === 'in') return { in: true, reason: '오늘 함께해요', manual: true };
+    if (over === 'out') return { in: false, reason: '오늘 안 먹음', detail: (d.absenceReasons || {})[id] || '', manual: true };
+    if (over === 'ceo') return { in: false, reason: '대표님과 점심', manual: true };
+    const dow = weekday(date);
+    if (dow === 0 || dow === 6) return { in: false, reason: '주말', manual: false };
+    if (!d.ceoCancelled && date <= s.scheduleEnd && s.ceoDays[id].includes(dow)) return { in: false, reason: '대표님과 점심', manual: false };
+    return { in: true, reason: '함께 먹어요', manual: false };
+  }
+  function participants(date, day, config) { return MEMBERS.filter(m => memberStatus(m.id, date, day, config).in); }
+  function places(day) { return PLACES.concat((day || emptyDay()).extras || []); }
+  function tally(date, day, config) {
+    const result = Object.fromEntries(places(day).map(p => [p.id, []]));
+    participants(date, day, config).forEach(m => { const p = day.votes[m.id]; if (result[p]) result[p].push(m.id); });
+    return result;
+  }
+  function applyOperation(value, date, config, op, now) {
+    if (!validDate(date)) throw new Error('날짜 형식이 잘못되었습니다.');
+    if (!op || !MEMBERS.some(m => m.id === op.actor)) throw new Error('먼저 내 이름을 선택해 주세요.');
+    const d = cleanDay(value), p = op.payload || {}; const hasPlace = id => places(d).some(x => x.id === id);
+    switch (op.type) {
+      case 'availability':
+        if (!['auto', 'in', 'out', 'ceo'].includes(p.value)) throw new Error('참석 상태를 확인해 주세요.');
+        if (p.value === 'auto') delete d.overrides[op.actor]; else d.overrides[op.actor] = p.value;
+        if (p.value === 'out') d.absenceReasons[op.actor] = String(p.reason || '').trim().slice(0, 60);
+        else delete d.absenceReasons[op.actor];
+        break;
+      case 'ceo': if (typeof p.cancelled !== 'boolean') throw new Error('일정을 확인해 주세요.'); d.ceoCancelled = p.cancelled; break;
+      case 'vote':
+        if (p.placeId === null) { delete d.votes[op.actor]; break; }
+        if (!memberStatus(op.actor, date, d, config).in) throw new Error('오늘 함께 먹는 상태로 바꾼 뒤 선택해 주세요.');
+        if (!hasPlace(p.placeId)) throw new Error('식당을 다시 선택해 주세요.');
+        d.votes[op.actor] = p.placeId; break;
+      case 'addPlace':
+        if (d.extras.length >= 8) throw new Error('다른 식당은 하루 8곳까지 추가할 수 있어요.');
+        if (!/^extra_[a-zA-Z0-9_-]{1,50}$/.test(p.id || '') || hasPlace(p.id)) throw new Error('식당 번호가 중복되었습니다.');
+        if (!String(p.name || '').trim()) throw new Error('식당 이름을 입력해 주세요.');
+        if (p.url && !safeUrl(p.url)) throw new Error('지도 링크는 http 또는 https로 시작해야 합니다.');
+        d.extras.push({ id: p.id, name: String(p.name).trim().slice(0, 30), subtitle: String(p.subtitle || '').trim().slice(0, 60), url: safeUrl(p.url) }); break;
+      case 'removePlace':
+        if (!d.extras.some(x => x.id === p.placeId)) throw new Error('추가한 식당만 삭제할 수 있어요.');
+        d.extras = d.extras.filter(x => x.id !== p.placeId);
+        MEMBERS.forEach(m => { if (d.votes[m.id] === p.placeId) delete d.votes[m.id]; });
+        if (d.decision && d.decision.placeId === p.placeId) d.decision = null;
+        delete d.notes[p.placeId]; break;
+      case 'note':
+        if (!hasPlace(p.placeId)) throw new Error('식당을 확인해 주세요.');
+        d.notes[p.placeId] = String(p.text || '').trim().slice(0, 300); break;
+      case 'decision':
+        if (!hasPlace(p.placeId)) throw new Error('확정할 식당을 선택해 주세요.');
+        if (!participants(date, d, config).length) throw new Error('오늘 함께 먹는 사람이 없습니다.');
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time || '')) throw new Error('만날 시간을 입력해 주세요.');
+        d.decision = { placeId: p.placeId, time: p.time, actor: op.actor, at: now || new Date().toISOString() }; break;
+      case 'unconfirm': d.decision = null; break;
+      default: throw new Error('지원하지 않는 요청입니다.');
+    }
+    d.revision += 1; d.updatedAt = now || new Date().toISOString(); return d;
+  }
+  function parseMenuMarkdown(text) {
+    const block = String(text || '').split(/^## 점심\s*$/m)[1];
+    if (!block) return [];
+    return block.split(/^## /m)[0].split('\n').filter(x => /^- /.test(x)).map(x => x.slice(2).trim()).filter(Boolean).slice(0, 12);
+  }
+  function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
+});
+
+
+/* This file is appended to core.js to create the single copy/paste Code.gs. */
+const TEAM_KEY = '__TEAM_KEY__';
+const DATA_PREFIX = 'LUNCH_DAY_';
+const KEEP_DAYS = 90;
+const MENU_IMAGE_PREFIX = 'LUNCH_MENU_IMAGE_';
+const MENU_IMAGE_FOLDER_KEY = 'LUNCH_MENU_IMAGE_FOLDER';
+const MENU_IMAGE_FOLDER_MARKER = 'SANDS_LUNCH_MENU_IMAGES_V1';
+const MENU_IMAGE_FILE_MARKER = 'SANDS_LUNCH_MENU_IMAGE_V1:';
+const MENU_IMAGE_MAX_BYTES = 1024 * 1024;
+const MENU_IMAGE_MAX_REQUEST = 1572864;
+const MENU_IMAGE_UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+function initializeLunchClub() {
+  if (!/^[a-f0-9]{48,64}$/.test(TEAM_KEY)) throw new Error('setup.html의 코드 복사 버튼으로 만든 코드를 붙여넣어 주세요.');
+  const properties = PropertiesService.getScriptProperties(), lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    // Run again after upgrading: Apps Script must authorize Drive before deployment.
+    menuImageFolder_(properties, properties.getProperties(), true);
+    properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
+  } finally { lock.releaseLock(); }
+  UrlFetchApp.fetch('https://welplan.pmh.codes/api/health', { muteHttpExceptions: true });
+  console.log('점심판 준비 완료. 배포 > 새 배포 > 웹 앱에서 실행 사용자: 나 / 액세스: 모든 사용자로 배포하세요.');
+}
+
+function output_(body, callback) {
+  const text = JSON.stringify(body).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  if (callback && /^lunchReply_[a-f0-9]{24}$/.test(callback)) return ContentService.createTextOutput(callback + '(' + text + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
+}
+
+function authorized_(key) { return /^[a-f0-9]{48,64}$/.test(TEAM_KEY) && typeof key === 'string' && key === TEAM_KEY; }
+function menuImageSlot_(date, scope) {
+  if (!LunchCore.validDate(date) || !['day', 'week'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
+  const start = scope === 'week' ? LunchCore.weekDates(date)[0] : date;
+  return { key: scope + ':' + start, property: MENU_IMAGE_PREFIX + scope + '_' + start, scope: scope, date: start, startDate: start, endDate: scope === 'week' ? LunchCore.shiftDate(start, 6) : start };
+}
+function menuImageEntry_(all, slot) {
+  if (!all[slot.property]) return null;
+  let entry; try { entry = JSON.parse(all[slot.property]); } catch (_) { throw new Error('저장된 식단 이미지 정보를 확인하지 못했어요. 운영자에게 문의해 주세요.'); }
+  if (!entry || !MENU_IMAGE_UUID.test(entry.id || '') || entry.scope !== slot.scope || entry.date !== slot.date || entry.startDate !== slot.startDate || entry.endDate !== slot.endDate || typeof entry.fileId !== 'string' || !entry.fileId || typeof entry.folderId !== 'string' || !entry.folderId || !['image/jpeg', 'image/png', 'image/webp'].includes(entry.mimeType) || !Number.isInteger(entry.size) || entry.size < 1 || entry.size > MENU_IMAGE_MAX_BYTES) throw new Error('저장된 식단 이미지 정보를 확인하지 못했어요. 운영자에게 문의해 주세요.');
+  return entry;
+}
+function publicMenuImage_(entry) {
+  if (!entry) return null;
+  const value = {};
+  ['id', 'scope', 'date', 'startDate', 'endDate', 'name', 'mimeType', 'size', 'uploadedBy', 'uploadedAt'].forEach(k => { value[k] = entry[k]; });
+  return value;
+}
+function menuImageState_(all, date, dates) {
+  const slots = [menuImageSlot_(date, 'week')].concat(dates.map(d => menuImageSlot_(d, 'day'))), images = {};
+  slots.forEach(slot => { const entry = menuImageEntry_(all, slot); if (entry) images[slot.key] = publicMenuImage_(entry); });
+  return images;
+}
+function imageStorageError_() {
+  return new Error('식단 이미지 저장소에 접근하지 못했어요. 운영자가 Apps Script에서 initializeLunchClub을 다시 실행해 Drive 권한을 허용한 뒤 새 버전으로 배포해 주세요.');
+}
+function menuImageFolder_(properties, all, create) {
+  try {
+    let folder;
+    if (all[MENU_IMAGE_FOLDER_KEY]) {
+      folder = DriveApp.getFolderById(all[MENU_IMAGE_FOLDER_KEY]);
+      if (folder.isTrashed() || folder.getDescription() !== MENU_IMAGE_FOLDER_MARKER || folder.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error('unavailable dedicated folder');
+      return folder;
+    }
+    if (!create) throw new Error('folder not initialized');
+    folder = DriveApp.createFolder('SANDS Lunch Club · 런치타임 식단');
+    folder.setDescription(MENU_IMAGE_FOLDER_MARKER);
+    // PRIVATE + VIEW is valid; PRIVATE + NONE is not supported by DriveApp.
+    folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
+    properties.setProperty(MENU_IMAGE_FOLDER_KEY, folder.getId());
+    all[MENU_IMAGE_FOLDER_KEY] = folder.getId();
+    return folder;
+  } catch (_) { throw imageStorageError_(); }
+}
+function menuImageSignature_(bytes, mime) {
+  const b = i => (bytes[i] + 256) % 256;
+  const is = (at, values) => values.every((n, i) => b(at + i) === n);
+  if (mime === 'image/png') return bytes.length >= 24 && is(0, [137, 80, 78, 71, 13, 10, 26, 10]) && is(8, [0, 0, 0, 13, 73, 72, 68, 82]);
+  if (mime === 'image/jpeg') return bytes.length >= 12 && is(0, [255, 216, 255]) && is(bytes.length - 2, [255, 217]);
+  if (mime === 'image/webp') {
+    const size = b(4) + b(5) * 256 + b(6) * 65536 + b(7) * 16777216;
+    return bytes.length >= 20 && is(0, [82, 73, 70, 70]) && is(8, [87, 69, 66, 80]) && size === bytes.length - 8 && (is(12, [86, 80, 56, 32]) || is(12, [86, 80, 56, 76]) || is(12, [86, 80, 56, 88]));
+  }
+  return false;
+}
+function decodeMenuImage_(dataUrl) {
+  if (typeof dataUrl !== 'string' || dataUrl.length > 4 * Math.ceil(MENU_IMAGE_MAX_BYTES / 3) + 32) throw new Error('식단 이미지는 압축 후 1MB 이하로 올려 주세요.');
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
+  if (!match || match[2].length % 4 !== 0) throw new Error('JPG·PNG·WEBP 형식의 식단 사진을 선택해 주세요.');
+  const base64 = match[2], padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  if (base64.length / 4 * 3 - padding > MENU_IMAGE_MAX_BYTES) throw new Error('식단 이미지는 압축 후 1MB 이하로 올려 주세요.');
+  let bytes;
+  try { bytes = Utilities.base64Decode(base64); } catch (_) { throw new Error('이미지 파일을 읽지 못했어요. 사진을 다시 선택해 주세요.'); }
+  if (!bytes.length || Utilities.base64Encode(bytes) !== base64 || !menuImageSignature_(bytes, match[1])) throw new Error('이미지 형식과 파일 내용이 맞지 않아요. JPG·PNG·WEBP 사진을 다시 선택해 주세요.');
+  return { bytes: bytes, mimeType: match[1] };
+}
+function menuImageTag_(entry) {
+  return MENU_IMAGE_FILE_MARKER + JSON.stringify({ id: entry.id, slot: entry.scope + ':' + entry.date, endDate: entry.endDate, folderId: entry.folderId });
+}
+function ownsMenuImageFile_(file, entry, folderId) {
+  if (entry.folderId !== folderId || file.getDescription() !== menuImageTag_(entry)) return false;
+  const parents = file.getParents();
+  while (parents.hasNext()) if (parents.next().getId() === folderId) return true;
+  return false;
+}
+function retireMenuImage_(entry, all) {
+  try {
+    const file = DriveApp.getFileById(entry.fileId);
+    if (ownsMenuImageFile_(file, entry, all[MENU_IMAGE_FOLDER_KEY]) && !file.isTrashed()) file.setTrashed(true);
+    return true;
+  } catch (_) { return false; } // Leave inaccessible files for a later retention sweep.
+}
+function uploadMenuImage_(properties, all, date, op) {
+  const p = op.payload || {}, slot = menuImageSlot_(date, p.scope), previous = menuImageEntry_(all, slot);
+  // This also recovers a request whose metadata was saved before its receipt write failed.
+  if (previous && previous.operationId === op.id && previous.operationDate === date && previous.uploadedBy === op.actor) return;
+  if (typeof p.expectedImageId !== 'string' || (p.expectedImageId !== '' && !MENU_IMAGE_UUID.test(p.expectedImageId))) throw new Error('식단 이미지를 새로고침한 뒤 다시 올려 주세요.');
+  if (p.expectedImageId !== (previous ? previous.id : '')) throw new Error('다른 멤버가 식단 이미지를 먼저 바꿨어요. 새로고침 후 새 이미지를 확인하고 다시 올려 주세요.');
+  const decoded = decodeMenuImage_(p.dataUrl), folder = menuImageFolder_(properties, all, true);
+  const name = typeof p.name === 'string' ? p.name.replace(/[\u0000-\u001f\u007f/\\]/g, '').trim().slice(0, 100) : '';
+  const entry = { id: Utilities.getUuid(), scope: slot.scope, date: slot.date, startDate: slot.startDate, endDate: slot.endDate, name: name || '런치타임 식단', mimeType: decoded.mimeType, size: decoded.bytes.length, uploadedBy: op.actor, uploadedAt: new Date().toISOString(), operationId: op.id, operationDate: date, folderId: folder.getId() };
+  const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[entry.mimeType];
+  let file;
+  try {
+    file = folder.createFile(Utilities.newBlob(decoded.bytes, entry.mimeType, 'LunchMenu_' + entry.scope + '_' + entry.date + '_' + entry.id + '.' + extension));
+    file.setDescription(menuImageTag_(entry));
+    file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
+    entry.fileId = file.getId();
+    properties.setProperty(slot.property, JSON.stringify(entry));
+    all[slot.property] = JSON.stringify(entry);
+  } catch (_) {
+    if (file) { try { file.setTrashed(true); } catch (_) {} }
+    throw imageStorageError_();
+  }
+  // Old binary data is retired only after the new slot has been published successfully.
+  if (previous) retireMenuImage_(previous, all);
+}
+function menuImageResponse_(date, scope, imageId) {
+  if (!MENU_IMAGE_UUID.test(imageId || '')) throw new Error('식단 이미지를 새로고침한 뒤 다시 열어 주세요.');
+  const slot = menuImageSlot_(date, scope), lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const properties = PropertiesService.getScriptProperties(), all = properties.getProperties(), entry = menuImageEntry_(all, slot);
+    if (!entry || entry.id !== imageId) throw new Error('식단 이미지가 바뀌었어요. 새로고침한 후 다시 열어 주세요.');
+    let bytes;
+    try {
+      const folder = menuImageFolder_(properties, all, false), file = DriveApp.getFileById(entry.fileId);
+      if (file.isTrashed() || !ownsMenuImageFile_(file, entry, folder.getId()) || file.getSize() !== entry.size || file.getMimeType() !== entry.mimeType || file.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error('unavailable image');
+      bytes = file.getBlob().getBytes();
+      if (bytes.length !== entry.size || !menuImageSignature_(bytes, entry.mimeType)) throw new Error('invalid image');
+    } catch (_) { throw imageStorageError_(); }
+    return { ok: true, image: Object.assign(publicMenuImage_(entry), { dataUrl: 'data:' + entry.mimeType + ';base64,' + Utilities.base64Encode(bytes) }) };
+  } finally { lock.releaseLock(); }
+}
+function pruneMenuImages_(properties, all, keepDate) {
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'), cutoff = LunchCore.shiftDate(today, -KEEP_DAYS);
+  const keep = [menuImageSlot_(keepDate, 'day').key, menuImageSlot_(keepDate, 'week').key];
+  Object.keys(all).forEach(key => {
+    const match = /^LUNCH_MENU_IMAGE_(day|week)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
+    if (!match || !LunchCore.validDate(match[2])) return;
+    const slot = menuImageSlot_(match[2], match[1]);
+    if (key !== slot.property || keep.includes(slot.key) || slot.endDate >= cutoff) return;
+    let entry; try { entry = menuImageEntry_(all, slot); } catch (_) { return; }
+    if (!entry || retireMenuImage_(entry, all)) { properties.deleteProperty(key); delete all[key]; }
+  });
+  // At most once per day, retire old owned leftovers from interrupted requests.
+  if (!all[MENU_IMAGE_FOLDER_KEY] || all.LUNCH_MENU_IMAGE_LAST_PRUNE === today) return;
+  try {
+    const folder = menuImageFolder_(properties, all, false), files = folder.getFiles();
+    while (files.hasNext()) {
+      const file = files.next(), description = file.getDescription();
+      if (!description.startsWith(MENU_IMAGE_FILE_MARKER)) continue;
+      let tag; try { tag = JSON.parse(description.slice(MENU_IMAGE_FILE_MARKER.length)); } catch (_) { continue; }
+      const match = /^(day|week):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
+      if (!match || !MENU_IMAGE_UUID.test(tag.id || '') || !LunchCore.validDate(match[2]) || tag.folderId !== folder.getId()) continue;
+      const slot = menuImageSlot_(match[2], match[1]);
+      if (slot.key !== tag.slot || tag.endDate !== slot.endDate || slot.endDate >= cutoff || keep.includes(slot.key)) continue;
+      // Only files created by this feature in this dedicated folder have this exact tag.
+      if (file.getDateCreated().getTime() < Date.parse(cutoff + 'T00:00:00+09:00')) file.setTrashed(true);
+    }
+    properties.setProperty('LUNCH_MENU_IMAGE_LAST_PRUNE', today);
+  } catch (_) { /* Image housekeeping must not block votes when Drive is unavailable. */ }
+}
+function getConfig_(all) {
+  let value = {}; try { value = JSON.parse(all.LUNCH_CONFIG || '{}'); } catch (_) {}
+  return { settings: LunchCore.settings(value.settings), revision: Number.isInteger(value.revision) ? value.revision : 0 };
+}
+function getRecord_(all, date) {
+  const prefix = DATA_PREFIX + date;
+  if (!all[prefix]) return { data: LunchCore.emptyDay(), receipts: {} };
+  const meta = JSON.parse(all[prefix]);
+  let json = ''; for (let i = 0; i < meta.parts; i++) {
+    const part = all[prefix + '_' + meta.generation + '_' + i];
+    if (typeof part !== 'string') throw new Error('저장 기록을 읽는 중입니다. 잠시 후 다시 시도해 주세요.');
+    json += part;
+  }
+  const result = JSON.parse(json); result.data = LunchCore.cleanDay(result.data); result.receipts = result.receipts || {}; return result;
+}
+function saveRecord_(properties, all, date, record) {
+  const json = JSON.stringify(record);
+  if (Utilities.newBlob(json).getBytes().length > 42000) throw new Error('하루 기록이 너무 큽니다. 긴 지도 링크나 메뉴 메모를 줄여 주세요.');
+  const chars = Array.from(json), prefix = DATA_PREFIX + date, generation = Utilities.getUuid().replace(/-/g, '').slice(0, 12), values = {};
+  const parts = Math.ceil(chars.length / 1500);
+  values[prefix] = JSON.stringify({ parts: parts, generation: generation });
+  for (let i = 0; i < parts; i++) values[prefix + '_' + generation + '_' + i] = chars.slice(i * 1500, (i + 1) * 1500).join('');
+  properties.setProperties(values, false);
+  // Readers use one getProperties snapshot; old generations are removed after publishing metadata.
+  Object.keys(all).filter(k => k.startsWith(prefix + '_')).forEach(k => properties.deleteProperty(k));
+}
+function prune_(properties, all, keepDate) {
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const cutoff = LunchCore.shiftDate(today, -KEEP_DAYS);
+  const dates = Object.keys(all).filter(k => /^LUNCH_DAY_20\d{2}-\d{2}-\d{2}$/.test(k)).map(k => k.slice(DATA_PREFIX.length)).sort();
+  dates.filter((date, i) => date !== keepDate && (date < cutoff || i < dates.length - 89)).forEach(date => {
+    const prefix = DATA_PREFIX + date;
+    Object.keys(all).filter(k => k === prefix || k.startsWith(prefix + '_')).forEach(k => properties.deleteProperty(k));
+  });
+  pruneMenuImages_(properties, all, keepDate);
+}
+function stateResponse_(date, receiptId) {
+  const all = PropertiesService.getScriptProperties().getProperties(), cfg = getConfig_(all), dates = LunchCore.weekDates(date);
+  if (!dates.includes(date)) dates.push(date);
+  const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
+  const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
+  return { ok: true, serverVersion: 2, features: { menuImages: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+}
+function menuResponse_(date) {
+  const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;
+  const previous = cache.get(cacheKey); if (previous) return { ok: true, menu: JSON.parse(previous) };
+  const url = LunchCore.menuUrl(date);
+  const response = UrlFetchApp.fetch(url, { headers: { Accept: 'text/markdown' }, muteHttpExceptions: true, followRedirects: true });
+  if (response.getResponseCode() !== 200) throw new Error('식단 원본에 연결하지 못했어요. 원문 식단에서 확인해 주세요.');
+  const text = response.getContentText();
+  const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)), d = Number(date.slice(8, 10));
+  if (!text.includes(y + '년 ' + m + '월 ' + d + '일') || !text.includes('메가존산학연센터') || !text.includes('- Vendor:')) throw new Error('선택한 날짜의 식단 원문을 확인하지 못했어요.');
+  const menu = { date: date, dishes: LunchCore.parseMenuMarkdown(text), fetchedAt: new Date().toISOString(), source: url };
+  cache.put(cacheKey, JSON.stringify(menu), 600);
+  return { ok: true, menu: menu };
+}
+function doGet(e) {
+  const p = (e || {}).parameter || {}, callback = p.callback || '';
+  try {
+    if (callback && !/^lunchReply_[a-f0-9]{24}$/.test(callback)) return output_({ ok: false, error: '콜백 형식이 올바르지 않습니다.' });
+    if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
+    if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
+    if (p.action === 'menu') return output_(menuResponse_(p.date), callback);
+    if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);
+    if (p.action === 'state') return output_(stateResponse_(p.date, p.receipt), callback);
+    return output_({ ok: false, error: '지원하지 않는 조회입니다.' }, callback);
+  } catch (error) { return output_({ ok: false, error: error.message || '조회에 실패했어요. 다시 시도해 주세요.' }, callback); }
+}
+function doPost(e) {
+  let lock;
+  try {
+    const raw = e && e.postData && e.postData.contents;
+    if (typeof raw !== 'string' || !raw || raw.length > MENU_IMAGE_MAX_REQUEST) throw new Error('요청 크기가 올바르지 않습니다.');
+    const body = JSON.parse(raw);
+    if ((!body.op || body.op.type !== 'menuImageUpload') && raw.length > 10000) throw new Error('요청 크기가 올바르지 않습니다.');
+    if (body.op && body.op.type === 'menuImageUpload' && Utilities.newBlob(raw).getBytes().length > MENU_IMAGE_MAX_REQUEST) throw new Error('요청 크기가 올바르지 않습니다.');
+    if (!authorized_(body.key)) throw new Error('팀 키가 맞지 않습니다.');
+    if (!LunchCore.validDate(body.date) || !body.op || !/^[a-f0-9]{24}$/.test(body.op.id || '')) throw new Error('요청 형식이 올바르지 않습니다.');
+    if (!LunchCore.MEMBERS.some(m => m.id === body.op.actor)) throw new Error('멤버가 올바르지 않습니다.');
+    lock = LockService.getScriptLock(); lock.waitLock(20000);
+    const properties = PropertiesService.getScriptProperties(), all = properties.getProperties(), cfg = getConfig_(all), record = getRecord_(all, body.date);
+    if (record.receipts[body.op.id]) return output_({ ok: true, duplicate: true });
+    let receipt;
+    try {
+      if (body.op.type === 'menuImageUpload') uploadMenuImage_(properties, all, body.date, body.op);
+      else if (body.op.type === 'settings') {
+        const p = body.op.payload || {};
+        if (body.configRevision !== cfg.revision) throw new Error('다른 멤버가 기본 일정을 먼저 바꿨어요. 설정을 다시 열어 저장해 주세요.');
+        if (!LunchCore.validDate(p.scheduleEnd) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(p.meetingTime || '') || !p.ceoDays) throw new Error('기본 일정 정보를 확인해 주세요.');
+        const newConfig = { settings: LunchCore.settings(p), revision: cfg.revision + 1 };
+        properties.setProperty('LUNCH_CONFIG', JSON.stringify(newConfig));
+      } else record.data = LunchCore.applyOperation(record.data, body.date, cfg.settings, body.op, new Date().toISOString());
+      receipt = { ok: true, at: new Date().toISOString() };
+    } catch (error) { receipt = { ok: false, error: String(error.message).slice(0, 160), at: new Date().toISOString() }; }
+    const ids = Object.keys(record.receipts); while (ids.length >= 16) delete record.receipts[ids.shift()];
+    record.receipts[body.op.id] = receipt;
+    prune_(properties, all, body.date);
+    saveRecord_(properties, all, body.date, record);
+    return output_({ ok: true, accepted: true });
+  } catch (error) { return output_({ ok: false, error: error.message || '저장하지 못했어요. 다시 시도해 주세요.' }); }
+  finally { if (lock && lock.hasLock()) lock.releaseLock(); }
+}
+</script>
+<script>
+(function(){'use strict';
+const K={pending:'sandsLunch.pendingKey.v1',connection:'sandsLunch.connection.v1'};const $=id=>document.getElementById(id);
+function read(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
+function newKey(){return Array.from(crypto.getRandomValues(new Uint8Array(24)),n=>n.toString(16).padStart(2,'0')).join('');}
+const existing=read(K.connection);let key=existing&&existing.key||read(K.pending)||'';if(!/^[a-f0-9]{48,64}$/.test(key))key=newKey();
+try{localStorage.setItem(K.pending,JSON.stringify(key));}catch(e){}
+$('teamKey').value=key;$('endpoint').value=existing&&existing.url||'';
+function code(){return $('codeTemplate').textContent.replace("'__TEAM_KEY__'", "'"+key+"'");}
+function updateCodeKey(){const value=$('teamKey').value.trim();if(!/^[a-f0-9]{48,64}$/.test(value)){$('codeStatus').textContent='기존 팀 키를 정확히 입력해 주세요.';return false;}key=value;try{localStorage.setItem(K.pending,JSON.stringify(key));}catch(e){}$('generatedCode').value=code();return true;}
+$('teamKey').addEventListener('input',updateCodeKey);
+$('generatedCode').value=code();
+if(location.protocol==='file:')$('localNotice').hidden=false;
+$('copyCode').onclick=async()=>{if(!updateCodeKey())return;try{await navigator.clipboard.writeText(code());$('codeStatus').textContent='전체 코드를 복사했어요. Google Apps Script의 Code.gs에 붙여넣으세요.';}catch(e){$('generatedCode').closest('details').open=true;$('generatedCode').select();$('codeStatus').textContent='아래 코드를 전체 선택한 뒤 Ctrl+C 또는 ⌘C로 복사해 주세요.';}};
+$('downloadCode').onclick=()=>{if(!updateCodeKey())return;const u=URL.createObjectURL(new Blob([code()],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='SANDS_Lunch_Code.gs';a.click();setTimeout(()=>URL.revokeObjectURL(u),5000);};
+function today(){const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return p.year+'-'+p.month+'-'+p.day;}
+function probe(c){return new Promise((resolve,reject)=>{const name='lunchReply_'+newKey().slice(0,24),node=document.createElement('script');const timer=setTimeout(()=>{clean();reject(new Error('응답을 받지 못했어요. 배포 권한과 /exec 주소를 확인해 주세요.'));},28000);function clean(){clearTimeout(timer);node.remove();delete window[name];}window[name]=data=>{clean();resolve(data);};node.onerror=()=>{clean();reject(new Error('공유 서버에 연결하지 못했어요. 배포 권한이 모든 사용자로 되어 있는지 확인해 주세요.'));};node.referrerPolicy='no-referrer';node.src=c.url+'?'+new URLSearchParams({action:'state',date:today(),key:c.key,callback:name});document.head.appendChild(node);});}
+$('connectForm').onsubmit=async e=>{e.preventDefault();const c={url:$('endpoint').value.trim(),key:$('teamKey').value.trim()};const status=$('connectStatus');status.className='status';if(location.protocol==='file:'){status.className='status error';status.textContent='GitHub Pages의 setup.html을 열고 이 단계를 진행해 주세요.';return;}if(!/^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(c.url)||! /^[a-f0-9]{48,64}$/.test(c.key)){status.className='status error';status.textContent='/exec로 끝나는 웹 앱 주소와 팀 키를 확인해 주세요.';return;}$('connectButton').disabled=true;status.textContent='공유 서버 연결을 확인하고 있어요…';try{const result=await probe(c);if(!result.ok)throw new Error(result.error||'연결 설정을 확인해 주세요.');localStorage.setItem(K.connection,JSON.stringify(c));status.textContent='연결됐어요! 점심판을 열고 있습니다.';location.href='index.html';}catch(error){status.className='status error';status.textContent=error.message;}finally{$('connectButton').disabled=false;}};
+})();
+</script></main></body></html>

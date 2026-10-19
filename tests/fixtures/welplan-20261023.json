@@ -1,0 +1,123 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "structuredContent": {
+      "restaurant": {
+        "id": "REST007327",
+        "name": "메가존산학연센터",
+        "vendor": "welstory"
+      },
+      "date": "20261023",
+      "menuUrl": "https://welplan.pmh.codes/restaurants/welstory/REST007327/%EB%A9%94%EA%B0%80%EC%A1%B4%EC%82%B0%ED%95%99%EC%97%B0%EC%84%BC%ED%84%B0/20261023",
+      "meals": [
+        {
+          "id": "1",
+          "name": "아침",
+          "type": "breakfast",
+          "menus": []
+        },
+        {
+          "id": "2",
+          "name": "점심",
+          "type": "lunch",
+          "menus": [
+            {
+              "id": "20261023-REST007327-E5Z5-BB",
+              "name": "New 치즈스팸순두부찌개",
+              "components": [
+                {
+                  "name": "New 치즈스팸순두부찌개",
+                  "isMain": true
+                },
+                {
+                  "name": "수제계란말이",
+                  "isMain": false
+                },
+                {
+                  "name": "매운가지볶음",
+                  "isMain": false
+                },
+                {
+                  "name": "오이생채",
+                  "isMain": false
+                },
+                {
+                  "name": "배추김치",
+                  "isMain": false
+                },
+                {
+                  "name": "쌀밥",
+                  "isMain": false
+                }
+              ],
+              "isTakeOut": false
+            },
+            {
+              "id": "20261023-REST007327-E5Z5-CC",
+              "name": "해산물팟타이",
+              "components": [
+                {
+                  "name": "해산물팟타이",
+                  "isMain": true
+                },
+                {
+                  "name": "야채춘권&스위트칠리소스",
+                  "isMain": false
+                },
+                {
+                  "name": "양파초절임",
+                  "isMain": false
+                },
+                {
+                  "name": "배추김치",
+                  "isMain": false
+                },
+                {
+                  "name": "쌀국수장국",
+                  "isMain": false
+                }
+              ],
+              "isTakeOut": false
+            },
+            {
+              "id": "20261023-REST007327-E5Z5-DD",
+              "name": "[포케]오늘의데일리팩(우삼겹포케)",
+              "components": [
+                {
+                  "name": "[포케]오늘의데일리팩(우삼겹포케)",
+                  "isMain": true
+                }
+              ],
+              "isTakeOut": false
+            }
+          ]
+        },
+        {
+          "id": "3",
+          "name": "저녁",
+          "type": "dinner",
+          "menus": []
+        },
+        {
+          "id": "4",
+          "name": "야식",
+          "type": "supper",
+          "menus": []
+        },
+        {
+          "id": "5",
+          "name": "간식",
+          "type": "snack",
+          "menus": []
+        },
+        {
+          "id": "6",
+          "name": "새벽식",
+          "type": "dawn",
+          "menus": []
+        }
+      ]
+    }
+  }
+}

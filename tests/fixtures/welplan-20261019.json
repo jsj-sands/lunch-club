@@ -1,0 +1,131 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "structuredContent": {
+      "restaurant": {
+        "id": "REST007327",
+        "name": "메가존산학연센터",
+        "vendor": "welstory"
+      },
+      "date": "20261019",
+      "menuUrl": "https://welplan.pmh.codes/restaurants/welstory/REST007327/%EB%A9%94%EA%B0%80%EC%A1%B4%EC%82%B0%ED%95%99%EC%97%B0%EC%84%BC%ED%84%B0/20261019",
+      "meals": [
+        {
+          "id": "1",
+          "name": "아침",
+          "type": "breakfast",
+          "menus": []
+        },
+        {
+          "id": "2",
+          "name": "점심",
+          "type": "lunch",
+          "menus": [
+            {
+              "id": "20261019-REST007327-E5Z5-BB",
+              "name": "나주곰탕*당면사리",
+              "components": [
+                {
+                  "name": "나주곰탕*당면사리",
+                  "isMain": true
+                },
+                {
+                  "name": "데리야끼고기경단조림",
+                  "isMain": false
+                },
+                {
+                  "name": "건파래볶음",
+                  "isMain": false
+                },
+                {
+                  "name": "오복지무침",
+                  "isMain": false
+                },
+                {
+                  "name": "깍두기",
+                  "isMain": false
+                },
+                {
+                  "name": "흑미밥",
+                  "isMain": false
+                }
+              ],
+              "isTakeOut": false
+            },
+            {
+              "id": "20261019-REST007327-E5Z5-CC",
+              "name": "눈꽃치즈김치볶음밥",
+              "components": [
+                {
+                  "name": "눈꽃치즈김치볶음밥",
+                  "isMain": true
+                },
+                {
+                  "name": "돼지고기육전*부추무침",
+                  "isMain": false
+                },
+                {
+                  "name": "떠먹는요구르트(딸기맛)",
+                  "isMain": false
+                },
+                {
+                  "name": "오복지무침",
+                  "isMain": false
+                },
+                {
+                  "name": "깍두기",
+                  "isMain": false
+                },
+                {
+                  "name": "온육수",
+                  "isMain": false
+                }
+              ],
+              "isTakeOut": false
+            },
+            {
+              "id": "20261019-REST007327-E5Z5-DD",
+              "name": "[오늘의데일리팩] 치킨텐더포케",
+              "components": [
+                {
+                  "name": "[오늘의데일리팩] 치킨텐더포케",
+                  "isMain": true
+                },
+                {
+                  "name": "[오늘의샐러드] New 차돌유자포테이토샐러드)",
+                  "isMain": false
+                }
+              ],
+              "isTakeOut": false
+            }
+          ]
+        },
+        {
+          "id": "3",
+          "name": "저녁",
+          "type": "dinner",
+          "menus": []
+        },
+        {
+          "id": "4",
+          "name": "야식",
+          "type": "supper",
+          "menus": []
+        },
+        {
+          "id": "5",
+          "name": "간식",
+          "type": "snack",
+          "menus": []
+        },
+        {
+          "id": "6",
+          "name": "새벽식",
+          "type": "dawn",
+          "menus": []
+        }
+      ]
+    }
+  }
+}

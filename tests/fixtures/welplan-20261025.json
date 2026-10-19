@@ -1,0 +1,53 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "structuredContent": {
+      "restaurant": {
+        "id": "REST007327",
+        "name": "메가존산학연센터",
+        "vendor": "welstory"
+      },
+      "date": "20261025",
+      "menuUrl": "https://welplan.pmh.codes/restaurants/welstory/REST007327/%EB%A9%94%EA%B0%80%EC%A1%B4%EC%82%B0%ED%95%99%EC%97%B0%EC%84%BC%ED%84%B0/20261025",
+      "meals": [
+        {
+          "id": "1",
+          "name": "아침",
+          "type": "breakfast",
+          "menus": []
+        },
+        {
+          "id": "2",
+          "name": "점심",
+          "type": "lunch",
+          "menus": []
+        },
+        {
+          "id": "3",
+          "name": "저녁",
+          "type": "dinner",
+          "menus": []
+        },
+        {
+          "id": "4",
+          "name": "야식",
+          "type": "supper",
+          "menus": []
+        },
+        {
+          "id": "5",
+          "name": "간식",
+          "type": "snack",
+          "menus": []
+        },
+        {
+          "id": "6",
+          "name": "새벽식",
+          "type": "dawn",
+          "menus": []
+        }
+      ]
+    }
+  }
+}

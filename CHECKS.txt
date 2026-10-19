@@ -1,0 +1,24 @@
+SANDS Lunch Club 수정본 검증 · 2026-10-19
+
+자동 기능 검사: 49건 통과
+- core.test.cjs: 12건 통과
+- image-server.test.cjs: 11건 통과
+- menu-source.test.cjs: 11건 통과
+- server.test.cjs: 6건 통과
+- ui.test.cjs: 9건 통과
+
+추가 확인
+- app.js / core.js / menu-source.js / backend/server.js / setup.html 스크립트 문법 검사 통과
+- 배포용 Code.gs와 setup.html 내 서버 코드가 최신 core.js + backend/server.js와 일치
+- 천진기(디자인팀), 화요일 대표님과 점심, 기존 네 사람 설정 보존
+- 메가존 공개 API의 오늘/금요일 실제 응답과 CORS 설정 확인, 응답 fixture로 날짜·식당 검증
+- 주간 미등록과 조회 오류 구분, 다른 날짜 메뉴 혼용 방지
+- 이미지 업로드 선택→준비→POST→서버 확인→독립 동료 세션 표시 경로 검증
+- 주간/하루 구분, 날짜 변경, 로컬 전용 저장, 구서버 업데이트 안내 검증
+- 서버 권한·용량·MIME·중복·충돌·실패 복구 및 관련 없는 파일 보존 검증
+
+검증 범위
+- 이미지 압축 호출과 화면·서버 통신은 DOM/Canvas/Apps Script 모의 환경에서 검증
+- 실제 브라우저의 화면 배치 및 압축 품질을 시각 검수하지는 못함
+- 사용자의 GitHub/Google 계정에 실제 배포하거나 업로드하지 않음
+- Google 서버 업데이트 후 두 기기에서 이미지 공유를 최종 확인해야 함

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5ef">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="다섯 사람의 오늘 점심. 참석 확인부터 식단 비교, 식당 선택까지 한곳에서.">
+  <title>오늘 점심 · SANDS Lunch Club</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="core.js" defer></script>
+  <script src="menu-source.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">본문 바로가기</a>
+  <header class="site-header">
+    <a class="brand" href="./"><img src="assets/favicon.svg" width="34" height="34" alt=""><span>SANDS <b>LUNCH CLUB</b></span></a>
+    <nav aria-label="페이지 메뉴"><a href="#menuSection">오늘 식단</a><a href="#weekSection">주간 일정</a><button id="settingsBtn" class="icon-button" aria-label="공유 연결 및 기본 일정 설정"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/></svg></button></nav>
+  </header>
+  <main id="main" class="page">
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="hero-copy"><p class="eyebrow">A LITTLE BREAK, TOGETHER.</p><h1 id="heroTitle">오늘 점심,<br><span>같이 먹을까요?</span></h1><p class="hero-description">메뉴는 가볍게 고르고, 점심은 함께 즐겨요.</p><div class="hero-pills"><span id="heroDate" class="pill"></span><span id="heroCount" class="pill soft-green"></span></div></div>
+      <div class="hero-art" aria-hidden="true"><div class="sun-dot"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="plate"><div class="plate-rim"><div class="rice rice-one"></div><div class="rice rice-two"></div><div class="rice rice-three"></div><div class="leaf leaf-one"></div><div class="leaf leaf-two"></div><div class="tomato tomato-one"></div><div class="tomato tomato-two"></div><div class="egg"><i></i></div></div></div><div class="chopstick stick-one"></div><div class="chopstick stick-two"></div><span class="art-label">GOOD FOOD.<br>BETTER COMPANY.</span><span class="spark spark-one">✳</span><span class="spark spark-two">✳</span></div>
+    </section>
+    <div id="connectionBanner" class="connection-banner" aria-live="polite"></div>
+    <section class="date-toolbar" aria-label="날짜와 참여자 선택">
+      <div class="date-controls"><button id="prevDate" class="icon-button" aria-label="이전 날">←</button><label class="date-label"><span class="sr-only">점심 날짜</span><input type="date" id="dateInput" min="2020-01-01" max="2099-12-31"></label><button id="nextDate" class="icon-button" aria-label="다음 날">→</button><button id="todayBtn" class="small-button">오늘</button></div>
+      <label class="identity"><span>나는</span><select id="identitySelect" aria-label="내 이름"><option value="">이름 선택</option></select></label>
+    </section>
+    <section class="people-section" aria-labelledby="peopleTitle">
+      <div class="section-heading"><div><span class="section-kicker">01 / THE CREW</span><h2 id="peopleTitle">오늘 함께 먹는 사람</h2></div><label class="switch-label"><input id="ceoCancelled" type="checkbox" role="switch"><span class="switch-track"></span><span>오늘 대표님과 점심 취소</span></label></div>
+      <p id="availabilityHint" class="section-description"></p>
+      <div id="membersGrid" class="members-grid"></div>
+    </section>
+    <div class="main-columns">
+      <section id="menuSection" class="menu-section" aria-labelledby="menuTitle">
+        <div class="section-heading"><div><span class="section-kicker">02 / ON THE MENU</span><h2 id="menuTitle">오늘은 어디로 갈까요?</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
+        <div id="restaurantCards" class="restaurant-cards"></div>
+        <button id="addPlaceBtn" class="add-place"><span>＋</span> 다른 식당 제안하기 <small>오늘은 새로운 곳도 좋아요</small></button>
+      </section>
+      <aside class="decision-panel" aria-labelledby="decisionTitle">
+        <div class="section-kicker">03 / OUR PICK</div><h2 id="decisionTitle">우리의 점심 선택</h2><p id="voteSummary" class="section-description"></p>
+        <div id="voteResults"></div>
+        <div id="decisionContent"></div>
+        <div class="share-actions"><button id="copySummary" class="secondary-button">점심 공지 복사</button><button id="shareLink" class="text-button">초대 / 선택 결과 링크 ↗</button></div>
+        <p class="tiny-note">참석하는 멤버의 선택만 집계해요.<br>동률이면 함께 정하거나 가볍게 추첨하세요.</p>
+      </aside>
+    </div>
+    <section id="weekSection" class="week-section" aria-labelledby="weekTitle">
+      <div class="section-heading"><div><span class="section-kicker">LOOKING AHEAD</span><h2 id="weekTitle">이번 주, 함께할 점심</h2></div><span id="scheduleBadge" class="subtle-badge"></span></div>
+      <div class="table-scroll"><table class="week-table"><thead id="weekHead"></thead><tbody id="weekBody"></tbody></table></div>
+      <p class="tiny-note">● 함께 점심 &nbsp; 대표님과 점심 &nbsp; — 개인 일정 / 주말 &nbsp; · 날짜를 누르면 해당 날로 이동해요.</p>
+    </section>
+    <footer><span>SANDS LUNCH CLUB <i>—</i> 작은 선택, 함께하는 점심.</span><a href="setup.html">처음 설정하는 분께 ↗</a></footer>
+  </main>
+  <div id="toast" role="status" class="toast" hidden></div>
+  <dialog id="appDialog"><div class="dialog-heading"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-button" aria-label="닫기">×</button></div><div id="dialogContent"></div></dialog>
+  <noscript><p class="no-script">이 점심판은 JavaScript를 켜야 사용할 수 있습니다. <a href="https://welplan.pmh.codes/restaurants/welstory/REST007327/메가존산학연센터">메가존 식단 바로 보기</a></p></noscript>
+</body>
+</html>
