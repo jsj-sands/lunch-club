@@ -23,6 +23,8 @@
   const MEMBER_IDS = new Set(MEMBERS.map(m => m.id));
   const PAIR_ID = /^pair_[a-f0-9]{24}$/;
   const OVERRIDE_VALUES = ['in', 'out', 'ceo', 'pending', 'separate'];
+  const GUIDE_ID = /^guide_(\d{5,20})$/;
+  const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
   const DEFAULT_SETTINGS = {
     scheduleEnd: '2026-12-31',
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
@@ -57,7 +59,7 @@
     MEMBERS.forEach(m => { if (v.ceoDays && Array.isArray(v.ceoDays[m.id])) out.ceoDays[m.id] = [...new Set(v.ceoDays[m.id].filter(n => Number.isInteger(n) && n >= 1 && n <= 5))]; });
     return out;
   }
-  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, notes: {}, pairs: [], revision: 0, updatedAt: null }; }
+  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, ceoDecision: null, notes: {}, pairs: [], revision: 0, updatedAt: null }; }
   function safeUrl(url) {
     if (!url) return '';
     const value = String(url).trim();
@@ -70,6 +72,7 @@
     MEMBERS.forEach(m => {
       if (OVERRIDE_VALUES.includes(v.overrides && v.overrides[m.id])) d.overrides[m.id] = v.overrides[m.id];
       if (d.overrides[m.id] === 'out' && typeof (v.absenceReasons && v.absenceReasons[m.id]) === 'string') d.absenceReasons[m.id] = v.absenceReasons[m.id].trim().slice(0, 60);
+      // Older extra-place selections are kept for backwards compatibility, but never tallied as regular lunch.
       if (typeof (v.votes && v.votes[m.id]) === 'string') d.votes[m.id] = v.votes[m.id].slice(0, 70);
     });
     const seen = new Set();
@@ -80,6 +83,15 @@
     PLACES.concat(d.extras).forEach(p => { if (v.notes && typeof v.notes[p.id] === 'string') d.notes[p.id] = v.notes[p.id].slice(0, 300); });
     if (v.decision && PLACES.concat(d.extras).some(p => p.id === v.decision.placeId)) {
       d.decision = { placeId: v.decision.placeId, time: /^([01]\d|2[0-3]):[0-5]\d$/.test(v.decision.time || '') ? v.decision.time : '12:00', actor: MEMBERS.some(m => m.id === v.decision.actor) ? v.decision.actor : '', at: String(v.decision.at || '') };
+    }
+    // A CEO venue belongs to one date, not to each person's cafeteria choice.
+    const ceo = v.ceoDecision, guideMatch = typeof ceo?.placeId === 'string' && ceo.placeId.match(GUIDE_ID);
+    if (guideMatch && ceo.url === `https://m.place.naver.com/place/${guideMatch[1]}/home`
+        && typeof ceo.name === 'string' && ceo.name.trim()
+        && typeof ceo.actor === 'string' && MEMBER_IDS.has(ceo.actor) && TIME.test(ceo.time || '')) {
+      d.ceoDecision = { placeId: ceo.placeId, name: ceo.name.trim().slice(0, 60), url: ceo.url,
+        category: typeof ceo.category === 'string' ? ceo.category.slice(0, 20) : '',
+        time: ceo.time, actor: ceo.actor, at: typeof ceo.at === 'string' ? ceo.at.slice(0, 40) : '' };
     }
     const pairs = (Array.isArray(v.pairs) ? v.pairs : []).slice(0, MEMBERS.length * MEMBERS.length), pairIds = new Set(), pairedMembers = new Set();
     // Prefer existing consented pairs when a malformed record contains overlaps.
@@ -109,7 +121,7 @@
   function participants(date, day, config) { return MEMBERS.filter(m => memberStatus(m.id, date, day, config).in); }
   function places(day) { return PLACES.concat((day || emptyDay()).extras || []); }
   function tally(date, day, config) {
-    const result = Object.fromEntries(places(day).map(p => [p.id, []]));
+    const result = Object.fromEntries(PLACES.map(p => [p.id, []]));
     participants(date, day, config).forEach(m => { const p = day.votes[m.id]; if (result[p]) result[p].push(m.id); });
     return result;
   }
@@ -160,10 +172,22 @@
         break;
       }
       case 'vote':
-        if (p.placeId === null) { delete d.votes[op.actor]; break; }
         if (!memberStatus(op.actor, date, d, config).in) throw new Error('오늘 함께 먹는 상태로 바꾼 뒤 선택해 주세요.');
-        if (!hasPlace(p.placeId)) throw new Error('식당을 다시 선택해 주세요.');
+        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 메가존 또는 런치타임만 선택할 수 있어요.');
         d.votes[op.actor] = p.placeId; break;
+      case 'ceoDecision': {
+        if (memberStatus(op.actor, date, d, config).kind !== 'ceo') throw new Error('해당 날짜의 대표님 점심 참석자만 장소를 확정할 수 있어요.');
+        const match = typeof p.placeId === 'string' && p.placeId.match(GUIDE_ID);
+        if (!match || p.url !== `https://m.place.naver.com/place/${match[1]}/home` || typeof p.name !== 'string' || !p.name.trim()) throw new Error('과천 맛집 목록에서 식당을 다시 선택해 주세요.');
+        if (!TIME.test(p.time || '')) throw new Error('대표님 점심 시간을 확인해 주세요.');
+        d.ceoDecision = { placeId: p.placeId, name: p.name.trim().slice(0, 60), url: p.url,
+          category: typeof p.category === 'string' ? p.category.slice(0, 20) : '', time: p.time,
+          actor: op.actor, at: now || new Date().toISOString() };
+        break;
+      }
+      case 'ceoUnconfirm':
+        if (memberStatus(op.actor, date, d, config).kind !== 'ceo') throw new Error('해당 날짜의 대표님 점심 참석자만 장소 확정을 취소할 수 있어요.');
+        d.ceoDecision = null; break;
       case 'addPlace':
         if (d.extras.length >= 8) throw new Error('다른 식당은 하루 8곳까지 추가할 수 있어요.');
         if (!/^extra_[a-zA-Z0-9_-]{1,50}$/.test(p.id || '') || hasPlace(p.id)) throw new Error('식당 번호가 중복되었습니다.');
@@ -198,7 +222,6 @@
   function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
   return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
 });
-
 
 /* Public channel metadata only. No login, friend relationship, or menu date is inferred.
  * Fetch HOME_ENDPOINT on the server: browser Origin requests omit the public OG data.
@@ -390,7 +413,6 @@
     parseHTML: parseHTML
   });
 });
-
 
 /* Append this file after core.js and lunchtime-source.js to create the copy/paste Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
@@ -725,7 +747,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 3, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 4, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
   const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;

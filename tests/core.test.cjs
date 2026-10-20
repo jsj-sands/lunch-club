@@ -175,21 +175,19 @@ test('일정 적용기한 이후에는 종료된 대표님과 점심 반복 규�
   assert.equal(C.participants('2027-01-01',C.emptyDay(),extended).length,0);
   assert.equal(C.memberStatus('juri','2027-01-01',C.emptyDay(),extended).kind,'ceo');
 });
-test('다른 식당 추가, 한 사람 한 표, 삭제 시 연관 투표와 확정을 정리한다', () => {
-  let d=C.applyOperation(C.emptyDay(),monday,settings,op('addPlace','seongjun',{id:'extra_test',name:'국수집',url:'https://naver.me/test'}));
-  d=choose(d,'seongjun','in');
+test('일반 점심은 메가존과 런치타임만 선택할 수 있고 재선택은 한 사람 한 표로 변경된다', () => {
+  let d=choose(C.emptyDay(),'seongjun','in');
   d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'megazone'}));
-  d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'}));
-  assert.equal(C.tally(monday,d,settings).megazone.length,0);
-  d=C.applyOperation(d,monday,settings,op('decision','seongjun',{placeId:'extra_test',time:'12:15'}));
-  assert.equal(d.decision.placeId,'extra_test');
-  d=C.applyOperation(d,monday,settings,op('removePlace','seongjun',{placeId:'extra_test'}));
-  assert.equal(d.decision,null);assert.equal(d.votes.seongjun,undefined);
+  assert.deepEqual(C.tally(monday,d,settings),{megazone:['seongjun'],lunchtime:[]});
+  d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'lunchtime'}));
+  assert.deepEqual(C.tally(monday,d,settings),{megazone:[],lunchtime:['seongjun']});
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:null})),/메가존 또는 런치타임/);
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'})),/메가존 또는 런치타임/);
 });
 test('허용된 멤버, 식당, 링크, 시간만 처리한다', () => {
   const day = choose(C.emptyDay(),'seongjun','in');
   assert.throws(()=>C.applyOperation(C.emptyDay(),monday,settings,op('vote','other',{placeId:'megazone'})),/이름/);
-  assert.throws(()=>C.applyOperation(day,monday,settings,op('vote','seongjun',{placeId:'does-not-exist'})),/식당/);
+  assert.throws(()=>C.applyOperation(day,monday,settings,op('vote','seongjun',{placeId:'does-not-exist'})),/메가존 또는 런치타임/);
   assert.equal(C.safeUrl('javascript:alert(1)'), '');
   assert.equal(C.safeUrl('https://example.com/\n<script>'), '');
   assert.throws(()=>C.applyOperation(day,monday,settings,op('decision','seongjun',{placeId:'megazone',time:'25:00'})),/시간/);
@@ -222,10 +220,10 @@ test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 �
     revision:42, updatedAt:'2026-10-19T02:00:00Z'
   };
   const before = JSON.stringify(legacy), restored = C.cleanDay(legacy);
-  assert.deepEqual(restored,{...legacy,pairs:[]});
+  assert.deepEqual(restored,{...legacy,ceoDecision:null,pairs:[]});
   assert.equal(JSON.stringify(legacy),before);
   assert.deepEqual(C.participants(monday,restored,settings).map(m => m.id),['seongjun']);
-  assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[],extra_old:['seongjun']});
+  assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[]});
   const returned = choose(restored,'yunchul','in');
   assert.deepEqual(C.tally(monday,returned,settings).megazone,['yunchul']);
   assert.deepEqual(returned.decision,legacy.decision);
@@ -371,4 +369,44 @@ test('메가존 Markdown에서 점심 주메뉴만 추출한다', () => {
   const input='# 메뉴\n## 아침\n- 토스트\n## 점심\n\n- 나주곰탕\n  - Nutrition: 817 kcal\n  - Components: 나주곰탕\n- 치즈볶음밥\n## 저녁\n- 카레\n';
   assert.deepEqual(C.parseMenuMarkdown(input),['나주곰탕','치즈볶음밥']);
   assert.deepEqual(C.parseMenuMarkdown('# 메뉴\n## 아침\n- 토스트'),[]);
+});
+
+// 2026-10-20: CEO venue is date-wide while regular cafeteria choices stay person-wide.
+test('대표님 점심은 식당 하나를 그 날짜에만 공유하고 일반 점심 선택과 서로 침범하지 않는다', () => {
+  const tuesday='2026-10-20', other='2026-10-21';
+  let d=C.applyOperation(C.emptyDay(), tuesday, settings, op('availability','yunchul',{value:'in'}));
+  d=C.applyOperation(d,tuesday,settings,op('vote','yunchul',{placeId:'megazone'}));
+  const payload={placeId:'guide_1764937561',name:'만보성',url:'https://m.place.naver.com/place/1764937561/home',time:'12:00',category:'중식'};
+  d=C.applyOperation(d,tuesday,settings,op('ceoDecision','jingi',payload));
+  assert.equal(d.ceoDecision.name,'만보성');
+  assert.equal(d.ceoDecision.actor,'jingi');
+  assert.deepEqual(C.tally(tuesday,d,settings),{megazone:['yunchul'],lunchtime:[]});
+  assert.equal(C.cleanDay(JSON.parse(JSON.stringify(d))).ceoDecision.url,payload.url);
+  assert.equal(C.cleanDay(C.emptyDay()).ceoDecision,null);
+  assert.equal(C.memberStatus('jingi',other,C.emptyDay(),settings).kind,'pending');
+  const next=C.applyOperation(d,tuesday,settings,op('ceoDecision','jiwoo',{...payload,placeId:'guide_2046292975',name:'코다리명가',url:'https://m.place.naver.com/place/2046292975/home'}));
+  assert.equal(next.ceoDecision.actor,'jiwoo');
+  assert.deepEqual(next.votes,d.votes);
+  assert.equal(d.ceoDecision.name,'만보성','원래 날짜 데이터는 불변');
+  const reset=C.applyOperation(next,tuesday,settings,op('ceoUnconfirm','jingi',{}));
+  assert.equal(reset.ceoDecision,null);
+  assert.deepEqual(reset.votes,d.votes);
+});
+
+test('대표님 점심 확정·취소 권한과 식당/시간 형식을 검증한다', () => {
+  const tuesday='2026-10-20';
+  const payload={placeId:'guide_1764937561',name:'만보성',url:'https://m.place.naver.com/place/1764937561/home',time:'12:00',category:'중식'};
+  const d=C.emptyDay();
+  for(const actor of ['yunchul','minjun']){
+    assert.throws(()=>C.applyOperation(d,tuesday,settings,op('ceoDecision',actor,payload)),/대표님 점심 참석자만/);
+    assert.throws(()=>C.applyOperation(d,tuesday,settings,op('ceoUnconfirm',actor,{})),/대표님 점심 참석자만/);
+  }
+  for(const [changes,regex] of [
+    [{placeId:'extra_1764937561'},/맛집 목록/],
+    [{placeId:'guide_123',url:'https://m.place.naver.com/place/123/home'},/맛집 목록/],
+    [{url:'https://example.org/'},/맛집 목록/],
+    [{name:'   '},/맛집 목록/],
+    [{time:'25:30'},/시간/],
+  ]) assert.throws(()=>C.applyOperation(d,tuesday,settings,op('ceoDecision','jingi',{...payload,...changes})),regex);
+  assert.equal(d.ceoDecision,null);
 });

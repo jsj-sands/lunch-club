@@ -18,7 +18,7 @@ const kakaoKey = 'sandsLunch.kakaoProfile.v1';
 const kakaoChannel = 'https://pf.kakao.com/_xbbMPn';
 const kakaoImage = 'https://k.kakaocdn.net/dn/lunch-profile/fixture/img_m.jpg';
 const connection = { url: 'https://script.google.com/macros/s/test_deployment/exec', key: 'a'.repeat(64) };
-const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true };
+const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNQAAAABJRU5ErkJggg==';
 // A valid 2 x 2 JPEG returned by the canvas fixture. Pixel rendering is not tested.
 const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7CooorID/2Q==';
@@ -43,7 +43,7 @@ function stateDaysFor(date, stored = {}) {
 
 function basicSharedState(request, extra = {}) {
   assert.equal(request.action, 'state');
-  return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date),
+  return { ok: true, serverVersion: 4, features: sharedFeatures, days: stateDaysFor(request.date),
     settings: C.settings(), configRevision: 0, menuImages: {}, ...extra };
 }
 
@@ -589,7 +589,7 @@ test('아직 조회하지 않은 날짜는 공유 응답 전까지 현황 확인
   const ui = await boot({ connected: true, server: async request => {
     assert.equal(request.action, 'state');
     if (request.date === target) await responseGate;
-    return { ok: true, serverVersion: 3, days: stateDaysFor(request.date, { [target]: record }), settings: C.settings(), configRevision: 0,
+    return { ok: true, serverVersion: 4, days: stateDaysFor(request.date, { [target]: record }), settings: C.settings(), configRevision: 0,
       features: sharedFeatures, menuImages: {} };
   } });
   assert.equal(ui.element('heroCount').textContent, '오늘 함께 0명');
@@ -624,7 +624,7 @@ test('따로 먹기 초대는 상대 수락 후에만 두 사람 모임이 되�
   const target = '2026-10-20', days = {}, receipts = {}, bodies = [];
   const server = request => {
     assert.equal(request.action, 'state');
-    return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date, days),
+    return { ok: true, serverVersion: 4, features: sharedFeatures, days: stateDaysFor(request.date, days),
       settings: C.settings(), configRevision: 0, menuImages: {}, receipt: receipts[request.receipt] };
   };
   const post = async (url, init) => {
@@ -705,7 +705,7 @@ test('공유 취소와 본인 일정 수정은 선택일로 POST하고 수신 �
   const days = {}, receipts = {}, bodies = [];
   const server = request => {
     assert.equal(request.action, 'state');
-    return { ok: true, serverVersion: 3, days: stateDaysFor(request.date, days), settings: C.settings(), configRevision: 0,
+    return { ok: true, serverVersion: 4, days: stateDaysFor(request.date, days), settings: C.settings(), configRevision: 0,
       features: sharedFeatures, menuImages: {}, receipt: receipts[request.receipt] };
   };
   const post = async (url, init) => {
@@ -751,7 +751,7 @@ test('저장 응답을 기다리며 토요일로 이동해도 수정 날짜를 �
     assert.equal(request.action, 'state');
     if (request.date === saturday && !request.receipt) saturdayReads++;
     if (request.receipt) await receiptGate;
-    return { ok: true, serverVersion: 3, days: stateDaysFor(request.date,days), settings: C.settings(), configRevision: 0,
+    return { ok: true, serverVersion: 4, days: stateDaysFor(request.date,days), settings: C.settings(), configRevision: 0,
       features: sharedFeatures, menuImages: request.date === saturday ? { ['day:' + saturday]: meta } : {},
       receipt: receipts[request.receipt] };
   };
@@ -780,11 +780,11 @@ test('저장 응답을 기다리며 토요일로 이동해도 수정 날짜를 �
   assert.match(ui.element('restaurantCards').innerHTML, /data:image\/png;base64,/);
 });
 
-test('저장한 맛집 33곳을 종류·검색·더보기로 찾고 지도와 선택일의 점심 후보에 연결한다', async () => {
+test('맛집 33곳을 종류·검색하고 대표님 참석자만 해당 날짜의 장소를 확정한다', async () => {
   const ui = await boot();
-  const cardCount = () => (ui.element('guideCards').innerHTML.match(/class="guide-card"/g) || []).length;
+  const cardCount = () => (ui.element('guideCards').innerHTML.match(/class="guide-card(?:\s|\")/g) || []).length;
   assert.ok(ui.html.indexOf('id="restaurantCards"') < ui.html.indexOf('id="guideSection"'));
-  assert.ok(ui.html.indexOf('id="guideSection"') < ui.html.indexOf('id="addPlaceBtn"'));
+  assert.ok(ui.html.indexOf('id="guideSection"') < ui.html.indexOf('id="ceoDecisionPanel"'));
   assert.match(ui.html, /href="https:\/\/naver\.me\/xSBAzufn"/);
   assert.equal(cardCount(), 6);
   assert.equal(ui.element('guideResultCount').textContent, '전체 · 33곳');
@@ -804,32 +804,18 @@ test('저장한 맛집 33곳을 종류·검색·더보기로 찾고 지도와 �
   const place = G.restaurants.find(item => item.name === '꾸아 과천디테크점');
   assert.ok(place);
   assert.ok(ui.element('guideCards').innerHTML.includes(`href="${place.url}"`));
-  assert.match(ui.element('guideCards').innerHTML, /rel="noopener noreferrer"/);
-  await search('없는식당테스트');
-  assert.equal(cardCount(), 0);
-  assert.equal(ui.element('guideEmpty').hidden, false);
-  assert.equal(ui.element('guideMore').hidden, true);
-  await search('꾸아');
-  assert.equal(ui.element('guideEmpty').hidden, true);
-  await ui.action('guideAdd', place.id);
-  const choice = ui.saved(localKey).days[monday].extras[0];
-  assert.equal(choice.name, place.name);
-  assert.equal(choice.url, place.url);
-  assert.equal(ui.findControl({ 'data-action': 'guideAdd', 'data-id': place.id }).disabled, true);
-  assert.match(ui.element('restaurantCards').innerHTML, /꾸아 과천디테크점/);
-  assert.deepEqual(dailyMembers(ui, 'in'), []);
-  await ui.press('choiceIn');
-  await ui.action('vote', choice.id);
-  assert.equal(ui.saved(localKey).days[monday].votes.jingi, choice.id);
-  const savedMonday = ui.saved(localKey).days[monday];
+  await ui.action('guideConfirm', place.id);
+  assert.equal(ui.saved(localKey)?.days?.[monday]?.ceoDecision, undefined, '월요일 일반 점심은 CEO 장소를 선택할 수 없다');
   await ui.chooseDate('2026-10-20');
-  assert.equal(ui.findControl({ 'data-action': 'guideAdd', 'data-id': place.id }).disabled, false);
-  await ui.action('guideAdd', place.id);
-  assert.equal(ui.saved(localKey).days['2026-10-20'].extras[0].name, place.name);
-  assert.deepEqual(ui.saved(localKey).days[monday], savedMonday);
+  assert.equal(ui.findControl({ 'data-action': 'guideConfirm', 'data-id': place.id }).disabled, false);
+  await ui.action('guideConfirm', place.id);
+  assert.equal(ui.saved(localKey).days['2026-10-20'].ceoDecision.name, place.name);
+  assert.equal(ui.saved(localKey).days['2026-10-20'].ceoDecision.url, place.url);
+  assert.equal(ui.findControl({ 'data-action': 'guideConfirm', 'data-id': place.id }).disabled, true);
+  assert.match(ui.element('ceoDecisionPanel').innerHTML, /꾸아 과천디테크점/);
+  assert.match(ui.element('ceoDecisionPanel').innerHTML, /장소 확정/);
   assert.equal(ui.requests.length, 0);
 });
-
 test('공유 연결 전에도 메가존 주간 식단 다섯 날짜를 조회하고 선택한 날로 이동한다', async () => {
   const ui = await boot();
   assert.match(ui.element('restaurantCards').innerHTML, /월요일 곰탕/);
@@ -1165,7 +1151,7 @@ test('독립된 두 공유 세션에서 같은 주간 사진을 불러오고 다
   const meta = { id: 'img_test_week', scope: 'week', date: monday, startDate: monday, endDate: '2026-10-25',
     name: '런치타임 주간 식단.png', mimeType: 'image/png', size: 67, uploadedBy: 'jingi', uploadedAt: fixedTime };
   const server = request => {
-    if (request.action === 'state') return { ok: true, serverVersion: 3, features: sharedFeatures,
+    if (request.action === 'state') return { ok: true, serverVersion: 4, features: sharedFeatures,
       days: stateDaysFor(request.date), settings: {}, configRevision: 0, menuImages: { ['week:' + monday]: meta } };
     if (request.action === 'menuImage') return { ok: true, image: { ...meta, dataUrl: png } };
     throw new Error('Unexpected action ' + request.action);
@@ -1207,7 +1193,7 @@ function sharedImageServer(receiptGate, options = {}) {
     async read(request) {
       if (request.action === 'state') {
         if (request.receipt && receiptGate) await receiptGate;
-        return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date), settings: {}, configRevision: 0,
+        return { ok: true, serverVersion: 4, features: sharedFeatures, days: stateDaysFor(request.date), settings: {}, configRevision: 0,
           menuImages: Object.fromEntries(Object.entries(images).map(([slot, image]) => {
             const { dataUrl, ...meta } = image; return [slot, meta];
           })), receipt: request.receipt ? receipts[request.receipt] : undefined };
@@ -1493,7 +1479,7 @@ test('설정 폼을 연 뒤 동료가 설정을 바꾸면 오래된 폼 제출�
   let configRevision = 1, settings = C.settings();
   const ui = await boot({ connected: true, server: request => {
     assert.equal(request.action, 'state');
-    return { ok: true, serverVersion: 3, features: sharedFeatures, days: stateDaysFor(request.date),
+    return { ok: true, serverVersion: 4, features: sharedFeatures, days: stateDaysFor(request.date),
       settings: C.clone(settings), configRevision, menuImages: {} };
   } });
   await ui.press('settingsBtn');
@@ -1537,4 +1523,26 @@ test('구버전 공유 서버는 새 참석 기능 업데이트를 안내하고 
     }
     assert.equal(ui.posted.length, 0);
   }
+});
+
+test('대표님 점심 확정 후 다른 식당으로 변경하고 취소하며 일반 점심 기록을 보존한다',async()=>{
+ const date='2026-10-20',first=G.restaurants[0],second=G.restaurants[1];
+ const ui=await boot();
+ await ui.chooseDate(date);
+ await ui.action('guideConfirm',first.id);
+ assert.equal(ui.saved(localKey).days[date].ceoDecision.placeId,first.id);
+ await ui.action('guideConfirm',second.id);
+ assert.equal(ui.saved(localKey).days[date].ceoDecision.placeId,second.id);
+ assert.match(ui.element('ceoDecisionPanel').innerHTML,/확정 취소/);
+ await ui.action('ceoUnconfirm');
+ assert.equal(ui.saved(localKey).days[date].ceoDecision,null);
+ assert.match(ui.element('ceoDecisionPanel').innerHTML,/아직 장소를 확정하지 않았어요/);
+ await ui.press('choiceIn');
+ assert.match(ui.element('myResponseContent').innerHTML,/일반 점심 장소/);
+ await ui.action('vote','megazone');
+ assert.equal(ui.saved(localKey).days[date].votes.jingi,'megazone');
+ assert.equal(ui.findControl({'data-action':'guideConfirm','data-id':first.id}).disabled,true);
+ await ui.action('vote','lunchtime');
+ assert.equal(ui.saved(localKey).days[date].votes.jingi,'lunchtime');
+ assert.equal(ui.element('restaurantCards').innerHTML.match(/class="restaurant-card/g).length,2);
 });

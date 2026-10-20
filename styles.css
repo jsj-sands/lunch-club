@@ -981,3 +981,32 @@ button.mega-meal-photo:not(:disabled):hover{background:var(--brand-pale)}
   .mega-meals.is-week .mega-meal-photo{width:72px;height:54px}
 }
 
+
+/* 2026-10-20: separate cafeteria choices and the date-specific CEO venue. */
+.response-cafeteria-picker{margin-top:13px;padding:14px;border:1px solid var(--brand-line);border-radius:12px;background:var(--brand-pale)}
+.response-cafeteria-picker>strong{display:block;font-size:12px;color:var(--brand-deep);margin-bottom:9px}
+.response-cafeteria-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.response-cafeteria-buttons button{min-height:41px;padding:8px;border:1px solid var(--brand-line);border-radius:10px;color:var(--brand);background:var(--paper);font-size:13px;font-weight:700}
+.response-cafeteria-buttons button.active{color:var(--white);background:var(--brand);border-color:var(--brand)}
+.response-cafeteria-buttons button:disabled{opacity:.6;cursor:not-allowed}
+.response-cafeteria-picker small{display:block;margin-top:8px;font-size:10px;line-height:1.65;color:var(--muted)}
+.ceo-guide-jump{display:inline-block;margin:6px 0 10px;font-size:12px;font-weight:750;color:var(--brand);text-underline-offset:3px}
+.lunch-choice-note{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;font-size:12px;line-height:1.8;color:var(--muted)}
+.lunch-choice-note strong{color:var(--ink)}
+.lunch-choice-note p{margin:4px 0 0}
+.ceo-venue-summary{margin-top:27px;padding-top:22px;border-top:1px solid var(--line)}
+.ceo-venue-summary h3{font-size:18px;line-height:1.4;margin:7px 0}
+.ceo-venue-members{font-size:11px;color:var(--muted);line-height:1.8}
+.ceo-venue-pending{padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:11px;color:var(--muted);font-size:12px}
+.ceo-venue-confirmed{padding:16px;background:var(--brand-pale);border:1px solid var(--brand-line);border-radius:12px}
+.ceo-venue-badge{font-size:10px;color:var(--brand);font-weight:750}
+.ceo-venue-confirmed h4{font-size:20px;color:var(--ink);line-height:1.4;margin:8px 0 9px;word-break:keep-all}
+.ceo-venue-confirmed p{font-size:11px;line-height:1.7;color:var(--muted);margin:5px 0}
+.ceo-venue-confirmed a,.ceo-venue-link{display:inline-flex;align-items:center;margin-top:8px;font-weight:700;color:var(--brand);font-size:12px;text-underline-offset:3px}
+.ceo-venue-confirmed button{display:block;margin-top:11px;padding-left:0}
+.ceo-venue-help{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.8}
+.guide-card.is-ceo-picked{background:var(--brand-pale);border-color:var(--brand)}
+.guide-card.is-ceo-picked .guide-card-actions button{background:var(--brand);color:var(--white);border-color:var(--brand)}
+.guide-card-actions button:not(:disabled){background:var(--brand);color:var(--white);border-color:var(--brand)}
+.guide-card-actions button:disabled{opacity:.73;cursor:default}
+@media(max-width:410px){.response-cafeteria-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}.response-cafeteria-buttons button{font-size:12px}}

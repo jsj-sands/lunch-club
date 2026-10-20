@@ -22,9 +22,9 @@ test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요
  let d=s.get().days[DATE];assert.equal(d.votes.seongjun,'megazone');assert.equal(d.votes.yunchul,'lunchtime');assert.equal(d.revision,4);
  s.context.doPost({postData:{contents:JSON.stringify(a.body)}});assert.equal(s.get().days[DATE].revision,4);assert.equal(s.get({receipt:a.body.op.id}).receipt.ok,true);assert.equal(s.locked(),false);
 });
-test('버전 3 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
+test('버전 4 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,3);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true});
+ assert.equal(state.serverVersion,4);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
@@ -118,10 +118,29 @@ test('기존 버전의 저장된 일일 기록·영수증·사용자 일정은 �
  s.store['LUNCH_DAY_'+DATE]=JSON.stringify({parts:1,generation:'legacy'});
  s.store['LUNCH_DAY_'+DATE+'_legacy_0']=JSON.stringify({data,receipts:{[oldReceipt]:{ok:true,at:data.updatedAt}}});
  const restored=s.get({receipt:oldReceipt});
- assert.deepEqual(restored.days[DATE],{...data,pairs:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
+ assert.deepEqual(restored.days[DATE],{...data,ceoDecision:null,pairs:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
  for(const [id,days] of Object.entries(cfg.ceoDays))assert.deepEqual(restored.settings.ceoDays[id],days);
  assert.equal(restored.settings.scheduleEnd,cfg.scheduleEnd);assert.equal(restored.settings.meetingTime,cfg.meetingTime);
  s.post('pairInvite','yunchul',{id:'pair_'+'b'.repeat(24),to:'jiwoo'});const latest=s.get({receipt:oldReceipt});
  assert.deepEqual(latest.days[DATE].votes,data.votes);assert.deepEqual(latest.days[DATE].decision,data.decision);assert.deepEqual(latest.days[DATE].notes,data.notes);
  assert.equal(latest.days[DATE].overrides.seongjun,'in');assert.equal(latest.days[DATE].absenceReasons.jingi,'외부 일정');assert.deepEqual(latest.settings,restored.settings);assert.equal(latest.receipt.ok,true);
+});
+
+test('대표님 점심 식당 확정은 기존 서버 저장·수신 확인을 통과해 다른 기기에도 날짜별로 공유된다',()=>{
+ const s=server(),tuesday='2026-10-20';
+ const venue={placeId:'guide_1764937561',name:'만보성',url:'https://m.place.naver.com/place/1764937561/home',time:'12:00',category:'중식'};
+ const bad=s.post('ceoDecision','yunchul',venue,{date:tuesday});
+ assert.equal(s.get({date:tuesday,receipt:bad.body.op.id}).receipt.ok,false);
+ const saved=s.post('ceoDecision','jingi',venue,{date:tuesday});
+ const receipt=s.get({date:tuesday,receipt:saved.body.op.id});
+ assert.equal(receipt.receipt.ok,true);
+ assert.equal(receipt.days[tuesday].ceoDecision.name,'만보성');
+ assert.equal(receipt.days[tuesday].ceoDecision.actor,'jingi');
+ assert.equal(s.get({date:DATE}).days[DATE].ceoDecision,null);
+ const otherClient=s.get({date:tuesday});
+ assert.equal(otherClient.days[tuesday].ceoDecision.placeId,venue.placeId);
+ const unconfirmed=s.post('ceoUnconfirm','jiwoo',{}, {date:tuesday});
+ const after=s.get({date:tuesday,receipt:unconfirmed.body.op.id});
+ assert.equal(after.receipt.ok,true);assert.equal(after.days[tuesday].ceoDecision,null);
+ assert.equal(s.locked(),false);
 });
