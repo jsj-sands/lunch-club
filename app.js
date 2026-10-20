@@ -4,7 +4,7 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v2', images: 'sandsLunch.menuImages.v1', kakao: 'sandsLunch.kakaoProfile.v1' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v2', kakao: 'sandsLunch.kakaoProfile.v1' };
   const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
   const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
@@ -28,13 +28,8 @@
   let guideCategory = '전체', guideQuery = '', guideLimit = 6;
   const GUIDE_CATEGORIES = ['한식', '중식', '일식', '양식', '분식', '아시안'];
   const menuRequests = new Map(), menuLoadingDates = new Set(), mealImageErrors = new Set(), expandedMenuDates = new Set();
-  let localImages = read(KEYS.images, {});
-  if (!localImages || typeof localImages !== 'object' || Array.isArray(localImages)) localImages = {};
-  const imageCache = new Map(), imageErrors = new Map(), imageLoading = new Set();
-  let imageDraft = null, imageReadToken = 0, imageSaving = false, imageDeleteDraft = null, imageMutationEpoch = 0;
   let kakaoProfile = cleanKakaoProfile(read(KEYS.kakao, null));
   let kakaoLoading = false, kakaoWaiting = false, kakaoError = '', kakaoPhotoError = '', kakaoRequest = null, lastKakaoAttempt = 0;
-  let manualMenuOpen = false;
   let connectedReady = false, dialogReturnFocus = null, selectedDecision = '', draftTime = '';
   const state = () => connection ? shared : local;
   const config = () => C.settings(state().settings);
@@ -56,7 +51,7 @@
     $('dialogTitle').textContent = title; $('dialogContent').innerHTML = html;
     $('appDialog').classList.toggle('wide', wide); if (!$('appDialog').open) $('appDialog').showModal();
   }
-  function closeDialog() { if (imageSaving) { toast('식단 이미지 변경을 저장하고 있어요. 완료 후 닫아 주세요.'); return; } $('appDialog').close(); const focusTarget = dialogReturnFocus?.id ? $(dialogReturnFocus.id) : dialogReturnFocus; if (focusTarget && document.contains(focusTarget)) focusTarget.focus({ preventScroll: true }); }
+  function closeDialog() { $('appDialog').close(); const focusTarget = dialogReturnFocus?.id ? $(dialogReturnFocus.id) : dialogReturnFocus; if (focusTarget && document.contains(focusTarget)) focusTarget.focus({ preventScroll: true }); }
   function persistLocal() {
     const cutoff = C.shiftDate(C.today(), -120);
     Object.keys(local.days).forEach(d => { if (!C.validDate(d) || d < cutoff) delete local.days[d]; });
@@ -196,13 +191,6 @@
       return `<article class="week-menu-day${d === date ? ' selected-day' : ''}"><div class="week-menu-date"><button data-action="menuDate" data-id="${d}" aria-label="${esc(dateText(d))} 선택">${'일월화수목금토'[C.weekday(d)]}<strong>${Number(d.slice(5, 7))}.${Number(d.slice(8))}</strong>${d === today ? '<small>오늘</small>' : ''}</button></div><div class="week-menu-content">${content}<a href="${C.menuUrl(d)}" target="_blank" rel="noopener noreferrer">원문 ↗</a></div></article>`;
     }).join('')}</div><p class="tiny-note">공개된 일반식 메뉴만 표시해요. 날짜를 누르면 그날의 점심을 선택할 수 있어요.</p>`;
   }
-  function imageSlot(scope, d = date) { return scope + ':' + (scope === 'week' ? C.weekDates(d)[0] : d); }
-  function selectedMenuImage(d = date) {
-    const images = connection ? shared.menuImages || {} : localImages;
-    return images[imageSlot('day', d)] || images[imageSlot('week', d)] || null;
-  }
-  function validImageData(url) { return typeof url === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(url) && url.length < 1500000; }
-  function imageData(meta) { return meta && (connection ? imageCache.get(meta.id) : meta.dataUrl); }
   function cleanKakaoProfile(value) {
     if (!value || value.sourceUrl !== KAKAO_CHANNEL || typeof window.LunchKakaoSource?.validImageURL !== 'function' || !window.LunchKakaoSource.validImageURL(value.imageUrl)) return null;
     const checked = Date.parse(value.checkedAt);
@@ -218,7 +206,7 @@
     } else if (profile && !kakaoPhotoError) {
       content += `<button class="menu-photo-button" data-action="viewKakaoProfile" aria-label="카카오 프로필 식단 사진 크게 보기"><img id="kakaoProfilePhoto" class="menu-photo" src="${esc(profile.imageUrl)}" alt="런치타임 카카오 채널의 현재 프로필 사진. 사진에 적힌 식단 날짜를 확인해 주세요." loading="lazy" referrerpolicy="no-referrer"><span>식단 사진 크게 보기 ↗</span></button>`;
     } else {
-      content += `<div class="image-empty"><strong>${kakaoPhotoError ? '사진을 표시하지 못했어요' : !connection ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요' : !connectedReady ? '공유 연결을 확인하고 있어요…' : !shared.features.kakaoProfile ? '자동 식단 조회를 준비해 주세요' : kakaoLoading || kakaoWaiting || !lastKakaoAttempt ? '카카오에서 식단 사진을 가져오고 있어요…' : '자동으로 가져오지 못했어요'}</strong><p>${kakaoPhotoError ? '카카오 원문에서 확인하거나 다시 불러와 주세요.' : '카카오 채널 원문을 열거나 식단 이미지를 직접 올릴 수 있어요.'}</p></div>`;
+      content += `<div class="image-empty"><strong>${kakaoPhotoError ? '사진을 표시하지 못했어요' : !connection ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요' : !connectedReady ? '공유 연결을 확인하고 있어요…' : !shared.features.kakaoProfile ? '자동 식단 조회를 준비해 주세요' : kakaoLoading || kakaoWaiting || !lastKakaoAttempt ? '카카오에서 식단 사진을 가져오고 있어요…' : '자동으로 가져오지 못했어요'}</strong><p>${kakaoPhotoError ? '카카오 원문에서 확인하거나 다시 불러와 주세요.' : '카카오 채널 원문에서 확인하거나 사진을 다시 불러와 주세요.'}</p></div>`;
     }
     if (!connection) content += `<p class="kakao-auto-meta">${profile ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요. 현재는 마지막으로 가져온 사진입니다.<br>' : ''}<a href="setup.html">팀 공유 연결 안내 ↗</a></p>`;
     else if (connectedReady && !shared.features.kakaoProfile) content += '<p class="inline-warning">식단 사진을 자동으로 보려면 <a href="setup.html#update">공유 서버를 한 번 업데이트해 주세요 ↗</a></p>';
@@ -229,24 +217,14 @@
     content += `<div class="kakao-auto-actions">${!isToday && profile ? '<button class="secondary-button" data-action="viewKakaoProfile">카카오 최신 사진 보기 ↗</button>' : ''}<button class="text-button" data-action="refreshKakaoProfile" ${kakaoLoading || !available ? 'disabled' : ''}>${kakaoLoading ? '사진 확인 중…' : '사진 다시 불러오기 ↻'}</button><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 원문 ↗</a></div>`;
     return `<div class="kakao-auto-panel" aria-label="런치타임 카카오 프로필 자동 조회">${content}</div>`;
   }
+  // 런치타임은 공식 카카오 채널의 자동 식단만 표시합니다.
+  // 기존 공유 서버의 업로드 파일은 삭제하지 않으며, 화면에서는 노출하지 않습니다.
   function renderLunchImage() {
-    const meta = selectedMenuImage(), dataUrl = imageData(meta);
-    let content = renderKakaoProfile();
-    if (meta) {
-      let manual = dataUrl && validImageData(dataUrl) ? `<button class="menu-photo-button" data-action="viewMenuImage" aria-label="런치타임 식단 이미지 크게 보기"><img class="menu-photo" src="${dataUrl}" alt="런치타임 ${esc(meta.startDate)}부터 ${esc(meta.endDate)}까지의 식단" loading="lazy"><span>이미지 크게 보기 ↗</span></button>` : `<div class="image-empty"><strong>${imageErrors.has(meta.id) ? '이미지를 불러오지 못했어요' : '식단 이미지를 불러오고 있어요…'}</strong>${imageErrors.has(meta.id) ? '<button class="text-button" data-action="retryMenuImage">다시 불러오기 ↻</button>' : ''}</div>`;
-      manual += `<div class="image-caption"><strong>${meta.scope === 'week' ? '주간 식단' : '하루 식단'} · ${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''}</strong><span>${esc(nameOf(meta.uploadedBy) || '멤버')}님이 올림 · ${esc(timeText(meta.uploadedAt))}</span></div>`;
-      if (connection && meta.scope === 'day' && shared.menuImages?.[imageSlot('week')]) manual += '<p class="tiny-note">이 날짜에 따로 올린 식단을 우선 표시해요.</p>';
-      content += `<details id="manualMenuDetails" class="manual-menu-details" ${manualMenuOpen || date !== C.today() || !connection || !kakaoProfile || kakaoError || kakaoPhotoError ? 'open' : ''}><summary>${connection ? '동료가 올린 식단' : '이 기기에 올린 식단'} · ${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''}</summary>${manual}</details>`;
-    } else if (date !== C.today()) {
-      content += '<p class="tiny-note">이날에 해당하는 식단 이미지는 아직 올라오지 않았어요.</p>';
-    }
-    content += `<div class="image-share-row"><div class="menu-image-actions"><button class="secondary-button" data-action="menuImageUpload" ${busy ? 'disabled' : ''}>${meta ? '올린 이미지 교체' : '식단 이미지 직접 올리기'}</button>${meta ? `<button class="danger-button" data-action="menuImageDelete" data-date="${date}" data-scope="${esc(meta.scope)}" data-id="${esc(meta.id)}" ${busy ? 'disabled' : ''}>올린 이미지 삭제</button>` : ''}</div><span>${connection ? '직접 올린 이미지도 팀 모두 보기' : '연결 전에는 이 기기에서만 미리보기'}</span></div>`;
-    if (connection && connectedReady && !shared.features?.menuImages) content += '<p class="inline-warning">공유 이미지 기능을 사용하려면 <a href="setup.html#update">공유 서버를 한 번 업데이트해 주세요 ↗</a></p>';
-    return `<div class="lunch-image-panel">${content}</div>`;
+    return `<div class="lunch-image-panel">${renderKakaoProfile()}</div>`;
   }
   function renderMenuCards() {
     const d = day(), meStatus = identity && C.memberStatus(identity, date, d, config());
-    $('menuTitle').textContent = date === C.today() ? '오늘은 어디로 갈까요?' : '이날은 어디로 갈까요?';
+    $('menuTitle').textContent = date === C.today() ? '오늘 구내식당 식단' : '선택한 날의 구내식당 식단';
     const activeDates = menuView === 'week' ? C.weekDates(date) : [date];
     menuLoading = activeDates.some(d => menuLoadingDates.has(d));
     $('refreshMenu').disabled = menuLoading || kakaoLoading; $('refreshMenu').textContent = menuLoading || kakaoLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
@@ -392,18 +370,16 @@
     const focused = document.activeElement?.id;
     if (focused === 'meetingTime') draftTime = $('meetingTime').value;
     if (focused === 'decisionPlace') selectedDecision = $('decisionPlace').value;
-    renderConnection(); renderMembers(); renderMenuCards(); renderDecision(); renderGuide(); ensureMenuImage();
+    renderConnection(); renderMembers(); renderMenuCards(); renderDecision(); renderGuide();
     if ((focused === 'meetingTime' || focused === 'decisionPlace' || /^(?:dailyMember-|choice|cancelMyCeo|guideFilter-)/.test(focused || '')) && $(focused)) $(focused).focus({ preventScroll: true });
   }
-  function mergeResponse(result, updateImages = true) {
+  function mergeResponse(result) {
     if (!result || !result.ok) throw new Error(result?.error || '공유 연결 응답을 확인하지 못했어요.');
     if (result.days) Object.entries(result.days).forEach(([d, value]) => {
       if (C.validDate(d) && (!shared.days[d] || value.revision >= shared.days[d].revision)) shared.days[d] = C.cleanDay(value);
     });
     if (result.settings && (result.configRevision || 0) >= shared.configRevision) { shared.settings = C.settings(result.settings); shared.configRevision = result.configRevision || 0; }
     shared.features = result.features || {};
-    // A weekday receipt may omit a selected weekend's daily menu image.
-    if (updateImages && result.days && Object.prototype.hasOwnProperty.call(result.days, date)) shared.menuImages = result.menuImages || {};
     connectedReady = true; lastSync = new Date(); syncError = '';
   }
   function jsonp(params, target = connection) {
@@ -421,11 +397,11 @@
   }
   async function sync() {
     if (!connection || syncing || busy || document.hidden) return;
-    const target = connection, requestDate = date, imageEpoch = imageMutationEpoch; syncing = true; renderConnection();
+    const target = connection, requestDate = date; syncing = true; renderConnection();
     try {
       const before = JSON.stringify(shared);
       const res = await jsonp({ action: 'state', date: requestDate }, target); if (target !== connection) return;
-      mergeResponse(res, imageEpoch === imageMutationEpoch); if (before !== JSON.stringify(shared)) render(); else renderConnection();
+      mergeResponse(res); if (before !== JSON.stringify(shared)) render(); else renderConnection();
       loadKakaoProfile(!lastKakaoAttempt);
     }
     catch (e) { if (target === connection) { syncError = e.message; renderConnection(); } }
@@ -503,140 +479,6 @@
     });
     return request.promise;
   }
-  async function ensureMenuImage(force = false) {
-    const meta = selectedMenuImage(), target = connection;
-    if (!target || !connectedReady || !meta || imageLoading.has(meta.id) || (!force && (imageCache.has(meta.id) || imageErrors.has(meta.id)))) return;
-    const requestDate = date;
-    imageLoading.add(meta.id); imageErrors.delete(meta.id);
-    try {
-      const res = await jsonp({ action: 'menuImage', date: requestDate, scope: meta.scope, imageId: meta.id }, target);
-      if (target !== connection || shared.menuImages?.[imageSlot(meta.scope, requestDate)]?.id !== meta.id) return;
-      if (!res.ok || !res.image || res.image.id !== meta.id || !validImageData(res.image.dataUrl)) throw new Error(res.error || '식단 이미지를 확인하지 못했어요.');
-      imageCache.set(meta.id, res.image.dataUrl);
-      while (imageCache.size > 8) imageCache.delete(imageCache.keys().next().value);
-    } catch (e) { if (target === connection && shared.menuImages?.[imageSlot(meta.scope, requestDate)]?.id === meta.id) imageErrors.set(meta.id, e.message); }
-    finally { imageLoading.delete(meta.id); renderMenuCards(); }
-  }
-  async function prepareMenuImage(file) {
-    if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('JPG, PNG, WebP 이미지 파일을 골라 주세요.');
-    if (file.size > 15 * 1024 * 1024) throw new Error('15MB 이하의 식단 이미지를 골라 주세요.');
-    const url = URL.createObjectURL(file), img = new Image();
-    try {
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error('이미지를 열지 못했어요. 다른 파일로 다시 시도해 주세요.')); img.src = url; });
-      if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth * img.naturalHeight > 50000000) throw new Error('이미지가 너무 커요. 식단 부분만 캡처해서 올려 주세요.');
-      let ratio = Math.min(1, 2800 / Math.max(img.naturalWidth, img.naturalHeight));
-      for (let attempt = 0; attempt < 6; attempt++) {
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(img.naturalWidth * ratio)); canvas.height = Math.max(1, Math.round(img.naturalHeight * ratio));
-        const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('이 브라우저에서 이미지를 준비하지 못했어요.');
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', attempt < 3 ? 0.91 - attempt * 0.06 : 0.76);
-        if (dataUrl.length * 0.75 <= 900 * 1024 && validImageData(dataUrl)) return { dataUrl, name: file.name.slice(0, 120), mimeType: 'image/jpeg', size: Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75) };
-        ratio *= 0.84;
-      }
-      throw new Error('이미지 용량을 줄이지 못했어요. 식단 부분만 캡처해서 올려 주세요.');
-    } finally { URL.revokeObjectURL(url); }
-  }
-  function uploadScopeLabel(d, scope) {
-    const start = scope === 'week' ? C.weekDates(d)[0] : d, end = scope === 'week' ? C.shiftDate(start, 6) : d;
-    return `${scope === 'week' ? '선택한 주 전체' : '선택한 날짜만'} · ${start}${start === end ? '' : ' – ' + end}`;
-  }
-  function showMenuImageUpload() {
-    if (!identity) return showIdentity();
-    if (connection && !connectedReady) return toast('공유 연결을 먼저 확인해 주세요.');
-    if (connection && !shared.features?.menuImages) {
-      openDialog('공유 이미지 기능 업데이트', '<p class="dialog-copy">기존 공유 서버를 새 버전으로 바꾸면 식단 이미지를 함께 볼 수 있어요. 설정 안내의 업데이트 순서대로 서버 코드를 교체하고, 초기 실행 후 새 버전으로 배포해 주세요.</p><a class="primary-button" href="setup.html#update">업데이트 안내 보기 ↗</a>'); return;
-    }
-    imageDraft = null; imageReadToken++; imageSaving = false;
-    const d = date, meta = selectedMenuImage(), scope = meta?.scope || 'week';
-    openDialog('런치타임 식단 이미지 올리기', `<p class="dialog-copy">카카오 채널 프로필의 식단을 저장하거나 캡처한 이미지를 선택해 주세요. ${connection ? '올리면 팀 멤버 모두가 같은 이미지를 볼 수 있어요.' : '지금은 이 기기에서만 미리 볼 수 있어요. 모두에게 공유하려면 먼저 팀 공유를 연결해 주세요.'}</p><form id="menuImageForm" class="dialog-form" data-date="${d}"><label>식단 적용 기간<select id="menuImageScope" name="scope"><option value="week" ${scope === 'week' ? 'selected' : ''}>${uploadScopeLabel(d, 'week')}</option><option value="day" ${scope === 'day' ? 'selected' : ''}>${uploadScopeLabel(d, 'day')}</option></select></label><label>식단 이미지<input type="file" id="menuImageFile" accept="image/jpeg,image/png,image/webp" required></label><p class="upload-hint">JPG · PNG · WebP / 최대 15MB · 공유하기 좋게 자동으로 크기를 조정해요.</p><div id="menuImagePreview" class="upload-preview" hidden></div><p id="menuImageStatus" class="upload-status" role="status">적용 기간과 이미지 속 식단 날짜가 맞는지 확인해 주세요.</p><button id="uploadMenuImageButton" class="primary-button" type="submit" disabled>${connection ? '모두에게 식단 공유하기' : '이 기기에서 미리보기'}</button>${connection ? '' : '<a class="text-button" href="setup.html">동료들과 함께 쓰는 공유 연결 안내 ↗</a>'}</form>`);
-    const form = $('menuImageForm');
-    form.dataset.expectedWeek = (connection ? shared.menuImages : localImages)?.[imageSlot('week', d)]?.id || '';
-    form.dataset.expectedDay = (connection ? shared.menuImages : localImages)?.[imageSlot('day', d)]?.id || '';
-    $('menuImageFile').addEventListener('change', async e => {
-      const token = ++imageReadToken; imageDraft = null; $('uploadMenuImageButton').disabled = true; $('menuImagePreview').hidden = true;
-      const file = e.target.files?.[0]; if (!file) return;
-      $('menuImageStatus').textContent = '식단 이미지를 준비하고 있어요…';
-      try {
-        const ready = await prepareMenuImage(file);
-        if (token !== imageReadToken || !$('appDialog').open || !$('menuImageForm')) return;
-        imageDraft = ready; $('menuImagePreview').innerHTML = `<img src="${ready.dataUrl}" alt="업로드할 런치타임 식단 미리보기">`; $('menuImagePreview').hidden = false;
-        $('menuImageStatus').textContent = `${ready.name} · 준비 완료. 식단 날짜를 확인한 뒤 올려 주세요.`; $('uploadMenuImageButton').disabled = false;
-      } catch (error) { if (token === imageReadToken && $('menuImageStatus')) $('menuImageStatus').textContent = error.message; }
-    });
-  }
-  async function saveMenuImage(form) {
-    if (!imageDraft || imageSaving) return;
-    const scope = $('menuImageScope').value, d = form.dataset.date, draft = imageDraft;
-    if (!C.validDate(d) || !['day', 'week'].includes(scope)) return toast('식단 날짜와 적용 기간을 확인해 주세요.');
-    imageSaving = true; $('uploadMenuImageButton').disabled = true; $('menuImageFile').disabled = true; $('menuImageScope').disabled = true;
-    $('menuImageStatus').textContent = connection ? '식단 이미지를 팀에 공유하고 있어요…' : '이 기기에 미리보기를 저장하고 있어요…';
-    let saved = false;
-    if (connection) {
-      saved = await mutate('menuImageUpload', { scope, dataUrl: draft.dataUrl, name: draft.name, expectedImageId: scope === 'week' ? form.dataset.expectedWeek : form.dataset.expectedDay }, d);
-    } else {
-      const start = scope === 'week' ? C.weekDates(d)[0] : d;
-      const meta = { ...draft, id: 'local_' + uid(), scope, date: start, startDate: start, endDate: scope === 'week' ? C.shiftDate(start, 6) : d, uploadedBy: identity, uploadedAt: new Date().toISOString() };
-      const next = Object.fromEntries(Object.entries({ ...localImages, [imageSlot(scope, d)]: meta }).sort((a, b) => String(b[1].uploadedAt).localeCompare(String(a[1].uploadedAt))).slice(0, 3));
-      try { write(KEYS.images, next); localImages = next; saved = true; } catch (_) { $('menuImageStatus').textContent = '기기 저장 공간이 부족해요. 팀 공유 연결 후 다시 올려 주세요.'; }
-    }
-    imageSaving = false;
-    if (saved) { closeDialog(); render(); ensureMenuImage(); toast(connection ? '식단 이미지를 공유했어요. 동료들도 같은 이미지를 볼 수 있어요.' : '이 기기에 미리보기를 저장했어요. 공유 연결 후 다시 올리면 동료들도 볼 수 있어요.'); }
-    else if ($('menuImageForm')) { $('uploadMenuImageButton').disabled = false; $('menuImageFile').disabled = false; $('menuImageScope').disabled = false; if (connection) $('menuImageStatus').textContent = syncError || '이미지를 공유하지 못했어요. 다시 시도해 주세요.'; }
-  }
-  function showMenuImageDelete(button) {
-    if (busy || imageSaving) return;
-    if (!identity) return showIdentity();
-    const d = button.dataset.date, scope = button.dataset.scope, expectedImageId = button.dataset.id;
-    if (!C.validDate(d) || !['day', 'week'].includes(scope)) return;
-    if (connection && (!connectedReady || !dayReady(d))) return toast('선택한 날짜의 공유 현황을 먼저 확인해 주세요.');
-    if (connection && !shared.features?.menuImageDelete) {
-      openDialog('식단 이미지 삭제 기능 업데이트', '<p class="dialog-copy">공유 서버를 새 버전으로 바꾸면 팀에 올린 식단 이미지를 삭제할 수 있어요. 업데이트 안내에서 코드를 교체한 뒤 기존 배포를 새 버전으로 갱신해 주세요.</p><a class="primary-button" href="setup.html#update">업데이트 안내 보기 ↗</a>'); return;
-    }
-    const images = connection ? shared.menuImages : localImages, meta = images?.[imageSlot(scope, d)];
-    if (!meta || meta.id !== expectedImageId) { render(); sync(); return toast('식단 이미지가 바뀌었어요. 현재 이미지를 확인한 뒤 다시 선택해 주세요.'); }
-    imageDeleteDraft = { date: d, scope, expectedImageId, actor: identity, target: connection };
-    openDialog('올린 식단 이미지를 삭제할까요?', `<p class="dialog-copy"><strong>${esc(uploadScopeLabel(d, scope))}</strong><br>${esc(nameOf(meta.uploadedBy) || '멤버')}님이 올린 이미지입니다.</p><p class="dialog-copy">${connection ? '삭제하면 팀 모두의 점심판에서 이 업로드 이미지가 사라져요.' : '이 기기에 저장된 업로드 이미지를 삭제해요.'} 카카오에서 자동으로 가져오는 사진은 계속 표시됩니다.</p>${scope === 'day' && images[imageSlot('week', d)] ? '<p class="note">이 하루 이미지를 삭제하면 이미 올려 둔 주간 식단이 표시돼요.</p>' : ''}<form id="menuImageDeleteForm" class="dialog-form" data-date="${d}" data-scope="${scope}" data-id="${esc(expectedImageId)}"><p id="menuImageDeleteStatus" class="upload-status" role="status">삭제할 기간을 확인해 주세요.</p><div class="button-row"><button type="button" id="cancelMenuImageDelete" class="secondary-button" data-action="cancelMenuImageDelete">유지하기</button><button type="submit" id="confirmMenuImageDelete" class="primary-button danger-button">${scope === 'week' ? '주간' : '하루'} 이미지 삭제</button></div></form>`);
-  }
-  async function deleteMenuImage(form) {
-    const draft = imageDeleteDraft;
-    if (!draft || imageSaving || busy) return;
-    if (draft.actor !== identity || draft.target !== connection || form.dataset.id !== draft.expectedImageId || form.dataset.date !== draft.date || form.dataset.scope !== draft.scope) return toast('내 이름과 공유 연결을 확인하고 삭제할 이미지를 다시 선택해 주세요.');
-    // Another tab may have changed this device's photos since this dialog opened.
-    // Compare and remove from the latest stored map so unrelated slots survive.
-    let images = shared.menuImages;
-    if (!connection) {
-      try { const stored = localStorage.getItem(KEYS.images); images = stored ? JSON.parse(stored) : {}; }
-      catch (_) { return toast('기기에 저장된 이미지 정보를 읽지 못했어요. 다시 시도해 주세요.'); }
-    }
-    if (!images || typeof images !== 'object' || Array.isArray(images)) return toast('기기에 저장된 이미지 정보를 확인하지 못했어요. 새로고침 후 다시 확인해 주세요.');
-    if (!connection) localImages = images;
-    const slot = imageSlot(draft.scope, draft.date), meta = images[slot];
-    if (!meta || meta.id !== draft.expectedImageId) { imageDeleteDraft = null; closeDialog(); render(); sync(); return toast('식단 이미지가 바뀌었어요. 현재 이미지를 확인한 뒤 다시 선택해 주세요.'); }
-    imageSaving = true; $('confirmMenuImageDelete').disabled = true; $('cancelMenuImageDelete').disabled = true;
-    $('menuImageDeleteStatus').textContent = '식단 이미지를 삭제하고 있어요…';
-    let deleted = false;
-    if (connection) {
-      deleted = await mutate('menuImageDelete', { scope: draft.scope, expectedImageId: draft.expectedImageId }, draft.date);
-    } else {
-      const next = { ...images }; delete next[slot];
-      try { write(KEYS.images, next); localImages = next; deleted = true; }
-      catch (_) { $('menuImageDeleteStatus').textContent = '기기에 삭제 결과를 저장하지 못했어요. 다시 시도해 주세요.'; }
-    }
-    imageSaving = false;
-    if (deleted) {
-      imageCache.delete(draft.expectedImageId); imageErrors.delete(draft.expectedImageId); imageDeleteDraft = null; manualMenuOpen = false;
-      closeDialog(); render(); ensureMenuImage();
-      toast(draft.target ? '올린 식단 이미지를 삭제했어요. 동료들의 점심판에도 반영됩니다.' : '이 기기에 올린 식단 이미지를 삭제했어요.');
-    } else if ($('menuImageDeleteForm')) {
-      $('confirmMenuImageDelete').disabled = false; $('cancelMenuImageDelete').disabled = false;
-      if (connection) $('menuImageDeleteStatus').textContent = syncError || '이미지를 삭제하지 못했어요. 다시 시도해 주세요.';
-    }
-  }
-  function viewMenuImage() {
-    const meta = selectedMenuImage(), dataUrl = imageData(meta); if (!meta || !validImageData(dataUrl)) return;
-    openDialog('런치타임 · ' + (meta.scope === 'week' ? '주간 식단' : dateText(meta.date)), `<p class="dialog-copy">${esc(meta.startDate)}${meta.startDate !== meta.endDate ? ' – ' + esc(meta.endDate) : ''} · ${esc(nameOf(meta.uploadedBy))}님이 올린 식단</p><div class="full-menu-image"><img src="${dataUrl}" alt="런치타임 식단 이미지"></div>`, true);
-  }
   function viewKakaoProfile() {
     if (!kakaoProfile) return;
     openDialog('런치타임 · 카카오 최신 프로필 사진', `<p class="dialog-copy">마지막 확인 ${esc(timeText(kakaoProfile.checkedAt))}<br>${date !== C.today() ? '선택한 날짜의 식단이 아니에요. ' : ''}사진에 적힌 식단 날짜를 확인해 주세요.${kakaoError ? '<br>다시 확인하지 못해 마지막으로 가져온 사진입니다.' : ''}</p><div class="full-menu-image"><img id="kakaoProfileFull" src="${esc(kakaoProfile.imageUrl)}" alt="런치타임 카카오 프로필 식단. 이미지 속 날짜 확인이 필요합니다." referrerpolicy="no-referrer"></div><p id="kakaoFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 아래 카카오 원문에서 확인해 주세요.</p><p class="dialog-copy"><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 채널 원문 열기 ↗</a></p>`, true);
@@ -648,17 +490,14 @@
     if (needsServerUpdate()) { toast('모임 참여 요청·알림 기능을 위해 공유 서버를 업데이트해야 합니다. 설정 안내를 확인해 주세요.'); return false; }
     const opDate = requestedDate, actor = identity, op = { type, payload, actor, id: uid() }, target = connection;
     let next;
-    try { if (!['settings', 'menuImageUpload', 'menuImageDelete'].includes(type)) next = C.applyOperation(day(opDate), opDate, config(), op); }
+    try { if (type !== 'settings') next = C.applyOperation(day(opDate), opDate, config(), op); }
     
     catch (e) { toast(e.message); return false; }
-    if (!target && ['menuImageUpload', 'menuImageDelete'].includes(type)) return false;
-    if (target && type === 'menuImageDelete' && !shared.features?.menuImageDelete) { toast('공유 서버 업데이트 후 식단 이미지를 삭제할 수 있어요.'); return false; }
     if (!target) {
       const prev = C.clone(local);
       try { if (type === 'settings') local.settings = C.settings(payload); else local.days[opDate] = next; persistLocal(); render(); return true; }
       catch (_) { local = prev; toast('기기에 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.'); return false; }
     }
-    if (['menuImageUpload', 'menuImageDelete'].includes(type)) imageMutationEpoch++;
     busy = true; render();
     try {
       const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 24000);
@@ -722,7 +561,7 @@
     try {
       toast('공유 서버와 연결하고 있어요…'); const result = await jsonp({ action: 'state', date }, next);
       if (!result.ok) throw new Error(result.error || '팀 키를 확인해 주세요.');
-      write(KEYS.connection, next); connection = next; imageCache.clear(); imageErrors.clear(); shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} }; mergeResponse(result);
+      write(KEYS.connection, next); connection = next; shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} }; mergeResponse(result);
       lastKakaoAttempt = 0; kakaoWaiting = false; render(); loadMenu(true); loadKakaoProfile(true); return true;
     } catch (e) { toast(e.message); return false; }
   }
@@ -842,13 +681,8 @@
     else if (action === 'menuView') { menuView = id === 'week' ? 'week' : 'day'; renderMenuCards(); loadMenu(); }
     else if (action === 'menuDate') { menuView = 'day'; changeDate(id); }
     else if (action === 'viewMegaMeal') viewMegaMeal(id, b.dataset.date);
-    else if (action === 'menuImageUpload') showMenuImageUpload();
-    else if (action === 'menuImageDelete') showMenuImageDelete(b);
-    else if (action === 'cancelMenuImageDelete') closeDialog();
-    else if (action === 'viewMenuImage') viewMenuImage();
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
-    else if (action === 'retryMenuImage') ensureMenuImage(true);
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }
     else if (action === 'settings') showSettings();
@@ -864,7 +698,7 @@
     }
     else if (action === 'disconnect') {
       if (busy) return toast('저장이 끝난 뒤 연결을 해제해 주세요.');
-      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; imageCache.clear(); imageErrors.clear(); try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
+      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
     }
     else if (action === 'random') {
       const counts = C.tally(date, day(), config()), max = Math.max(0, ...Object.values(counts).map(a => a.length));
@@ -873,7 +707,7 @@
     }
   });
   document.addEventListener('submit', async e => {
-    const form = e.target; if (!['decisionForm','addForm','noteForm','connectionForm','scheduleForm','absenceForm','menuImageForm','menuImageDeleteForm','pairInviteForm'].includes(form.id)) return;
+    const form = e.target; if (!['decisionForm','addForm','noteForm','connectionForm','scheduleForm','absenceForm','pairInviteForm'].includes(form.id)) return;
     e.preventDefault(); const f = new FormData(form);
     if (form.id === 'pairInviteForm') {
       if (form.dataset.member !== identity) return toast('내 이름을 다시 선택해 주세요.');
@@ -888,8 +722,6 @@
       if (result) { closeDialog(); toast(`${members.length}명에게 따로 먹기 초대를 보냈어요. 각자 수락하면 모임에 합류합니다.`); }
       else submit.disabled = false;
     }
-    else if (form.id === 'menuImageForm') { await saveMenuImage(form); }
-    else if (form.id === 'menuImageDeleteForm') { await deleteMenuImage(form); }
     else if (form.id === 'decisionForm') { toast('일반 점심은 메가존 또는 런치타임에서 각자 선택해 주세요.'); }
     else if (form.id === 'absenceForm') {
       if (form.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
@@ -928,11 +760,8 @@
   };
   $('copySummary').onclick = () => copy(summary(), '점심 공지를 복사했어요. 메신저에 붙여넣어 주세요.'); $('shareLink').onclick = shareLink;
   $('closeDialog').onclick = closeDialog;
-  $('appDialog').addEventListener('close', () => { imageReadToken++; imageDraft = null; imageDeleteDraft = null; });
-  $('appDialog').addEventListener('cancel', e => { if (imageSaving) e.preventDefault(); });
   $('appDialog').addEventListener('click', e => { if (e.target === $('appDialog')) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeDialog(); } });
   document.addEventListener('toggle', e => {
-    if (e.target.id === 'manualMenuDetails') manualMenuOpen = e.target.open;
     const d = e.target.dataset?.mealDetailsDate;
     if (C.validDate(d)) { if (e.target.open) expandedMenuDates.add(d); else expandedMenuDates.delete(d); }
   }, true);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f7f5f0">
+  <meta name="theme-color" content="#f3f1ed">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow">
   <meta name="description" content="우리 멤버들의 오늘 점심. 참석 확인부터 식단 비교, 식당 선택까지 한곳에서.">
@@ -11,12 +11,12 @@
   <link rel="icon" href="assets/favicon.svg?v=20261020-join-alerts" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/red-hat-display-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/pretendard-variable.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=20261020-join-alerts">
+  <link rel="stylesheet" href="styles.css?v=20261020-readable-v1">
   <script src="core.js?v=20261020-join-alerts" defer></script>
   <script src="menu-source.js?v=20261020-join-alerts" defer></script>
   <script src="lunchtime-source.js?v=20261020-join-alerts" defer></script>
   <script src="restaurant-guide.js?v=20261020-join-alerts" defer></script>
-  <script src="app.js?v=20261020-join-alerts" defer></script>
+  <script src="app.js?v=20261020-readable-v1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문 바로가기</a>
@@ -30,8 +30,14 @@
       <div class="hero-art" aria-hidden="true"><div class="sun-dot"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="plate"><div class="plate-rim"><div class="rice rice-one"></div><div class="rice rice-two"></div><div class="rice rice-three"></div><div class="leaf leaf-one"></div><div class="leaf leaf-two"></div><div class="tomato tomato-one"></div><div class="tomato tomato-two"></div><div class="egg"><i></i></div></div></div><div class="chopstick stick-one"></div><div class="chopstick stick-two"></div><span class="art-label">GOOD FOOD.<br>BETTER COMPANY.</span><span class="spark spark-one">✳</span><span class="spark spark-two">✳</span></div>
     </section>
     <div id="connectionBanner" class="connection-banner" aria-live="polite"></div>
-    <section id="peopleSection" class="people-section daily-section" aria-labelledby="peopleTitle">
-      <div class="section-heading"><div><span class="section-kicker">01 / TODAY'S CREW</span><h2 id="peopleTitle">오늘 점심 현황</h2></div></div>
+    <nav class="section-jumpnav" aria-label="섹션 바로가기">
+      <a class="jump-people" href="#peopleSection"><span aria-hidden="true">01</span>점심 현황</a>
+      <a class="jump-menu" href="#menuSection"><span aria-hidden="true">02</span>구내식당 식단</a>
+      <a class="jump-guide" href="#guideSection"><span aria-hidden="true">03</span>과천 맛집</a>
+      <a class="jump-result" href="#decisionSection"><span aria-hidden="true">04</span>선택 결과</a>
+    </nav>
+    <section id="peopleSection" class="people-section daily-section surface-section" aria-labelledby="peopleTitle">
+      <div class="section-heading"><div><span class="section-kicker">01 / 점심 참여 · 인원 확인</span><h2 id="peopleTitle">오늘 점심 현황</h2></div></div>
       <div class="date-toolbar daily-date-toolbar" role="group" aria-label="날짜와 참여자 선택">
         <div class="date-controls"><button id="prevDate" class="icon-button" aria-label="이전 날">←</button><label class="date-label"><span class="sr-only">점심 날짜</span><input type="date" id="dateInput" min="2020-01-01" max="2099-12-31"></label><button id="nextDate" class="icon-button" aria-label="다음 날">→</button><button id="todayBtn" class="small-button">오늘</button></div>
       </div>
@@ -41,17 +47,20 @@
         <div id="pairInvitations" class="pair-invitations"></div>
       </section>
       <div id="ceoControls" class="ceo-controls"><div><strong>대표님과 점심 일정</strong><p id="ceoControlHint">전체 일정이 취소된 날에 체크해 주세요.</p></div><label class="ceo-cancel-toggle"><input id="ceoCancelled" type="checkbox"><span id="ceoCancelLabel">오늘 대표님 점심 전체 취소</span></label></div>
+      <div class="roster-heading"><h3>직원별 점심 현황</h3><span>참여 상태별로 모아 봐요</span></div>
       <p id="availabilityHint" class="section-description"></p>
       <div id="membersGrid" class="daily-groups"></div>
       <section id="pairBoard" class="pair-board" aria-label="따로 먹는 점심 모임" hidden></section>
       <div class="daily-tools"><button class="text-button" data-action="settings">기본 요일 설정 ↗</button><p id="dailySaveNote" class="tiny-note" role="status" aria-live="polite"></p></div>
     </section>
     <div class="main-columns">
-      <section id="menuSection" class="menu-section" aria-labelledby="menuTitle">
-        <div class="section-heading"><div><span class="section-kicker">02 / ON THE MENU</span><h2 id="menuTitle">오늘은 어디로 갈까요?</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
+      <section id="menuSection" class="menu-section surface-section" aria-labelledby="menuTitle">
+        <div class="section-heading"><div><span class="section-kicker">02 / 메가존 · 런치타임</span><h2 id="menuTitle">오늘 구내식당 식단</h2></div><button id="refreshMenu" class="text-button">↻ 식단 새로고침</button></div>
         <div id="restaurantCards" class="restaurant-cards"></div>
-        <section id="guideSection" class="restaurant-guide" aria-labelledby="guideTitle">
-          <div class="guide-heading"><h3 id="guideTitle">과천 맛집 골라보기</h3><a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도 ↗</a></div>
+
+      </section>
+        <section id="guideSection" class="restaurant-guide surface-section" aria-labelledby="guideTitle">
+          <div class="section-heading guide-heading"><div><span class="section-kicker">03 / 대표님 점심 · 따로 먹는 모임</span><h2 id="guideTitle">과천 맛집 골라보기</h2></div><a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도 ↗</a></div>
           <p id="guideIntro" class="section-description"></p>
           <div class="guide-tools"><div id="guideFilters" class="guide-filters" role="group" aria-label="음식 종류"></div><label class="guide-search"><span class="sr-only">식당 또는 메뉴 검색</span><input id="guideSearch" type="search" placeholder="식당 또는 메뉴 검색" autocomplete="off"></label></div>
           <p id="guideResultCount" class="guide-result-count" role="status"></p>
@@ -59,9 +68,8 @@
           <p id="guideEmpty" class="guide-empty" hidden></p>
           <button id="guideMore" class="guide-more" data-action="guideMore" hidden>맛집 더 보기</button>
         </section>
-      </section>
-      <aside class="decision-panel" aria-labelledby="decisionTitle">
-        <div class="section-kicker">03 / OUR PICK</div><h2 id="decisionTitle">일반 점심 장소 선택 현황</h2><p id="voteSummary" class="section-description"></p>
+      <aside id="decisionSection" class="decision-panel surface-section" aria-labelledby="decisionTitle">
+        <div class="section-heading"><div><span class="section-kicker">04 / 선택 결과 · 공지</span><h2 id="decisionTitle">일반 점심 장소 선택 현황</h2></div></div><p id="voteSummary" class="section-description"></p>
         <div id="voteResults"></div>
         <div id="decisionContent"></div>
         <div id="ceoDecisionPanel"></div>
