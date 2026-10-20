@@ -56,7 +56,7 @@
     MEMBERS.forEach(m => { if (v.ceoDays && Array.isArray(v.ceoDays[m.id])) out.ceoDays[m.id] = [...new Set(v.ceoDays[m.id].filter(n => Number.isInteger(n) && n >= 1 && n <= 5))]; });
     return out;
   }
-  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, ceoDecision: null, notes: {}, pairs: [], revision: 0, updatedAt: null }; }
+  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, ceoDecision: null, separateVenues: {}, notes: {}, pairs: [], revision: 0, updatedAt: null }; }
   function safeUrl(url) {
     if (!url) return '';
     const value = String(url).trim();
@@ -90,15 +90,25 @@
         category: typeof ceo.category === 'string' ? ceo.category.slice(0, 20) : '',
         time: ceo.time, actor: ceo.actor, at: typeof ceo.at === 'string' ? ceo.at.slice(0, 40) : '' };
     }
-    const pairs = (Array.isArray(v.pairs) ? v.pairs : []).slice(0, MEMBERS.length * MEMBERS.length), pairIds = new Set(), pairedMembers = new Set();
-    // Prefer existing consented pairs when a malformed record contains overlaps.
+    const pairs = (Array.isArray(v.pairs) ? v.pairs : []).slice(0, MEMBERS.length * MEMBERS.length), pairIds = new Set(), occupied = new Set(), leaders = new Set();
+    // Accepted teammates and pending invitees may each belong to only one group.
+    // Several links with the same inviter form one group; legacy one-to-one links still work.
     ['accepted', 'pending'].forEach(status => pairs.forEach(pair => {
       if (!pair || typeof pair !== 'object' || Array.isArray(pair) || pair.status !== status || typeof pair.id !== 'string' || !PAIR_ID.test(pair.id) || !MEMBER_IDS.has(pair.from) || !MEMBER_IDS.has(pair.to) || pair.from === pair.to) return;
       if (d.overrides[pair.from] !== 'separate' || status === 'accepted' && d.overrides[pair.to] !== 'separate') return;
-      if (pairIds.has(pair.id) || pairedMembers.has(pair.from) || pairedMembers.has(pair.to)) return;
-      pairIds.add(pair.id); pairedMembers.add(pair.from); pairedMembers.add(pair.to);
-      d.pairs.push({ id: pair.id, from: pair.from, to: pair.to, status: status });
+      if (pairIds.has(pair.id) || occupied.has(pair.to) || occupied.has(pair.from) && !leaders.has(pair.from)) return;
+      pairIds.add(pair.id); leaders.add(pair.from); occupied.add(pair.from); occupied.add(pair.to);
+      d.pairs.push({ id: pair.id, from: pair.from, to: pair.to, status });
     }));
+    MEMBERS.forEach(m => {
+      const venue = v.separateVenues && v.separateVenues[m.id];
+      if (d.overrides[m.id] !== 'separate' || !venue || typeof venue !== 'object' || Array.isArray(venue)) return;
+      const match = typeof venue.placeId === 'string' && venue.placeId.match(GUIDE_ID);
+      if (!match || venue.url !== `https://m.place.naver.com/place/${match[1]}/home` || typeof venue.name !== 'string' || !venue.name.trim() || !MEMBER_IDS.has(venue.actor)) return;
+      d.separateVenues[m.id] = { placeId: venue.placeId, name: venue.name.trim().slice(0, 60), url: venue.url,
+        category: typeof venue.category === 'string' ? venue.category.slice(0, 20) : '',
+        actor: venue.actor, at: typeof venue.at === 'string' ? venue.at.slice(0, 40) : '' };
+    });
     d.revision = Number.isInteger(v.revision) ? Math.max(0, v.revision) : 0; d.updatedAt = v.updatedAt || null;
     return d;
   }
@@ -115,6 +125,14 @@
   }
   function pairFor(id, day) { return cleanDay(day).pairs.find(pair => pair.from === id || pair.to === id) || null; }
   function incomingPairs(id, day) { return cleanDay(day).pairs.filter(pair => pair.to === id && pair.status === 'pending'); }
+  function separateGroup(id, day) {
+    const d = cleanDay(day);
+    const joined = d.pairs.find(pair => pair.to === id && pair.status === 'accepted');
+    const root = joined ? joined.from : id;
+    const links = d.pairs.filter(pair => pair.from === root);
+    return { root, members: [root, ...links.filter(pair => pair.status === 'accepted').map(pair => pair.to)],
+      pending: links.filter(pair => pair.status === 'pending'), pairs: links, venue: d.separateVenues[root] || null };
+  }
   function participants(date, day, config) { return MEMBERS.filter(m => memberStatus(m.id, date, day, config).in); }
   function places(day) { return PLACES.concat((day || emptyDay()).extras || []); }
   function tally(date, day, config) {
@@ -130,6 +148,7 @@
       case 'availability':
         if (!['auto'].concat(OVERRIDE_VALUES).includes(p.value)) throw new Error('참석 상태를 확인해 주세요.');
         d.pairs = d.pairs.filter(pair => pair.from !== op.actor && pair.to !== op.actor);
+        delete d.separateVenues[op.actor];
         if (p.value === 'auto') delete d.overrides[op.actor]; else d.overrides[op.actor] = p.value;
         if (p.value === 'out') d.absenceReasons[op.actor] = String(p.reason || '').trim().slice(0, 60);
         else delete d.absenceReasons[op.actor];
@@ -145,6 +164,21 @@
         d.pairs.push({ id: p.id, from: op.actor, to: p.to, status: 'pending' });
         break;
       }
+      case 'groupInvite': {
+        if (!Array.isArray(p.invites) || !p.invites.length || p.invites.length >= MEMBERS.length) throw new Error('초대할 동료를 한 명 이상 선택해 주세요.');
+        const current = pairFor(op.actor, d);
+        if (current && current.from !== op.actor) throw new Error('다른 모임에 초대받거나 참여 중이에요. 먼저 초대를 처리하거나 나가 주세요.');
+        const invited = new Set(), ids = new Set(d.pairs.map(pair => pair.id));
+        p.invites.forEach(item => {
+          if (!item || typeof item.id !== 'string' || !PAIR_ID.test(item.id)) throw new Error('초대 번호를 확인해 주세요.');
+          if (!MEMBER_IDS.has(item.to) || item.to === op.actor || invited.has(item.to)) throw new Error('서로 다른 동료를 선택해 주세요.');
+          if (ids.has(item.id) || pairFor(item.to, d)) throw new Error('이미 다른 모임에 있거나 초대받은 동료가 포함되어 있어요.');
+          invited.add(item.to); ids.add(item.id);
+        });
+        d.overrides[op.actor] = 'separate'; delete d.absenceReasons[op.actor];
+        p.invites.forEach(item => d.pairs.push({ id: item.id, from: op.actor, to: item.to, status: 'pending' }));
+        break;
+      }
       case 'pairAccept':
       case 'pairDecline':
       case 'pairCancel':
@@ -155,7 +189,8 @@
         if (op.type === 'pairLeave') {
           if (pair.status !== 'accepted') throw new Error('수락한 짝에서만 나갈 수 있어요.');
           if (pair.from !== op.actor && pair.to !== op.actor) throw new Error('본인이 속한 짝에서만 나갈 수 있어요.');
-          d.pairs = d.pairs.filter(item => item.id !== pair.id);
+          d.pairs = d.pairs.filter(item => item.id !== pair.id && (pair.from !== op.actor || item.from !== op.actor));
+          delete d.separateVenues[op.actor];
           d.overrides[op.actor] = 'pending'; delete d.absenceReasons[op.actor];
         } else {
           if (pair.status !== 'pending') throw new Error('초대가 이미 처리됐어요. 새로고침 후 확인해 주세요.');
@@ -163,6 +198,7 @@
           if (op.type === 'pairAccept') {
             pair.status = 'accepted';
             d.overrides[pair.from] = 'separate'; d.overrides[pair.to] = 'separate';
+            delete d.separateVenues[pair.to];
             delete d.absenceReasons[pair.from]; delete d.absenceReasons[pair.to];
           } else d.pairs = d.pairs.filter(item => item.id !== pair.id);
         }
@@ -185,6 +221,19 @@
       case 'ceoUnconfirm':
         if (memberStatus(op.actor, date, d, config).kind !== 'ceo') throw new Error('해당 날짜의 대표님 점심 참석자만 장소 확정을 취소할 수 있어요.');
         d.ceoDecision = null; break;
+      case 'separateVenue': {
+        if (memberStatus(op.actor, date, d, config).kind !== 'separate') throw new Error('먼저 따로 먹기를 선택해 주세요.');
+        const match = typeof p.placeId === 'string' && p.placeId.match(GUIDE_ID);
+        if (!match || p.url !== `https://m.place.naver.com/place/${match[1]}/home` || typeof p.name !== 'string' || !p.name.trim()) throw new Error('과천 맛집 목록에서 식당을 다시 선택해 주세요.');
+        const root = separateGroup(op.actor, d).root;
+        d.separateVenues[root] = { placeId: p.placeId, name: p.name.trim().slice(0, 60), url: p.url,
+          category: typeof p.category === 'string' ? p.category.slice(0, 20) : '', actor: op.actor, at: now || new Date().toISOString() };
+        break;
+      }
+      case 'separateUnconfirm': {
+        if (memberStatus(op.actor, date, d, config).kind !== 'separate') throw new Error('따로 먹는 모임의 참석자만 장소를 변경할 수 있어요.');
+        delete d.separateVenues[separateGroup(op.actor, d).root]; break;
+      }
       case 'addPlace':
         if (d.extras.length >= 8) throw new Error('다른 식당은 하루 8곳까지 추가할 수 있어요.');
         if (!/^extra_[a-zA-Z0-9_-]{1,50}$/.test(p.id || '') || hasPlace(p.id)) throw new Error('식당 번호가 중복되었습니다.');
@@ -217,5 +266,5 @@
     return block.split(/^## /m)[0].split('\n').filter(x => /^- /.test(x)).map(x => x.slice(2).trim()).filter(Boolean).slice(0, 12);
   }
   function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
-  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, separateGroup, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
 });

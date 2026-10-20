@@ -220,7 +220,7 @@ test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 �
     revision:42, updatedAt:'2026-10-19T02:00:00Z'
   };
   const before = JSON.stringify(legacy), restored = C.cleanDay(legacy);
-  assert.deepEqual(restored,{...legacy,ceoDecision:null,pairs:[]});
+  assert.deepEqual(restored,{...legacy,ceoDecision:null,separateVenues:{},pairs:[]});
   assert.equal(JSON.stringify(legacy),before);
   assert.deepEqual(C.participants(monday,restored,settings).map(m => m.id),['seongjun']);
   assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[]});
@@ -409,4 +409,62 @@ test('대표님 점심 확정·취소 권한과 식당/시간 형식을 검증�
     [{time:'25:30'},/시간/],
   ]) assert.throws(()=>C.applyOperation(d,tuesday,settings,op('ceoDecision','jingi',{...payload,...changes})),regex);
   assert.equal(d.ceoDecision,null);
+});
+
+test('세 명 이상 따로 먹는 모임은 다중 초대·개별 수락·모임별 식당을 공유하되 대표님 장소와 분리한다', () => {
+  const venueA = { placeId: 'guide_123456789', name: '과천 식당 A', url: 'https://m.place.naver.com/place/123456789/home', category: '한식' };
+  const venueB = { placeId: 'guide_987654321', name: '과천 식당 B', url: 'https://m.place.naver.com/place/987654321/home', category: '일식' };
+  let d = apply(C.emptyDay(), 'groupInvite', 'seongjun', { invites: [
+    { id: pairId(1), to: 'jingi' }, { id: pairId(2), to: 'jiwoo' }, { id: pairId(3), to: 'hyunsu' }
+  ] });
+  assert.equal(d.pairs.length, 3);
+  assert.equal(d.overrides.seongjun, 'separate');
+  for (const id of ['jingi','jiwoo','hyunsu']) assert.equal(d.overrides[id], undefined);
+  assert.deepEqual(C.incomingPairs('jiwoo',d).map(p=>p.from), ['seongjun']);
+  assert.deepEqual(C.separateGroup('seongjun',d).members, ['seongjun']);
+  d = accept(d, 'jingi', 1);
+  d = accept(d, 'jiwoo', 2);
+  assert.deepEqual(C.separateGroup('jiwoo',d).members, ['seongjun','jingi','jiwoo']);
+  assert.deepEqual(C.separateGroup('jingi',d).pending.map(x=>x.to), ['hyunsu']);
+  d = apply(d,'separateVenue','jiwoo',venueA);
+  assert.equal(d.separateVenues.seongjun.name,'과천 식당 A');
+  assert.equal(d.separateVenues.jiwoo,undefined);
+  assert.equal(C.separateGroup('jingi',d).venue.name,'과천 식당 A');
+  assert.equal(d.ceoDecision,null);
+  assert.deepEqual(C.cleanDay(JSON.parse(JSON.stringify(d))),d);
+  // A second group can independently register a different restaurant.
+  d = apply(d,'groupInvite','yunchul',{invites:[{id:pairId(4),to:'minjun'}]});
+  d = accept(d,'minjun',4);
+  d = apply(d,'separateVenue','minjun',venueB);
+  assert.equal(C.separateGroup('minjun',d).venue.name,'과천 식당 B');
+  assert.equal(C.separateGroup('jiwoo',d).venue.name,'과천 식당 A');
+  d = apply(d,'separateVenue','jingi',venueB);
+  assert.equal(C.separateGroup('seongjun',d).venue.name,'과천 식당 B');
+  d = apply(d,'pairLeave','jiwoo',{pairId:pairId(2)});
+  assert.equal(C.separateGroup('jiwoo',d).venue,null);
+  assert.deepEqual(C.separateGroup('seongjun',d).members,['seongjun','jingi']);
+  assert.equal(C.separateGroup('jingi',d).venue.name,'과천 식당 B');
+  d = choose(d,'seongjun','pending');
+  assert.equal(d.separateVenues.seongjun,undefined);
+  assert.equal(C.memberStatus('jingi',monday,d,settings).kind,'separate');
+  assert.equal(C.separateGroup('yunchul',d).venue.name,'과천 식당 B');
+});
+
+test('다중 초대에서 대상 중복·중복 그룹 가입·잘못된 식당·비참여자 장소 변경을 거부한다', () => {
+  const a={id:pairId(30),to:'jingi'},b={id:pairId(31),to:'jiwoo'},place={placeId:'guide_123456789',name:'가게',url:'https://m.place.naver.com/place/123456789/home'};
+  let d=apply(C.emptyDay(),'groupInvite','seongjun',{invites:[a,b]});
+  const before=JSON.stringify(d);
+  assert.throws(()=>apply(d,'groupInvite','minjun',{invites:[{id:pairId(32),to:'jingi'}]}),/다른 모임/);
+  assert.throws(()=>apply(d,'groupInvite','seongjun',{invites:[{id:pairId(32),to:'jingi'}]}),/다른 모임/);
+  assert.throws(()=>apply(d,'groupInvite','seongjun',{invites:[{id:pairId(32),to:'hyunsu'},{id:pairId(33),to:'hyunsu'}]}),/서로 다른/);
+  assert.throws(()=>apply(d,'groupInvite','seongjun',{invites:[{id:pairId(32),to:'__proto__'}]}),/서로 다른/);
+  assert.throws(()=>apply(d,'groupInvite','seongjun',{invites:[{id:pairId(30),to:'hyunsu'}]}),/다른 모임/);
+  assert.equal(JSON.stringify(d),before);
+  assert.throws(()=>apply(d,'separateVenue','jingi',place),/먼저 따로 먹기/);
+  assert.throws(()=>apply(d,'separateVenue','seongjun',{...place,url:'javascript:bad'}),/목록/);
+  assert.throws(()=>apply(d,'separateVenue','seongjun',{...place,placeId:'guide_bad'}),/목록/);
+  assert.throws(()=>apply(d,'separateUnconfirm','jiwoo',{}),/참석자/);
+  d=apply(d,'separateVenue','seongjun',place);
+  d=apply(d,'separateUnconfirm','seongjun',{});
+  assert.deepEqual(d.separateVenues,{});
 });

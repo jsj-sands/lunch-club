@@ -1010,3 +1010,33 @@ button.mega-meal-photo:not(:disabled):hover{background:var(--brand-pale)}
 .guide-card-actions button:not(:disabled){background:var(--brand);color:var(--white);border-color:var(--brand)}
 .guide-card-actions button:disabled{opacity:.73;cursor:default}
 @media(max-width:410px){.response-cafeteria-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}.response-cafeteria-buttons button{font-size:12px}}
+
+/* Multiple accepted teammates can share a separate lunch and one restaurant. */
+#peopleSection .separate-place{margin-top:3px;font-weight:700;color:var(--separate-ink)}
+#peopleSection .separate-place a{font-weight:650;text-decoration:underline;text-underline-offset:2px;color:var(--brand)}
+#peopleSection .separate-board-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px}
+#peopleSection .separate-guide-link{display:inline-flex;align-items:center;min-height:34px;padding:6px 9px;border:1px solid var(--brand-line);border-radius:8px;background:var(--brand-pale);color:var(--brand);font-size:11px;font-weight:700;line-height:1.5;text-decoration:none}
+.personal-separate-notice{background:var(--separate-bg);border-color:var(--separate-line)}
+.pair-member-fieldset{min-width:0;margin:0;border:0;padding:0}
+.pair-member-fieldset legend{margin-bottom:10px;font-size:13px;font-weight:800;color:var(--ink)}
+.pair-member-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:270px;overflow-y:auto}
+.dialog-form label.pair-member-option{display:flex;align-items:center;gap:10px;min-width:0;margin:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);cursor:pointer;font-size:12px}
+.dialog-form .pair-member-option:has(input:checked){background:var(--brand-pale);border-color:var(--brand)}
+.pair-member-option span{min-width:0;overflow-wrap:anywhere}
+.pair-member-option strong{display:block;font-size:13px}
+.pair-member-option small{display:block;font-size:10px;font-weight:400;line-height:1.6;color:var(--muted)}
+.dialog-form .pair-member-option input[type=checkbox]{flex:none;width:18px;height:18px;accent-color:var(--brand)}
+.pair-detail-actions{flex-wrap:wrap;margin:14px 0}
+.separate-dialog-venue{display:grid;gap:8px;padding:13px 15px;background:var(--separate-bg);border:1px solid var(--separate-line);border-radius:10px;color:var(--separate-ink);font-size:12px}
+.separate-dialog-venue a{color:var(--brand);font-weight:700;text-underline-offset:3px}
+/* Explicit destination buttons: do not mistake "CEO only" for an unavailable action. */
+.guide-card-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.guide-card-actions a{grid-column:span 2}
+.guide-card-actions a,.guide-card-actions button{width:100%;flex:auto;min-height:37px}
+.guide-card-actions .guide-ceo-action:not(:disabled){background:var(--brand);color:var(--white)}
+.guide-card-actions .guide-separate-action:not(:disabled){background:var(--separate-bg);border-color:var(--separate-line);color:var(--separate-ink)}
+.guide-card.is-ceo-picked{background:var(--brand-pale);border-color:var(--brand-line)}
+.guide-card.is-separate-picked{background:var(--separate-bg);border-color:var(--separate-line)}
+.guide-card.is-ceo-picked .guide-card-actions .guide-ceo-action:disabled{background:var(--brand);color:var(--white);border-color:var(--brand);opacity:1}
+.guide-card.is-separate-picked .guide-card-actions .guide-separate-action:disabled{background:var(--separate-ink);color:var(--white);border-color:var(--separate-line);opacity:1}
+@media(max-width:500px){.pair-member-options{grid-template-columns:1fr}}

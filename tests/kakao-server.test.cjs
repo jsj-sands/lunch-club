@@ -68,7 +68,7 @@ test('카카오 조회는 팀 키와 JSONP 콜백을 검증하고 날짜·본인
   assert.ok(reply.text.startsWith(callback + '('));
   const payload = JSON.parse(reply.text.slice(callback.length + 1, -2));
   assert.equal(payload.profile.imageUrl, IMAGE);
-  assert.equal(s.state().serverVersion, 4); assert.equal(s.state().features.kakaoProfile, true);
+  assert.equal(s.state().serverVersion, 5); assert.equal(s.state().features.kakaoProfile, true);
   assert.equal(s.get({ action: 'state' }).ok, false);
 });
 

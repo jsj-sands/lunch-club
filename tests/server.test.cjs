@@ -22,9 +22,9 @@ test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요
  let d=s.get().days[DATE];assert.equal(d.votes.seongjun,'megazone');assert.equal(d.votes.yunchul,'lunchtime');assert.equal(d.revision,4);
  s.context.doPost({postData:{contents:JSON.stringify(a.body)}});assert.equal(s.get().days[DATE].revision,4);assert.equal(s.get({receipt:a.body.op.id}).receipt.ok,true);assert.equal(s.locked(),false);
 });
-test('버전 4 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
+test('버전 5 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,4);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true});
+ assert.equal(state.serverVersion,5);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
@@ -118,7 +118,7 @@ test('기존 버전의 저장된 일일 기록·영수증·사용자 일정은 �
  s.store['LUNCH_DAY_'+DATE]=JSON.stringify({parts:1,generation:'legacy'});
  s.store['LUNCH_DAY_'+DATE+'_legacy_0']=JSON.stringify({data,receipts:{[oldReceipt]:{ok:true,at:data.updatedAt}}});
  const restored=s.get({receipt:oldReceipt});
- assert.deepEqual(restored.days[DATE],{...data,ceoDecision:null,pairs:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
+ assert.deepEqual(restored.days[DATE],{...data,ceoDecision:null,separateVenues:{},pairs:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
  for(const [id,days] of Object.entries(cfg.ceoDays))assert.deepEqual(restored.settings.ceoDays[id],days);
  assert.equal(restored.settings.scheduleEnd,cfg.scheduleEnd);assert.equal(restored.settings.meetingTime,cfg.meetingTime);
  s.post('pairInvite','yunchul',{id:'pair_'+'b'.repeat(24),to:'jiwoo'});const latest=s.get({receipt:oldReceipt});
@@ -142,5 +142,33 @@ test('대표님 점심 식당 확정은 기존 서버 저장·수신 확인을 �
  const unconfirmed=s.post('ceoUnconfirm','jiwoo',{}, {date:tuesday});
  const after=s.get({date:tuesday,receipt:unconfirmed.body.op.id});
  assert.equal(after.receipt.ok,true);assert.equal(after.days[tuesday].ceoDecision,null);
+ assert.equal(s.locked(),false);
+});
+
+test('Google 공유 서버는 3명 이상 모임과 모임별 맛집 장소를 다른 접속자에게 복원하고 기존 데이터는 보존한다',()=>{
+ const s=server(),id1='pair_'+'a'.repeat(24),id2='pair_'+'b'.repeat(24);
+ const venue={placeId:'guide_123456789',name:'테스트 식당',url:'https://m.place.naver.com/place/123456789/home',category:'한식'};
+ s.post('availability','seongjun',{value:'in'});s.post('vote','seongjun',{placeId:'megazone'});
+ const sent=s.post('groupInvite','seongjun',{invites:[{id:id1,to:'jingi'},{id:id2,to:'jiwoo'}]});
+ assert.equal(s.get({receipt:sent.body.op.id}).receipt.ok,true);
+ const waiting=s.get().days[DATE];
+ assert.equal(waiting.pairs.length,2);
+ assert.equal(waiting.overrides.jingi,undefined);
+ const accepted=s.post('pairAccept','jingi',{pairId:id1});
+ assert.equal(s.get({receipt:accepted.body.op.id}).receipt.ok,true);
+ const placeSaved=s.post('separateVenue','jingi',venue);
+ const shared=s.get({receipt:placeSaved.body.op.id});
+ assert.equal(shared.receipt.ok,true);
+ assert.equal(shared.days[DATE].separateVenues.seongjun.placeId,venue.placeId);
+ assert.equal(shared.days[DATE].votes.seongjun,'megazone');
+ assert.equal(shared.days[DATE].ceoDecision,null);
+ s.post('pairAccept','jiwoo',{pairId:id2});
+ const other=s.get().days[DATE];
+ assert.equal(other.pairs.filter(x=>x.status==='accepted').length,2);
+ assert.equal(other.separateVenues.seongjun.name,'테스트 식당');
+ const bad=s.post('separateVenue','yunchul',venue);
+ assert.equal(s.get({receipt:bad.body.op.id}).receipt.ok,false);
+ s.post('availability','jiwoo',{value:'pending'});
+ assert.equal(s.get().days[DATE].separateVenues.seongjun.name,'테스트 식당');
  assert.equal(s.locked(),false);
 });
