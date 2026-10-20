@@ -1,0 +1,116 @@
+SANDS Lunch Club | Google Drive 공유 알림 -> Slack 알림 (관리자 권한 없는 방식)
+================================================================================
+
+[원리]
+Google Apps Script에서 '새 알림 텍스트 파일'을 생성하고 해당 직원의 Google 이메일로
+보기 권한을 공유합니다. Slack에 이미 연결된 Google Drive 앱이 그 직원에게
+'파일이 공유됨' 알림을 보내는 방식입니다.
+
+- Slack API 토큰, Slack 앱 설치 권한, Slack 멤버 ID는 필요하지 않습니다.
+- Google 공식 Drive API permissions.create(sendNotificationEmail=true)를 사용해
+  파일 공유 이메일을 보냅니다.
+- Slack 알림은 Google Drive 앱을 각 수신자가 연결하고 알림을 켠 경우에만 가능합니다.
+- 조직 설정/정책에 따라 Drive 공유 이벤트를 Slack으로 받지 못할 수 있습니다.
+- 파일 권한 '요청'을 조작하는 것이 아니라 새 파일을 정식으로 '공유'하는 방식입니다.
+- 각 알림 파일은 전용 비공개 Google Drive 폴더에 생성되며 14일 후 정리됩니다.
+- 점심판 자체에서도 초대/참여 요청 알림은 계속 확인할 수 있습니다.
+
+[1. 직원 Google 이메일 설정]
+실제 설치된 기존 Google Apps Script 프로젝트를 엽니다.
+프로젝트 설정(톱니바퀴) > 스크립트 속성 > 스크립트 속성 추가.
+
+속성 이름: LUNCH_DRIVE_MEMBER_EMAILS
+속성 값: 아래 JSON의 빈 따옴표를 실제 해당 직원의 Google 계정 이메일로 변경
+(특정 직원만 먼저 테스트해도 됩니다. 미입력 직원은 파일 공유 알림을 받지 않습니다.)
+
+{
+  "seongjun": "",
+  "juri": "",
+  "hyunsu": "",
+  "yunchul": "",
+  "jingi": "",
+  "minjun": "",
+  "seongeun": "",
+  "yunseok": "",
+  "jiwoo": "",
+  "hyunju": ""
+}
+
+[내부 ID = 이름]
+seongjun     = 조성준
+juri         = 손주리
+hyunsu       = 윤현수
+yunchul      = 김윤철
+jingi        = 천진기
+minjun       = 최민준
+seongeun     = 오성은
+yunseok      = 장윤석
+jiwoo        = 서지우
+hyunju       = 조현주
+
+선택: 외부 개인 계정으로의 잘못된 공유 방지
+속성 이름: LUNCH_DRIVE_ALLOWED_DOMAIN
+속성 값: 회사 Google 계정의 이메일 도메인 (예: example.com은 설명용입니다)
+실제 회사 도메인을 정확하게 확인해 입력하세요. 예시 도메인을 그대로 사용하면 안 됩니다.
+이 속성을 추가하면 도메인이 일치하는 이메일에만 파일 공유를 시도합니다.
+
+* 직원 개인 이메일을 GitHub 코드, setup.html, 저장소 파일에 넣지 마세요.
+* 동일한 이메일을 다른 직원에게 잘못 매핑하면 수신자가 엉뚱해집니다.
+* Google Workspace 관리자의 공유 정책이 적용됩니다. 외부 공유는 제한될 수 있습니다.
+* 사이트는 여전히 이름 선택 기반이며 사용자를 로그인으로 인증하지 않습니다.
+
+[2. 실제 직원 한 명에게 테스트 (필수 권장)]
+예를 들어 손주리 직원에게 테스트하려면 다음 속성을 추가합니다.
+
+속성 이름: LUNCH_DRIVE_TEST_MEMBER
+속성 값: juri
+
+Google Apps Script 편집기의 상단 함수 선택 드롭다운에서
+  testLunchDriveNotification
+을 선택하고 '실행'을 누릅니다.
+
+Google Drive 접근 권한 승인이 나오면 허용해야 합니다. Google Workspace 정책상
+권한을 승인할 수 없다면 기존 사내 관리자 정책을 확인해야 합니다.
+
+실행 로그의 'Drive 파일 공유 성공'은 Google Drive 공유 성공만 뜻합니다.
+수신자가 Slack에서 Google Drive 앱의 알림을 실제로 받았는지 직접 확인해야 합니다.
+발송 실패는 Apps Script 실행 로그에만 기록됩니다.
+수신자의 Slack > 앱 > Google Drive > Home > Notifications가 켜져 있어야 합니다.
+
+[3. GitHub와 기존 Google 공유 서버 업데이트]
+1) 이번 ZIP을 풀고 GitHub lunch-club 저장소에 내부 파일 전체 업로드 / Commit
+2) 업데이트된 https://jsj-sands.github.io/lunch-club/setup.html#update 에서
+   '공유 서버 코드 전체 복사' 사용 (기존 팀 키를 입력한 브라우저)
+3) 기존 Google Apps Script Code.gs를 새 코드 전체로 교체 후 저장
+4) 배포 > 배포 관리 > 기존 배포 수정(연필) > 버전 '새 버전' > 배포
+5) testLunchDriveNotification을 실행해 수신자의 Slack 알림 확인
+
+현재 공유 서버 및 Script Properties에 저장된 개인 점심 기록은 유지합니다.
+개별 공유 알림은 운영 데이터 저장보다 나중에 수행하여 알림 실패가
+기존 모임 생성/초대/승인/거절을 취소하지 않습니다.
+
+[4. 수신 이벤트]
+- 동료에게 따로 먹기 초대 → 초대받은 직원
+- 다른 직원이 모임 참여 요청 → 모임 최초 생성자
+- 동료가 초대 수락/거절 → 초대한 직원
+- 모임 생성자가 참여 요청 승인/거절 → 요청한 직원
+- 참여 요청 취소 → 모임 생성자
+
+[특히 중요한 제한]
+① Apps Script 웹 앱이 '나로 실행' 중이라면 해당 실행자의 Google 계정으로
+   본인이 소유한 Drive 파일을 다시 공유할 수 없습니다. 그 사람에게는 이 방식의
+   Slack Drive 알림을 보낼 수 없습니다. 점심판 내 알림은 정상 표시됩니다.
+   모든 사람에게 동일하게 Slack 알림을 보내려면 참여자와 다른 Google 계정에서
+   별도 알림 발신을 운영하거나, 관리자의 Slack 공식 연동이 필요합니다.
+② 이 방법은 Google Drive 앱에서 보낸 알림이지 SANDS Lunch Club Slack 봇이
+   보낸 일반 DM이 아닙니다. 파일명과 공유 문구에 점심 요청 내용이 표시됩니다.
+③ Google Drive 파일이 매 알림마다 새로 생성됩니다. 비공개 전용 폴더에 모이며
+   14일이 지나면 다음 알림 전송 시점에 순차 정리합니다.
+④ 수신자는 기업 정책/개인 설정에 따라 이메일은 받지만 Slack 알림이 없을 수 있습니다.
+⑤ Slack Drive가 '접근 권한 요청'에만 알림을 보내는 설정이라면,
+   '새 파일 공유'도 알림 대상인지 반드시 첫 테스트에서 확인해 주세요.
+⑥ 알림 전송 실패 시 자동 재시도는 하지 않습니다. 웹앱 알림이 기준입니다.
+
+공식 참고:
+https://slack.com/intl/ko-kr/help/articles/205875058-Slack%EC%9A%A9-Google-Drive
+https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create

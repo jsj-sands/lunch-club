@@ -1,6 +1,34 @@
+## 2026-10-20 추가 · 관리자 없이 Slackbot 알림 받기 (우선 추천)
+
+**관리자 권한 없이 가능한 더 간단한 방법**을 추가했습니다. 각 직원이 Slack 개인 설정에서 'Slack으로 이메일 가져오기 → 전달 주소 가져오기'로 고유 이메일 주소를 발급받고, 그 주소를 기존 Google Apps Script의 스크립트 속성에 저장합니다. 점심 초대/참여 요청 등 발생 시 `MailApp.sendEmail`이 해당 Slackbot 주소로 메일을 발송하므로, 수신자는 Slackbot 대화에서 확인할 수 있습니다. Gmail 공유 드라이브 알림보다 파일이 쌓이지 않고, Apps Script의 실행 계정 본인에게도 사용할 수 있습니다.
+
+- 스크립트 속성 `LUNCH_SLACKBOT_FORWARD_EMAILS`: 예를 들어 `{"juri":"여기에_손주리의_Slackbot_전달_주소"}` 처럼 직원 내부 ID별 전달 주소를 JSON 문자열로 저장합니다. 실제 전달 주소는 **GitHub에 절대 공개하지 않습니다**.
+- 스크립트 속성 `LUNCH_SLACKBOT_TEST_MEMBER`: 한 명의 내부 ID(`juri` 등)를 입력하고 편집기 함수 `testLunchSlackbotForwarding`을 직접 실행해 Slackbot 수신을 확인합니다. Google 메일 발송 권한을 승인해야 할 수 있습니다.
+- **발송 우선순위:** Slackbot 이메일 → Google Drive 공유 파일 → 기존 Slack Bot API. 설정된 통로만 사용하며 동일 알림의 중복 발송을 피합니다. 외부 알림이 모두 실패해도 모임/승인 기록과 웹앱 알림은 그대로 유지됩니다.
+- **한계:** 회사가 Slack 수신 이메일을 금지했거나 전달 주소를 쓰지 않으면 알림을 받을 수 없습니다. Google의 메일 발송 한도와 지연에 영향을 받습니다. 실제 Slack 도착 여부를 서버에서 확정할 수 없습니다.
+
+자세한 직원용 설정 가이드는 `Slackbot_이메일_알림_설정_안내.txt`입니다. [Slack 공식 문서](https://slack.com/intl/ko-kr/help/articles/206819278-Slack%EC%97%90-%EC%9D%B4%EB%A9%94%EC%9D%BC-%EB%B3%B4%EB%82%B4%EA%B8%B0) 및 [Google MailApp 문서](https://developers.google.com/apps-script/reference/mail/mail-app)를 참고했습니다.
+
+---
+
+## 2026-10-20 업데이트 · Google Drive 파일 공유로 Slack 알림 우회 (선택)
+
+**Slack 관리자가 아니어도 시험할 수 있는 대안**입니다. 기존 Apps Script에서 새 Google Drive 텍스트 파일을 만들고 특정 동료에게 읽기 권한을 공유합니다. 이미 회사 Slack에서 Google Drive 앱 알림을 받는 동료라면 공유 알림이 Slack으로 올 수 있습니다. 다만 알림 앱 설정과 회사 정책에 따라 다르므로 실제 직원에게 **테스트가 필수**입니다. 참고: [Slack 공식 설명](https://slack.com/intl/ko-kr/help/articles/205875058-Slack%EC%9A%A9-Google-Drive), [Drive API permissions.create](https://developers.google.com/workspace/drive/api/reference/rest/v3/permissions/create).
+
+- **설정:** 기존 Google Apps Script > 프로젝트 설정 > 스크립트 속성에 `LUNCH_DRIVE_MEMBER_EMAILS` JSON 추가. 예: `{"juri":"동료의_실제_구글이메일"}` (문자열은 정확한 이메일 주소로 변경). 해당 이메일/직원 매핑은 GitHub에는 올리지 않습니다.
+- **선택:** `LUNCH_DRIVE_ALLOWED_DOMAIN`에 정확한 회사 도메인을 넣으면 외부 계정으로의 잘못된 공유를 막을 수 있습니다.
+- **시험:** `LUNCH_DRIVE_TEST_MEMBER`를 `juri`처럼 등록하고 Apps Script의 `testLunchDriveNotification` 함수를 수동 실행합니다. 상대방이 실제로 Slack Drive 알림을 받았는지 확인합니다.
+- **이벤트:** 초대, 참여 요청, 수락, 거절, 승인, 참여 요청 취소. 이벤트마다 전용 폴더에 새 파일을 만들어 공유합니다. 성공한 신규 공유는 기존 Slack 봇을 통한 중복 발송을 피합니다.
+- **안전:** 알림 실패가 모임·선택 저장을 취소하지 않습니다. 공유 알림은 Google Drive 계정의 스팸/알림 정책에 영향을 받습니다. 파일은 14일 후 정리합니다. 부서/이름만으로 메일 주소를 추측하지 않습니다.
+- **중요한 예외:** Apps Script **소유자 본인에게는 자기 파일을 새로 공유할 수 없기 때문에** 이 경로의 Slack 알림이 불가능합니다. 소유자도 웹앱 내 초대/요청 알림은 정상 확인할 수 있습니다. 필요하다면 별도의 중립 Google 발신 계정 또는 정식 Slack 연동이 필요합니다.
+
+자세한 단계와 실제 직원용 빈 JSON 예시는 `Google_Drive_Slack_알림_설정_안내.txt`에 있습니다. **별도 Slack 앱을 새로 설치하는 기능이 아닙니다.** 기존 Slack 앱에서 Google Drive 공유를 알릴 수 있는 환경을 재사용합니다.
+
+---
+
 # SANDS Lab Lunch Club · 오늘 점심
 
-기존 GitHub Pages 점심판의 2026-10-20 다인원 따로 먹기 업데이트입니다. 총 10명, 팀 전체 공유, 요일별 대표님 일정, 메가존/런치타임 식단·사진, 따로 먹기·불참 기능을 그대로 유지합니다.
+기존 GitHub Pages 점심판의 2026-10-20 모임 참여 요청·웹앱 알림·선택형 Slack DM 업데이트입니다. 총 10명, 팀 전체 공유, 요일별 대표님 일정, 메가존/런치타임 식단·사진, 따로 먹기·불참 기능을 그대로 유지합니다.
 
 ## 2026-10-20 최신 수정 · 기존 따로 먹기 모임 참여 요청 + 알림
 

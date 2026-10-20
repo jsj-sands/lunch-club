@@ -528,6 +528,21 @@ const KAKAO_PROFILE_ERROR = '카카오 채널의 최신 프로필 사진을 가�
 // Set these in Apps Script > Project settings > Script properties.
 const SLACK_TOKEN_PROPERTY = 'LUNCH_SLACK_BOT_TOKEN';
 const SLACK_USERS_PROPERTY = 'LUNCH_SLACK_MEMBER_IDS';
+// Optional no-Slack-API route: newly shared Google Drive files can trigger
+// notifications in a recipient's *already connected* Google Drive Slack app.
+// Email addresses remain in private Apps Script Script Properties, never on GitHub.
+const DRIVE_NOTICE_EMAILS_PROPERTY = 'LUNCH_DRIVE_MEMBER_EMAILS';
+const DRIVE_NOTICE_DOMAIN_PROPERTY = 'LUNCH_DRIVE_ALLOWED_DOMAIN';
+const DRIVE_NOTICE_FOLDER_PROPERTY = 'LUNCH_DRIVE_NOTICE_FOLDER_ID';
+const DRIVE_NOTICE_TEST_MEMBER_PROPERTY = 'LUNCH_DRIVE_TEST_MEMBER';
+const DRIVE_NOTICE_CLEANUP_PROPERTY = 'LUNCH_DRIVE_NOTICE_CLEANUP';
+const DRIVE_NOTICE_FOLDER_MARKER = 'SANDS_LUNCH_CLUB_DRIVE_NOTICE_V1';
+const DRIVE_NOTICE_RETENTION_DAYS = 14;
+// Slack provides personal Slackbot email forwarding addresses on all plans.
+// A recipient must generate and privately share *their own* forwarding address.
+// These are effectively inbox secrets: keep them in Script Properties only.
+const SLACKBOT_EMAILS_PROPERTY = 'LUNCH_SLACKBOT_FORWARD_EMAILS';
+const SLACKBOT_TEST_MEMBER_PROPERTY = 'LUNCH_SLACKBOT_TEST_MEMBER';
 const LUNCH_SITE_URL = 'https://jsj-sands.github.io/lunch-club/';
 
 function initializeLunchClub() {
@@ -876,6 +891,157 @@ function slackCall_(token, method, payload) {
   if (!data.ok) throw new Error('Slack API: ' + String(data.error || 'unknown').slice(0, 60));
   return data;
 }
+// Better admin-free notification route: Apps Script MailApp sends directly to
+// each recipient's personal Slackbot forwarding inbox. No Slack bot API call or
+// Drive sharing is needed. A successful MailApp call is NOT Slack delivery proof.
+function slackbotEmails_(all) {
+  let map;
+  try { map = JSON.parse(all[SLACKBOT_EMAILS_PROPERTY] || '{}'); } catch (_) { return {}; }
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
+  const known = new Set(LunchCore.MEMBERS.map(m => m.id)), result = {};
+  for (const id of Object.keys(map)) {
+    if (!known.has(id) || typeof map[id] !== 'string') continue;
+    const email = map[id].trim().toLowerCase();
+    if (email.length > 240 || !/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i.test(email)) continue;
+    result[id] = email;
+  }
+  return result;
+}
+function sendSlackbotNotices_(notices, all, strict) {
+  const emails = slackbotEmails_(all), sent = new Set();
+  for (const notice of notices) {
+    const recipient = emails[notice.to];
+    if (!recipient) continue;
+    try {
+      const name = (LunchCore.MEMBERS.find(m => m.id === notice.to) || {}).name || notice.to;
+      const lines = String(notice.text).split('\n');
+      const title = '[SANDS Lunch Club] ' + name + '님 · ' + (lines[1] || '새 점심 알림').slice(0, 72);
+      MailApp.sendEmail({
+        to: recipient, subject: title, body: notice.text
+          + '\n\n알림 수신처: Slackbot 개인 전달 주소\n알림을 읽은 후 초대 수락·거절 또는 모임 참여 요청 승인은 점심판에서 진행하세요.',
+        name: 'SANDS Lunch Club'
+      });
+      sent.add(notice.to);
+    } catch (error) {
+      console.log('Lunch Club Slackbot forward notice failed for member ' + notice.to + ': ' + String(error.message || error).slice(0, 110));
+      if (strict) throw error;
+    }
+  }
+  return sent;
+}
+function testLunchSlackbotForwarding() {
+  const all = PropertiesService.getScriptProperties().getProperties();
+  const id = String(all[SLACKBOT_TEST_MEMBER_PROPERTY] || '').trim();
+  const member = LunchCore.MEMBERS.find(m => m.id === id);
+  if (!member) throw new Error('스크립트 속성 LUNCH_SLACKBOT_TEST_MEMBER에 시험 발송할 직원 ID를 입력해 주세요.');
+  if (!slackbotEmails_(all)[id]) throw new Error('LUNCH_SLACKBOT_FORWARD_EMAILS에 해당 직원의 Slackbot 전달 주소를 먼저 등록해 주세요.');
+  const notice = { to: id, text: '[SANDS Lunch Club] 알림 테스트\n' + member.name
+    + '님, Google Apps Script에서 보내는 Slackbot 이메일 알림 테스트입니다.\n점심판에서 확인: ' + LUNCH_SITE_URL };
+  if (!sendSlackbotNotices_([notice], all, true).has(id)) throw new Error('테스트 이메일을 보내지 못했습니다.');
+  console.log('Slackbot 전달 주소로 이메일을 보냈습니다. Slack 메시지 수신은 직원이 직접 확인해 주세요: ' + member.name);
+}
+// Sharing creates the Google Drive app's "shared with you" event, NOT a
+// Slack chat message. Actual Slack delivery depends on each member's settings.
+function driveNoticeEmails_(all) {
+  let value;
+  try { value = JSON.parse(all[DRIVE_NOTICE_EMAILS_PROPERTY] || '{}'); } catch (_) { return {}; }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const domain = String(all[DRIVE_NOTICE_DOMAIN_PROPERTY] || '').trim().toLowerCase().replace(/^@/, '');
+  const known = new Set(LunchCore.MEMBERS.map(m => m.id)), out = {};
+  for (const id of Object.keys(value)) {
+    if (!known.has(id) || typeof value[id] !== 'string') continue;
+    const email = value[id].trim().toLowerCase();
+    if (email.length > 200 || !/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i.test(email)) continue;
+    if (domain && email.split('@')[1] !== domain) continue;
+    out[id] = email;
+  }
+  return out;
+}
+function driveNoticeFolder_() {
+  const properties = PropertiesService.getScriptProperties();
+  const folderId = properties.getProperty(DRIVE_NOTICE_FOLDER_PROPERTY);
+  if (folderId) {
+    try {
+      const folder = DriveApp.getFolderById(folderId);
+      if (!folder.isTrashed() && folder.getDescription() === DRIVE_NOTICE_FOLDER_MARKER
+          && folder.getSharingAccess() === DriveApp.Access.PRIVATE) return folder;
+    } catch (_) { /* Folder removed or unavailable: create a private replacement. */ }
+  }
+  const folder = DriveApp.createFolder('SANDS Lunch Club - 자동 알림 (14일 보관)');
+  folder.setDescription(DRIVE_NOTICE_FOLDER_MARKER);
+  folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
+  properties.setProperty(DRIVE_NOTICE_FOLDER_PROPERTY, folder.getId());
+  return folder;
+}
+function pruneDriveNoticeFolder_(folder) {
+  const properties = PropertiesService.getScriptProperties(), now = Date.now();
+  const prev = Date.parse(properties.getProperty(DRIVE_NOTICE_CLEANUP_PROPERTY) || '');
+  if (Number.isFinite(prev) && now - prev < 86400000) return;
+  const cutoff = now - DRIVE_NOTICE_RETENTION_DAYS * 86400000;
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!file.isTrashed() && file.getDateCreated().getTime() < cutoff) file.setTrashed(true);
+  }
+  properties.setProperty(DRIVE_NOTICE_CLEANUP_PROPERTY, new Date().toISOString());
+}
+function sendDriveNotices_(notices, all, strict) {
+  const emails = driveNoticeEmails_(all), sent = new Set();
+  if (!notices.length || !Object.keys(emails).length) return sent;
+  let folder = null;
+  for (const notice of notices) {
+    const to = emails[notice.to];
+    if (!to) continue;
+    let file;
+    try {
+      // An Apps Script deployed as "execute as me" cannot share its own file
+      // *to the owner* and consequently cannot trigger a Drive self-share alert.
+      const owner = Session.getEffectiveUser().getEmail().trim().toLowerCase();
+      if (owner && owner === to) throw new Error('same-as-script-owner: no Drive self-share notification');
+      if (!folder) { folder = driveNoticeFolder_(); pruneDriveNoticeFolder_(folder); }
+      const member = LunchCore.MEMBERS.find(m => m.id === notice.to);
+      const parts = String(notice.text).split('\n');
+      const topic = (parts[1] || '새로운 점심 알림').trim().slice(0, 75);
+      const name = '[Lunch Club] ' + (member ? member.name + '님 · ' : '') + topic;
+      const body = notice.text + '\n\n이 파일은 Lunch Club에서 생성한 공유 알림입니다. 초대 수락/거절 및 참여 승인/거절은 반드시 점심판에서 해 주세요.';
+      file = folder.createFile(name, body, MimeType.PLAIN_TEXT);
+      file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
+      // Drive permissions.create deliberately uses sendNotificationEmail=true.
+      // This produces a standard Google share notification even when Slack
+      // integration is unavailable. Do not grant edit/comment permission.
+      const url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.getId())
+        + '/permissions?sendNotificationEmail=true&emailMessage=' + encodeURIComponent(parts[1] + '\n' + LUNCH_SITE_URL);
+      const response = UrlFetchApp.fetch(url, {
+        method: 'post', contentType: 'application/json; charset=utf-8',
+        headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+        payload: JSON.stringify({ type: 'user', role: 'reader', emailAddress: to }),
+        muteHttpExceptions: true, timeoutSeconds: 10
+      });
+      const code = response.getResponseCode();
+      if (code !== 200 && code !== 201) throw new Error('Drive permissions.create status ' + code);
+      sent.add(notice.to);
+    } catch (error) {
+      // An unshared file carries no useful notice; keep the Drive folder clean.
+      if (file) try { file.setTrashed(true); } catch (_) {}
+      console.log('Lunch Club Google Drive notice failed for member ' + notice.to + ': ' + String(error.message || error).slice(0, 110));
+      if (strict) throw error;
+    }
+  }
+  return sent;
+}
+// Explicit manual smoke test from Apps Script editor, never called by page.
+// Set LUNCH_DRIVE_TEST_MEMBER to the intended colleague's internal ID first.
+function testLunchDriveNotification() {
+  const all = PropertiesService.getScriptProperties().getProperties();
+  const id = String(all[DRIVE_NOTICE_TEST_MEMBER_PROPERTY] || '').trim();
+  const person = LunchCore.MEMBERS.find(m => m.id === id);
+  if (!person) throw new Error('먼저 스크립트 속성 LUNCH_DRIVE_TEST_MEMBER에 테스트할 직원 ID를 넣어 주세요.');
+  if (!driveNoticeEmails_(all)[id]) throw new Error('테스트할 직원의 LUNCH_DRIVE_MEMBER_EMAILS를 올바르게 설정해 주세요.');
+  const notice = { to: id, text: '[SANDS Lunch Club] 알림 연결 테스트\n' + person.name
+    + '님, Google Drive 파일 공유 알림 테스트입니다.\n점심판: ' + LUNCH_SITE_URL };
+  if (!sendDriveNotices_([notice], all, true).has(id)) throw new Error('알림 파일을 공유하지 못했습니다.');
+  console.log('Drive 파일 공유 성공. Slack에서 실제 수신되는지는 수신자가 직접 확인해 주세요: ' + person.name);
+}
 function sendSlackNotices_(notices, all) {
   if (!notices.length) return;
   const token = all[SLACK_TOKEN_PROPERTY];
@@ -969,7 +1135,14 @@ function doPost(e) {
     if (receipt.ok && notices.length) storedProperties = all;
     // Slack requests happen after the transaction is durable and after releasing the lock.
     lock.releaseLock();
-    if (storedProperties) sendSlackNotices_(notices, storedProperties);
+    if (storedProperties) {
+      const emailed = sendSlackbotNotices_(notices, storedProperties, false);
+      const remaining = notices.filter(n => !emailed.has(n.to));
+      const shared = sendDriveNotices_(remaining, storedProperties, false);
+      // Priority: personal Slackbot forwarding email -> Google Drive file share
+      // -> (if configured) official Slack bot DM. Avoid duplicate sends.
+      sendSlackNotices_(remaining.filter(n => !shared.has(n.to)), storedProperties);
+    }
     return output_({ ok: true, accepted: true });
   } catch (error) { return output_({ ok: false, error: error.message || '저장하지 못했어요. 다시 시도해 주세요.' }); }
   finally { if (lock && lock.hasLock()) lock.releaseLock(); }
