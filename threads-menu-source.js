@@ -4,29 +4,34 @@ var LunchThreadsMenu = (function (root) {
   const ACCOUNT = 'gangnambab';
   const PAGE = 'https://www.threads.com/@gangnambab';
   const MEDIA_HOSTS = ['fbcdn.net', 'cdninstagram.com', 'cdnthreads.net', 'threads.net', 'threads.com', 'instagram.com'];
+  // Apps Script has no browser URL/URLSearchParams global.
+  // Parse only the strict HTTPS subset required here, not a general URL polyfill.
+  function httpsParts(value, maxLength) {
+    if (typeof value !== 'string' || !value || value.length > maxLength ||
+        /[\u0000-\u0020\u007f\\<>"'`]/.test(value)) return null;
+    const m = /^https:\/\/([a-z0-9.-]+)(?::443)?(\/[^?#]*)?(\?[^#]*)?(#.*)?$/i.exec(value);
+    if (!m) return null;
+    const hostname = m[1].toLowerCase();
+    if (hostname.length > 253 || !hostname.split('.').every(label =>
+        /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))) return null;
+    return { hostname, pathname: m[2] || '/' };
+  }
   function validMediaURL(value) {
-    if (typeof value !== 'string' || value.length > 2500) return false;
-    try {
-      const u = new URL(value);
-      return u.protocol === 'https:' && !u.username && !u.password &&
-        MEDIA_HOSTS.some(domain => u.hostname.toLowerCase() === domain || u.hostname.toLowerCase().endsWith('.' + domain));
-    } catch (_) { return false; }
+    const u = httpsParts(value, 6000);
+    return !!u && MEDIA_HOSTS.some(domain =>
+      u.hostname === domain || u.hostname.endsWith('.' + domain));
   }
   function validImageURL(url) { return validMediaURL(url); }
   function validPostURL(value) {
-    if (typeof value !== 'string' || value.length > 350) return false;
-    try {
-      const u = new URL(value);
-      return u.protocol === 'https:' && ['threads.com', 'www.threads.com', 'threads.net', 'www.threads.net'].includes(u.hostname.toLowerCase()) &&
-        (/^\/@gangnambab\/post\/[A-Za-z0-9_-]+\/?$/.test(u.pathname) || /^\/t\/[A-Za-z0-9_-]+\/?$/.test(u.pathname));
-    } catch (_) { return false; }
+    const u = httpsParts(value, 1000);
+    return !!u && ['threads.com', 'www.threads.com', 'threads.net', 'www.threads.net'].includes(u.hostname) &&
+      (/^\/@gangnambab\/post\/[A-Za-z0-9_-]+\/?$/.test(u.pathname) || /^\/t\/[A-Za-z0-9_-]+\/?$/.test(u.pathname));
   }
   function seoulDate(value) {
     const time = Date.parse(value);
     if (!Number.isFinite(time)) return '';
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(time));
-    const pick = name => (parts.find(part => part.type === name) || {}).value;
-    return [pick('year'), pick('month'), pick('day')].join('-');
+    const adjusted = new Date(time + 9 * 60 * 60 * 1000);
+    return Number.isFinite(adjusted.getTime()) ? adjusted.toISOString().slice(0, 10) : '';
   }
   function decodeXml(value) {
     return String(value || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -79,9 +84,35 @@ var LunchThreadsMenu = (function (root) {
     candidate.menuHint = MENU_HINT.test(text) && !FOOD_HINT.test(text);
     return candidate;
   }
+  // Aggregate diagnostics only: no credentials, raw feed bodies or signed URLs.
+  function inspectPosts(json, date) {
+    const all = json && Array.isArray(json.data) ? json.data : [];
+    const posts = all.filter(p => p && String(p.username || '').toLowerCase() === ACCOUNT &&
+      !p.is_quote_post && !p.reposted_post);
+    const dated = posts.filter(p => seoulDate(p.timestamp));
+    const matching = dated.filter(p => seoulDate(p.timestamp) === date);
+    const media = matching.filter(p => ['VIDEO', 'IMAGE'].includes(p.media_type));
+    const valid = media.filter(p => validMediaURL(p.media_url) && validPostURL(p.permalink));
+    const d = {
+      totalPosts: all.length, accountPosts: posts.length, datedPosts: dated.length,
+      matchingDatePosts: matching.length, mediaPosts: media.length, validMediaPosts: valid.length,
+      invalidMediaURLs: media.filter(p => !validMediaURL(p.media_url)).length,
+      invalidPostURLs: media.filter(p => !validPostURL(p.permalink)).length,
+      latestPostDate: dated.map(p => seoulDate(p.timestamp)).sort().pop() || '',
+      expectedDate: date, failure: ''
+    };
+    if (!all.length) d.failure = 'empty_feed';
+    else if (!posts.length) d.failure = 'source_mismatch';
+    else if (!dated.length) d.failure = 'date_unknown';
+    else if (!matching.length) d.failure = 'not_found';
+    else if (!media.length) d.failure = 'no_supported_media';
+    else if (!valid.length) d.failure = d.invalidPostURLs ? 'invalid_post_link' : 'media_unavailable';
+    return d;
+  }
   function chooseMenu(json, date) {
     if (!json || !Array.isArray(json.data) || !/^\d{4}-\d\d-\d\d$/.test(date)) throw new Error('Threads 게시물 응답 형식이 올바르지 않습니다.');
     if (json.data.length > 100) throw new Error('Threads 게시물이 너무 많습니다.');
+    const diagnostics = inspectPosts(json, date);
     const candidates = json.data.filter(post => post && String(post.username || '').toLowerCase() === ACCOUNT && seoulDate(post.timestamp) === date &&
       ['VIDEO', 'IMAGE'].includes(post.media_type) && validMediaURL(post.media_url) && validPostURL(post.permalink) && !post.is_quote_post && !post.reposted_post)
       .map(publicCandidate).sort((a,b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
@@ -90,14 +121,14 @@ var LunchThreadsMenu = (function (root) {
     const hinted = candidates.filter(c => c.menuHint);
     let selected = null;
     if (hinted.length === 1) selected = hinted[0];
-    else if (hinted.length > 1) return { ok: false, reason: 'ambiguous', alternatives: hinted.slice(0, 3) };
+    else if (hinted.length > 1) return { ok: false, reason: 'ambiguous', alternatives: hinted.slice(0, 3), diagnostics };
     else if (videos.length === 1) selected = videos[0];
     else if (candidates.length === 1) selected = candidates[0];
     if (selected) return { ok: true, date, kind: selected.kind, imageUrl: selected.imageUrl, videoUrl: selected.videoUrl,
-      posterUrl: selected.posterUrl, postUrl: selected.postUrl, publishedAt: selected.publishedAt, confidence: selected.menuHint ? 'caption' : 'only_media', source: PAGE };
-    return { ok: false, reason: candidates.length > 1 ? 'ambiguous' : 'not_found', alternatives: candidates.slice(0, 3) };
+      posterUrl: selected.posterUrl, postUrl: selected.postUrl, publishedAt: selected.publishedAt, confidence: selected.menuHint ? 'caption' : 'only_media', source: PAGE, diagnostics };
+    return { ok: false, reason: candidates.length > 1 ? 'ambiguous' : 'not_found', alternatives: candidates.slice(0, 3), diagnostics };
   }
-  const api = { ACCOUNT, PAGE, validImageURL, validMediaURL, validPostURL, seoulDate, parseRss, chooseMenu };
+  const api = { ACCOUNT, PAGE, validImageURL, validMediaURL, validPostURL, seoulDate, parseRss, chooseMenu, inspectPosts, VERSION: '20261020-gas-url-fix' };
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.LunchThreadsMenu = api;
   return api;
