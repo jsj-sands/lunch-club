@@ -9,22 +9,23 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
 <header><a class="brand" href="./" aria-label="SANDS Lab Lunch Club 홈"><img class="brand-symbol" src="assets/sands-symbol.svg?v=20261020-join-alerts" width="30" height="30" alt=""><img class="brand-wordmark" src="assets/sands-wordmark.svg?v=20261020-join-alerts" width="126" height="28" alt="SANDS Lab"><span class="brand-divider" aria-hidden="true"></span><span class="brand-product">Lunch Club</span></a><a href="index.html">점심판 열기 ↗</a></header>
 <div class="intro"><p class="tag">ONE-TIME SETUP</p><h1>코딩은 끝났어요.<br>이제 우리 점심판을 열어볼까요?</h1><p>파일을 GitHub에 올리면 화면이 열립니다. 동료와 선택을 공유하려면 Google 연결을 한 번 더 진행해 주세요. 코드 작성 없이 복사·붙여넣기로 설정할 수 있습니다.</p></div>
 <section id="update">
-<h2>이번 수정본 · Slackbot 이메일 알림 + Google Drive 연동</h2>
-<p><strong>일반 점심은 메가존 / 런치타임 중 한 곳만 개인별로 고릅니다.</strong> 대표님과 점심인 사람은 <strong>과천 맛집 골라보기 → 대표님 점심 장소</strong>을 누르면 그날 모든 대표님 점심 참석자가 동일한 식당을 확인할 수 있습니다. <strong>따로 먹기</strong>는 동료를 여러 명 한꺼번에 초대하고 모임별로 과천 맛집 식당을 등록할 수 있습니다. 식당 예약은 별도로 진행합니다.</p>
+<h2>이번 수정 · 강남밥상 Threads 게시물 점심판 안에서 자동 보기</h2>
+<p><strong>일반 점심은 메가존 / 런치타임 / 강남밥상 중 한 곳만 개인별로 고릅니다.</strong> 대표님과 점심인 사람은 <strong>과천 맛집 골라보기 → 대표님 점심 장소</strong>을 누르면 그날 모든 대표님 점심 참석자가 동일한 식당을 확인할 수 있습니다. <strong>따로 먹기</strong>는 동료를 여러 명 한꺼번에 초대하고 모임별로 과천 맛집 식당을 등록할 수 있습니다. 식당 예약은 별도로 진행합니다.</p>
 <p><strong>간편식·데일리팩·테이크아웃을 제외하고 메가존 일반식 메뉴 1·메뉴 2만 표시합니다.</strong> 오늘과 주간 요약·상세에 모두 적용되며 날짜가 바뀌어도 계속 유지됩니다. 일반식 사진과 반찬 목록은 그대로 볼 수 있습니다.</p>
 <p><strong>메가존은 메뉴별 음식 사진과 밥·국·반찬 목록까지 보여 줍니다.</strong> 사진을 누르면 확대할 수 있고, 이번 주 식단은 날짜별 <strong>사진·반찬 보기</strong>를 펼치면 됩니다. 사진이 없는 날에도 메뉴명은 표시됩니다.</p>
-<p><strong>동료가 올린 식단에 ‘올린 이미지 삭제’를 추가했습니다.</strong> 내 이름을 고른 뒤 버튼을 누르고, 하루·주간의 적용 기간을 확인해 삭제합니다. 공유 이미지는 팀 모두의 화면에 반영되고 카카오 자동 사진은 계속 표시됩니다. 하루용을 삭제한 뒤 기존 주간용이 표시될 수 있습니다.</p>
+<p><strong>런치타임의 식단 이미지 직접 올리기·교체·삭제 UI를 제거했습니다.</strong> 카카오 자동 식단 조회·사진 확대·원문 링크·다시 불러오기는 유지합니다. 과거 업로드된 파일은 삭제하지 않고 화면에서만 숨깁니다.</p>
 <p>회사 CI 심벌과 공식 워드마크를 적용했습니다. 사이트 전체의 한글은 <strong>Pretendard</strong>, 영문·숫자는 <strong>Red Hat Display</strong>로 표시됩니다. 두 글꼴 파일을 함께 포함했습니다. 배경은 로고 시스템 자료의 미색 <strong>#F7F5F0</strong>이며 주요 버튼과 강조 요소는 회사 레드입니다. 식당 분류는 <strong>스마트경양식 → 양식 / 샤브올데이 → 아시안 / 상월 → 일식</strong>으로 보정했습니다.</p>
 <p><strong>카카오 프로필 사진을 매일 저장하지 않아도 런치타임 식단을 볼 수 있어요.</strong> 공유 서버 연결 후 점심판을 열면 자동으로 가져오고, 화면이 열려 있는 동안 약 5분마다 다시 확인합니다. 사진을 누르면 크게 볼 수 있습니다.</p>
-<p>확인 시각은 식단 날짜가 아닙니다. 사진에 적힌 날짜를 확인해 주세요. 내일·모레 화면에는 현재 프로필 사진을 그날 식단으로 표시하지 않습니다. 조회 실패 시 이전 사진·원문 링크·직접 업로드를 사용할 수 있어요.</p>
+<p>확인 시각은 식단 날짜가 아닙니다. 사진에 적힌 날짜를 확인해 주세요. 내일·모레 화면에는 현재 프로필 사진을 그날 식단으로 표시하지 않습니다. 조회 실패 시 이전 사진·원문 링크·사진 다시 불러오기를 사용할 수 있어요.</p>
 <p><strong>함께 먹기 · 따로 먹기 · 안 먹기</strong>를 화면에서 바로 선택합니다. <strong>함께 점심 / 대표님과 점심 / 오늘 안 먹음 / 미선택</strong> 네 그룹과 따로 먹는 모임을 확인할 수 있습니다.</p>
 <ul><li>직접 <strong>함께 먹기</strong>를 선택한 사람만 초록색 그룹에 들어갑니다. 대표님 기본 일정 외에는 미선택으로 시작합니다.</li><li><strong>내 대표님 점심 취소</strong> 버튼과 <strong>대표님 점심 전체 취소</strong> 체크를 보이게 배치했습니다. 취소 후에는 미선택으로 이동합니다.</li><li>불참 사유에 <strong>연차·반차·외근·출장</strong>을 하나의 항목으로 추가했습니다.</li><li><strong>따로 먹기</strong>에서 동료를 초대하고 각 동료가 수락하면 여러 명의 한 모임으로 표시합니다. 모임별 식당도 따로 등록합니다.</li><li>런치타임 아래에 주변 식당을 한식·중식·일식·양식·분식·아시안으로 정리했습니다.</li><li>한 번에 하루만 표시하고 <strong>← / →</strong>로 날짜를 바꿉니다. 팀명과 이름은 가나다순입니다.</li></ul>
-<div class="note warn"><strong>중요: 이번 업데이트는 GitHub 파일과 Google Apps Script 공유 서버의 두 곳 모두를 업데이트해야 합니다.</strong> 웹 화면만 바꾸면 팀 전체가 공유하는 다인원 따로 먹기와 모임별 식당을 저장할 수 없습니다. 기존에 쓰던 Google Apps Script 프로젝트의 같은 웹 앱 배포를 <strong>새 버전</strong>으로 갱신해야 기존 참석 기록·식단 이미지를 유지할 수 있습니다.</div>
+<div class="note"><strong>이번 강남밥상 추가에는 GitHub의 <code>index.html</code>, <code>styles.css</code>, <code>app.js</code>, <code>core.js</code>, <code>threads-menu-source.js</code>, <code>setup.html</code>을 교체하고 공유 서버도 업데이트해야 합니다.</strong> 기존 Slack/Drive 알림 속성은 유지하세요. 다만 세 번째 장소의 팀 공유 저장을 위해 같은 Apps Script 프로젝트의 서버 코드는 새 버전으로 배포해야 합니다. 메뉴표 자동 조회 기능을 적용하려면 기존 Apps Script 코드도 새 버전으로 업데이트해야 합니다.</div>
 <h3>1. GitHub 파일 교체</h3>
-<ol><li>이번 ZIP을 압축 해제합니다. 기존 <code>lunch-club</code> 저장소에서 <strong>Add file → Upload files</strong>를 누릅니다.</li><li>압축을 푼 폴더 <strong>안의 파일과 하위 폴더를 모두</strong> 끌어놓고 기존 Pages 배포 브랜치에 <strong>Commit changes</strong>로 저장합니다. <code>index.html</code>이 저장소 첫 화면에 바로 보이는 위치를 유지합니다. <code>assets</code> 폴더의 로고·폰트와 <code>lunchtime-source.js</code>, <code>restaurant-guide.js</code>도 함께 올립니다.</li><li>GitHub Pages 업데이트가 끝나면 다음 단계의 <strong>공유 서버 업데이트를 반드시 진행</strong>해 주세요.</li></ol>
-<h3>2. 기존 Google 공유 서버 업데이트 · 이번 변경에 필수</h3>
-<p>기존 팀 공유를 이용 중이라면 <strong>새 프로젝트를 만들지 말고 기존 Google Apps Script 프로젝트의 코드와 현재 웹 앱 버전을 업데이트</strong>하세요. 기존 팀 키와 <code>/exec</code> 공유 주소도 그대로 유지합니다.</p>
-<ol><li><strong>평소 팀 공유에 연결해 쓰던 브라우저</strong>에서 <code>https://jsj-sands.github.io/lunch-club/setup.html#update</code>를 엽니다. 강력 새로고침 후 위 제목이 <strong>‘이번 수정본 · Slackbot 이메일 알림 + Google Drive 연동’</strong>인지 확인합니다. Windows: <strong>Ctrl+Shift+R</strong> / Mac: <strong>⌘+Shift+R</strong>.</li><li>아래 <a href="#copyCode"><strong>공유 서버 코드 전체 복사</strong></a>를 누릅니다. 이 브라우저에 저장된 기존 팀 키가 코드에 들어갑니다. 다른 브라우저라면 <a href="#teamKey">‘다른 브라우저에서 설정했거나 기존 팀 키가 있어요’</a>를 열고 기존 키를 입력한 뒤 복사합니다.</li><li>Google Apps Script의 기존 <strong>SANDS 점심판</strong> 프로젝트를 엽니다. <code>Code.gs</code> 전체를 복사한 새 코드로 교체하고 저장합니다. 이미 공유·이미지 연결을 완료했다면 초기 실행은 필요하지 않습니다.</li><li><strong>배포 → 배포 관리 → 현재 웹 앱 선택 → 수정(연필) → 버전: 새 버전 → 배포</strong>로 갱신합니다.</li><li>기존 점심판을 새로고침해 <strong>팀 공유 연결됨</strong>을 확인합니다. 대표님 점심 참석자 이름으로 과천 맛집을 고른 뒤 우측 <strong>대표님 점심 장소</strong>에 확정된 식당이 표시되는지 확인해 주세요. 다른 기기에서도 동일한 장소가 표시되어야 합니다. 추가로 3명 이상 따로 먹는 모임을 만들고 모임별 식당이 다른 기기에도 보이는지 확인합니다. 기존 카카오 사진·메가존 사진·반찬도 계속 사용할 수 있습니다.</li></ol>
+<ol><li>이번 ZIP을 압축 해제합니다. 기존 <code>lunch-club</code> 저장소에서 <strong>Add file → Upload files</strong>를 누릅니다.</li><li>기존 저장소의 <code>index.html</code>, <code>styles.css</code>, <code>app.js</code>, <code>core.js</code>, <code>threads-menu-source.js</code>, <code>setup.html</code> <strong>여섯 파일을</strong> 같은 경로로 업로드하고 <strong>Commit changes</strong>로 저장합니다.</li><li>GitHub Pages 업데이트 후 사이트를 강력 새로고침합니다. <strong>그다음 기존 Google Apps Script 서버도 새 버전으로 업데이트합니다.</strong></li></ol>
+<h3>2. 기존 Google 공유 서버 업데이트 · 강남밥상 자동 메뉴 기능 포함</h3>
+<div class="note"><strong>강남밥상 자동 조회:</strong> 우선 RSSHub 공개 Threads 피드를 서버에서 확인하므로 <strong>별도의 Threads API 토큰 없이도 시도</strong>할 수 있습니다. 다만 RSSHub는 Meta 공식 서비스가 아닌 공개 커뮤니티 서비스여서 언제든 막히거나 지연될 수 있고, 강남밥상 실계정 조회도 아직 검증되지 않았습니다. 같은 날 음식 영상과 메뉴 공지 영상을 설명으로 구분하지 못하면 메뉴라고 추측하지 않고 게시물들을 이 화면에서 보여줍니다. <code>LUNCH_THREADS_ACCESS_TOKEN</code>은 공식 API 접근 권한을 이미 확보한 경우의 선택적 예비 수단입니다. 기존 Slack/Drive 스크립트 속성은 유지하세요.</div>
+<p>기존 팀 공유를 이미 설정했고 알림도 정상 동작한다면 <strong>이번 변경에서도 서버 코드를 새 버전으로 교체하세요.</strong> 기존 팀 키와 <code>/exec</code> 공유 주소도 그대로 유지합니다.</p>
+<ol><li><strong>평소 팀 공유에 연결해 쓰던 브라우저</strong>에서 <code>https://jsj-sands.github.io/lunch-club/setup.html#update</code>를 엽니다. 강력 새로고침 후 위 제목이 <strong>‘이번 수정 · 강남밥상 Threads 게시물 점심판 안에서 자동 보기’</strong>인지 확인합니다. Windows: <strong>Ctrl+Shift+R</strong> / Mac: <strong>⌘+Shift+R</strong>.</li><li>아래 <a href="#copyCode"><strong>공유 서버 코드 전체 복사</strong></a>를 누릅니다. 이 브라우저에 저장된 기존 팀 키가 코드에 들어갑니다. 다른 브라우저라면 <a href="#teamKey">‘다른 브라우저에서 설정했거나 기존 팀 키가 있어요’</a>를 열고 기존 키를 입력한 뒤 복사합니다.</li><li>Google Apps Script의 기존 <strong>SANDS 점심판</strong> 프로젝트를 엽니다. <code>Code.gs</code> 전체를 복사한 새 코드로 교체하고 저장합니다. 이미 공유·이미지 연결을 완료했다면 초기 실행은 필요하지 않습니다.</li><li><strong>배포 → 배포 관리 → 현재 웹 앱 선택 → 수정(연필) → 버전: 새 버전 → 배포</strong>로 갱신합니다.</li><li>기존 점심판을 새로고침해 <strong>팀 공유 연결됨</strong>을 확인합니다. 대표님 점심 참석자 이름으로 과천 맛집을 고른 뒤 우측 <strong>대표님 점심 장소</strong>에 확정된 식당이 표시되는지 확인해 주세요. 다른 기기에서도 동일한 장소가 표시되어야 합니다. 추가로 3명 이상 따로 먹는 모임을 만들고 모임별 식당이 다른 기기에도 보이는지 확인합니다. 기존 카카오 사진·메가존 사진·반찬도 계속 사용할 수 있습니다.</li></ol>
 <p>같은 프로젝트·팀 키·기존 배포를 갱신하면 공유 주소와 초대 링크, 저장된 개인 선택·일정 설정·공용 이미지를 이어서 쓸 수 있습니다. 코드가 들어 있는 ZIP 원본은 팀 키가 비어 있으므로 위 복사 버튼으로 만든 코드를 사용하세요.</p>
 <p>이전 화면에서 자동으로 함께 먹는 것으로 보이던 사람은 이제 <strong>미선택</strong>입니다. 예전에 직접 선택한 참석·불참과 식당 선택 기록은 유지됩니다. 미선택인 사람의 예전 식당 선택은 직접 함께 먹기를 선택한 뒤에만 다시 집계됩니다.</p>
 </section>
@@ -64,11 +65,10 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
 <p class="note">신원 확인 주의: 이 앱은 이름 선택·팀 키 방식이며 Slack 계정 로그인과 묶여 있지 않습니다. 이름 변경으로 다른 직원 대신 버튼을 누를 수 있으므로 사내 구성원만 공유 링크를 사용해 주세요. Slack 전송 실패는 점심 기록을 취소하지 않으며 자동 재발송하지 않습니다.</p></section>
 <section><h2>매일은 이렇게 사용해요</h2><ol><li><strong>오늘 점심, 어떻게 할까요?</strong>에서 <strong>나는 → 내 이름</strong>을 선택합니다. 팀명과 이름은 가나다순으로 표시됩니다.</li><li>큰 버튼 <strong>함께 먹기 · 따로 먹기 · 안 먹기</strong> 중에서 선택합니다. 아무것도 선택하지 않으면 미선택입니다. 함께 먹기를 선택해야 초록색 그룹과 식당 투표 집계에 포함됩니다.</li><li>안 먹는 날에는 필요한 경우 사유를 선택합니다. <strong>연차·반차·외근·출장</strong>은 하나의 항목입니다.</li><li>자동으로 들어간 대표님 일정이 취소됐다면 <strong>내 대표님 점심 취소</strong>를 누르고 점심 여부를 다시 고릅니다. 그날 전체 일정이 취소됐을 때에는 <strong>대표님 점심 전체 취소</strong>를 체크합니다.</li><li>동료끼리 따로 먹는 날은 <strong>따로 먹기 → 동료 여러 명 체크 → 초대</strong>를 누릅니다. 초대받은 동료가 본인 이름을 선택하고 <strong>수락하고 따로 먹기</strong>를 누르면 같은 모임으로 표시됩니다. 다른 직원은 모임 카드의 <strong>이 모임에 참여 요청</strong>을 눌러 먼저 제안할 수 있고 생성자가 승인하면 합류합니다. 혼자 먹을 때는 <strong>동료 지정 없이 따로 먹기</strong>를 선택합니다.</li><li><strong>← / →</strong>로 내일·모레 현황과 선택을 확인하고 <strong>오늘</strong> 버튼으로 돌아옵니다. 선택과 초대는 화면에 표시된 날짜에만 저장됩니다.</li><li>메가존의 <strong>오늘 식단 / 이번 주 식단</strong>을 비교합니다. 런치타임은 자동으로 가져온 카카오 프로필 사진을 확인합니다. 사진에 적힌 식단 날짜를 확인해 주세요. 필요한 경우 <strong>식단 이미지 직접 올리기</strong>로 주간용·하루용 이미지를 따로 공유할 수 있습니다.</li><li><strong>일반 점심</strong>에 참여하면 응답 패널 또는 메가존/런치타임 식단 카드에서 <strong>둘 중 하나</strong>를 고릅니다. 바꾸고 싶으면 다른 한 곳을 누르면 됩니다. 각자의 선택이 집계됩니다.
 </li><li><strong>대표님과 점심</strong>인 사람은 아래 <strong>과천 맛집 골라보기</strong>에서 종류·이름으로 찾아 <strong>대표님 점심 장소</strong>를 누릅니다. 우측에 팀 전체가 보는 등록 장소가 표시됩니다. 변경하려면 다른 식당을 고르고 확인합니다.</li><li>대표님 점심의 기본 만남 시간은 설정에 있는 시간(<strong>기본 12:00</strong>)을 사용합니다. 일반 점심에는 따로 전체 장소 확정 단계가 없고 각자 선택으로 끝납니다.</li></ol><div class="note">대표님과 점심·안 먹음·미선택·따로 먹기는 함께 먹는 인원과 식당 투표 집계에서 빠집니다. 기존 식당 선택은 보관되며, 다시 함께 먹기를 선택하면 집계에 돌아옵니다. 초대나 참여 요청만 보냈을 때는 상대의 점심 상태가 바뀌지 않습니다. 수락 또는 승인 시에는 자동으로 일반 함께 점심 인원에서 빠집니다.</div></section>
-<section><h2>식단과 일정에 대해 알아둘 점</h2><ul><li><strong>메가존:</strong> 공유 연결 전에도 공개된 날짜별 점심 메뉴를 직접 조회합니다. 오늘과 이번 주 월~금 식단을 볼 수 있습니다. 날짜가 맞는 식단만 표시하며, 미등록과 조회 실패를 구분합니다. 메뉴 사진과 상세 내용은 Welplan 원문에서 확인합니다.</li><li><strong>런치타임 자동 조회:</strong> 공유 서버가 카카오 채널에 공개된 최신 프로필 사진 주소를 가져옵니다. 별도 카카오 로그인이나 친구 추가가 필요하지 않습니다. 점심판을 열 때와 화면이 열려 있는 동안 약 5분마다 확인합니다. 채널에 아직 전날 사진이 있으면 그 사진이 표시되므로 이미지 속 날짜를 확인해 주세요. 페이지를 닫은 상태의 오전 9시 예약 실행은 이번 버전에 포함하지 않습니다. 공개 화면의 데이터 형식이 바뀌면 자동 조회 코드 조정이 필요할 수 있습니다.</li><li><strong>직접 올린 식단 이미지 기간:</strong> 주간용은 월~일, 하루용은 지정한 날짜에 표시합니다. 같은 날짜에 하루용과 주간용이 모두 있으면 하루용을 우선 표시합니다. 다음 주에는 지난 주 이미지가 표시되지 않습니다.</li><li><strong>이미지 공유:</strong> 원본 선택은 15MB까지 가능하며 업로드 전 크기를 조정합니다. 이미지는 전용 비공개 Drive 폴더에 저장하고 팀 키로 조회합니다. 이미지 자체를 인터넷 공개 링크로 만들지 않습니다. 공유 연결 전 미리보기는 이 브라우저에만 보관하며 공유 연결 후 다시 올려야 합니다.</li><li><strong>대표님과 점심 기본 일정:</strong> 경영지원팀 김윤철·오성은·장윤석 수 / 디자인팀 서지우·천진기 화 / 연구기획팀 최민준 월·목 / 영업팀 조현주 월·금 / 전략사업팀 손주리·윤현수 월·화·금 / 커뮤니케이션팀 조성준 화·금. 연구기획팀은 연구소 팀장 일정을 따릅니다. 첨부 공지를 반영해 2026년 12월 31일까지 적용하며, 설정에서 기간과 요일을 바꿀 수 있습니다.</li><li><strong>주말·공휴일:</strong> 주말도 기본 미선택입니다. 공휴일은 자동 판정하지 않으므로 필요한 경우 대표님 일정을 취소하고 각자 점심 여부를 선택해 주세요.</li><li><strong>과천 맛집:</strong> <a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도</a>의 가게를 2026년 10월 19일 확인해 정리했습니다. 한식·중식·일식·양식·분식·아시안으로 나누고 스마트경양식·샤브올데이·상월은 요청에 맞게 분류를 보정했습니다. 원본 지도에 이후 추가한 장소는 이 파일에 자동 반영되지 않습니다. 맛집 목록은 대표님 점심 장소와 따로 먹는 모임별 식당 등록에 사용합니다. 일반 점심은 계속 메가존/런치타임 중 하나만 선택합니다.</li><li><strong>따로 먹는 모임:</strong> 동료 여러 명을 동시에 초대하여 모임을 만들고, 참여자는 모임 식당을 등록할 수 있습니다. 대기 중인 초대를 포함해 한 사람은 한 모임에만 들어갈 수 있습니다. 초대를 거절·취소하면 초대한 사람은 따로 먹기로 남고, 수락한 모임에서 나가면 본인만 미선택으로 바뀝니다.</li><li><strong>기록 보관:</strong> 공유 기록과 전용 식단 이미지는 최근 90일을 기준으로 정리합니다. 이 기기의 점심 기록은 최근 120일, 이미지 미리보기는 최근 3개를 보관합니다.</li></ul></section>
-<section><h2>잘 안 될 때</h2><table><tr><th>상황</th><th>확인할 것</th></tr><tr><td>GitHub 주소가 404예요</td><td>저장소 첫 화면에 index.html이 있는지, Pages가 main / (root)인지 확인합니다.</td></tr><tr><td>공유 서버 업데이트 안내가 떠요</td><td>맨 위 기존 서버 업데이트 순서대로 Code.gs를 교체하고 배포 관리에서 새 버전으로 갱신합니다. GitHub 파일 교체만으로는 이번 다인원 초대와 따로 먹기 식당을 팀에 저장할 수 없습니다.</td></tr><tr><td>동료와 선택이 달라요</td><td>양쪽 모두 ‘팀 공유 연결됨’인지 확인합니다. 일반 주소 대신 ‘동료 초대’로 복사한 링크를 전달하세요.</td></tr><tr><td>팀 키 오류예요</td><td>코드를 복사했던 브라우저에서 다시 연결합니다. 새 코드를 넣었다면 새 버전으로 재배포해야 합니다.</td></tr><tr><td>연결 응답이 없어요</td><td>웹 앱 실행 사용자 ‘나’, 접근 권한 ‘모든 사용자’, 주소 끝 /exec를 확인합니다. Workspace에서 익명 배포가 금지되어 있으면 관리자 확인이 필요합니다.</td></tr><tr><td>식단이 안 떠요</td><td>원문 서비스 또는 네트워크 문제일 수 있습니다. 메가존은 ‘식단 새로고침’과 Welplan 원문, 런치타임은 ‘사진 다시 불러오기’와 카카오 원문을 확인합니다. 런치타임 자동 조회의 서버 업데이트 안내가 있으면 위 순서로 기존 서버를 갱신합니다. 이전 사진은 마지막 확인 시각과 오류 안내를 함께 표시합니다.</td></tr><tr><td>올린 이미지 삭제에서 업데이트 안내가 떠요</td><td>위 안내대로 기존 Code.gs를 교체하고 배포 관리에서 새 버전으로 갱신합니다. 이미 이미지 공유를 쓰고 있다면 초기 실행을 다시 할 필요는 없습니다.</td></tr><tr><td>이미지를 올릴 수 없어요</td><td>아직 이미지 공유를 설치하지 않았다면 initializeLunchClub을 실행해 Drive 권한을 허용하고 새 버전으로 배포합니다. 이미 이미지 공유를 사용하던 경우 이번 업데이트에서는 Code.gs 교체와 새 버전 배포만 필요합니다.</td></tr><tr><td>공유 서버 코드를 수정했어요</td><td>배포 → 배포 관리 → 수정(연필) → 버전 ‘새 버전’ → 배포. 기존 주소를 유지하면 팀 연결을 바꿀 필요가 없습니다.</td></tr></table></section>
+<section><h2>식단과 일정에 대해 알아둘 점</h2><ul><li><strong>메가존:</strong> 공유 연결 전에도 공개된 날짜별 점심 메뉴를 직접 조회합니다. 오늘과 이번 주 월~금 식단을 볼 수 있습니다. 날짜가 맞는 식단만 표시하며, 미등록과 조회 실패를 구분합니다. 메뉴 사진과 상세 내용은 Welplan 원문에서 확인합니다.</li><li><strong>런치타임 자동 조회:</strong> 공유 서버가 카카오 채널에 공개된 최신 프로필 사진 주소를 가져옵니다. 별도 카카오 로그인이나 친구 추가가 필요하지 않습니다. 점심판을 열 때와 화면이 열려 있는 동안 약 5분마다 확인합니다. 채널에 아직 전날 사진이 있으면 그 사진이 표시되므로 이미지 속 날짜를 확인해 주세요. 페이지를 닫은 상태의 오전 9시 예약 실행은 이번 버전에 포함하지 않습니다. 공개 화면의 데이터 형식이 바뀌면 자동 조회 코드 조정이 필요할 수 있습니다.</li><li><strong>직접 올린 식단 이미지 기간:</strong> 주간용은 월~일, 하루용은 지정한 날짜에 표시합니다. 같은 날짜에 하루용과 주간용이 모두 있으면 하루용을 우선 표시합니다. 다음 주에는 지난 주 이미지가 표시되지 않습니다.</li><li><strong>이미지 공유:</strong> 원본 선택은 15MB까지 가능하며 업로드 전 크기를 조정합니다. 이미지는 전용 비공개 Drive 폴더에 저장하고 팀 키로 조회합니다. 이미지 자체를 인터넷 공개 링크로 만들지 않습니다. 공유 연결 전 미리보기는 이 브라우저에만 보관하며 공유 연결 후 다시 올려야 합니다.</li><li><strong>대표님과 점심 기본 일정:</strong> 경영지원팀 김윤철·오성은·장윤석 수 / 디자인팀 서지우·천진기 화 / 연구기획팀 최민준 월·목 / 영업팀 조현주 월·금 / 전략사업팀 손주리·윤현수 월·화·금 / 커뮤니케이션팀 조성준 화·금. 연구기획팀은 연구소 팀장 일정을 따릅니다. 첨부 공지를 반영해 2026년 12월 31일까지 적용하며, 설정에서 기간과 요일을 바꿀 수 있습니다.</li><li><strong>주말·공휴일:</strong> 주말도 기본 미선택입니다. 공휴일은 자동 판정하지 않으므로 필요한 경우 대표님 일정을 취소하고 각자 점심 여부를 선택해 주세요.</li><li><strong>과천 맛집:</strong> <a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도</a>의 가게를 2026년 10월 19일 확인해 정리했습니다. 한식·중식·일식·양식·분식·아시안으로 나누고 스마트경양식·샤브올데이·상월은 요청에 맞게 분류를 보정했습니다. 원본 지도에 이후 추가한 장소는 이 파일에 자동 반영되지 않습니다. 맛집 목록은 대표님 점심 장소와 따로 먹는 모임별 식당 등록에 사용합니다. 일반 점심은 계속 메가존/런치타임 중 하나만 선택합니다.</li><li><strong>따로 먹는 모임:</strong> 동료 여러 명을 동시에 초대하여 모임을 만들고, 참여자는 모임 식당을 등록할 수 있습니다. 대기 중인 초대를 포함해 한 사람은 한 모임에만 들어갈 수 있습니다. 초대를 거절·취소하면 초대한 사람은 따로 먹기로 남고, 수락한 모임에서 나가면 본인만 미선택으로 바뀝니다.</li><li><strong>기록 보관:</strong> 공유 기록과 전용 식단 이미지는 최근 90일을 기준으로 정리합니다. 이 기기의 점심 기록은 최근 120일 보관합니다. 예전에 올린 이미지 데이터는 새 화면에서 표시하지 않습니다.</li></ul></section>
+<section><h2>잘 안 될 때</h2><table><tr><th>상황</th><th>확인할 것</th></tr><tr><td>GitHub 주소가 404예요</td><td>저장소 첫 화면에 index.html이 있는지, Pages가 main / (root)인지 확인합니다.</td></tr><tr><td>공유 서버 업데이트 안내가 떠요</td><td>맨 위 기존 서버 업데이트 순서대로 Code.gs를 교체하고 배포 관리에서 새 버전으로 갱신합니다. GitHub 파일 교체만으로는 이번 다인원 초대와 따로 먹기 식당을 팀에 저장할 수 없습니다.</td></tr><tr><td>동료와 선택이 달라요</td><td>양쪽 모두 ‘팀 공유 연결됨’인지 확인합니다. 일반 주소 대신 ‘동료 초대’로 복사한 링크를 전달하세요.</td></tr><tr><td>팀 키 오류예요</td><td>코드를 복사했던 브라우저에서 다시 연결합니다. 새 코드를 넣었다면 새 버전으로 재배포해야 합니다.</td></tr><tr><td>연결 응답이 없어요</td><td>웹 앱 실행 사용자 ‘나’, 접근 권한 ‘모든 사용자’, 주소 끝 /exec를 확인합니다. Workspace에서 익명 배포가 금지되어 있으면 관리자 확인이 필요합니다.</td></tr><tr><td>식단이 안 떠요</td><td>원문 서비스 또는 네트워크 문제일 수 있습니다. 메가존은 ‘식단 새로고침’과 Welplan 원문, 런치타임은 ‘사진 다시 불러오기’와 카카오 원문을 확인합니다. 런치타임 자동 조회의 서버 업데이트 안내가 있을 때만 기존 서버 버전을 확인합니다. 이전 사진은 마지막 확인 시각과 오류 안내를 함께 표시합니다.</td></tr><tr><td>강남밥상 게시물이 표시되지 않아요</td><td>RSSHub 공개 피드가 접속 가능한지 확인하세요. 기본 서버는 두 공개 피드를 순서대로 조회하며 실패할 수 있습니다. 영상을 확인할 수 있다면 재생·정지로 메뉴표 장면을 찾을 수 있습니다. 같은 날 영상이 여럿 올라와 자동 구분이 어렵다면 게시물들을 점심판 안에 나누어 표시합니다. 이미 Threads 공식 API 권한이 있는 경우 비공개 스크립트 속성 LUNCH_THREADS_ACCESS_TOKEN을 예비 수단으로 사용할 수 있습니다.</td></tr><tr><td>런치타임 식단 직접 올리기 버튼이 없어요</td><td>정상입니다. 이번 버전부터 직접 업로드·교체·삭제 UI를 제거하고 카카오 자동 식단만 사용합니다.</td></tr><tr><td>공유 서버 코드를 수정했어요</td><td>배포 → 배포 관리 → 수정(연필) → 버전 ‘새 버전’ → 배포. 기존 주소를 유지하면 팀 연결을 바꿀 필요가 없습니다.</td></tr></table></section>
 <footer>공식 설정 참고: <a href="https://docs.github.com/ko/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site" target="_blank" rel="noopener noreferrer">GitHub Pages</a> · <a href="https://developers.google.com/apps-script/guides/web?hl=ko" target="_blank" rel="noopener noreferrer">Google Apps Script</a> · <a href="https://welplan.pmh.codes/docs/api" target="_blank" rel="noopener noreferrer">Welplan 공개 API</a><br>이 패키지는 업로드용 소스입니다. GitHub 공개와 Google 계정 연결은 위 순서로 진행해야 완료됩니다.</footer>
-<script type="text/plain" id="codeTemplate">// SANDS Lunch Club, Google Apps Script single file. Generated from core.js + lunchtime-source.js + backend/server.js.
-
+<script type="text/plain" id="codeTemplate">// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + threads-menu-source.js + backend/server.js.
 /* Shared, dependency-free rules used by the page and the Apps Script server. */
 (function (root, factory) {
   const api = factory();
@@ -102,7 +102,8 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
   const WELPLAN = 'https://welplan.pmh.codes/restaurants/welstory/REST007327/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
     { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: WELPLAN, type: 'cafeteria' },
-    { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' }
+    { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' },
+    { id: 'gangnambab', name: '강남밥상', subtitle: 'Threads 최신 게시물 · 메뉴 공지 화면 자동 보기', url: 'https://www.threads.com/@gangnambab', menuUrl: 'https://www.threads.com/@gangnambab', type: 'cafeteria' }
   ];
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
   function validDate(date) {
@@ -321,7 +322,7 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
       }
       case 'vote':
         if (!memberStatus(op.actor, date, d, config).in) throw new Error('오늘 함께 먹는 상태로 바꾼 뒤 선택해 주세요.');
-        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 메가존 또는 런치타임만 선택할 수 있어요.');
+        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 메가존·런치타임·강남밥상 중 선택해 주세요.');
         d.votes[op.actor] = p.placeId; break;
       case 'ceoDecision': {
         if (memberStatus(op.actor, date, d, config).kind !== 'ceo') throw new Error('해당 날짜의 대표님 점심 참석자만 장소를 확정할 수 있어요.');
@@ -383,7 +384,6 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
   function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
   return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
 });
-
 
 /* Public channel metadata only. No login, friend relationship, or menu date is inferred.
  * Fetch HOME_ENDPOINT on the server: browser Origin requests omit the public OG data.
@@ -576,6 +576,110 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
   });
 });
 
+/* Public Threads daily-menu selection: accepts official Graph API and RSSHub feeds. */
+var LunchThreadsMenu = (function (root) {
+  'use strict';
+  const ACCOUNT = 'gangnambab';
+  const PAGE = 'https://www.threads.com/@gangnambab';
+  const MEDIA_HOSTS = ['fbcdn.net', 'cdninstagram.com', 'cdnthreads.net', 'threads.net', 'threads.com', 'instagram.com'];
+  function validMediaURL(value) {
+    if (typeof value !== 'string' || value.length > 2500) return false;
+    try {
+      const u = new URL(value);
+      return u.protocol === 'https:' && !u.username && !u.password &&
+        MEDIA_HOSTS.some(domain => u.hostname.toLowerCase() === domain || u.hostname.toLowerCase().endsWith('.' + domain));
+    } catch (_) { return false; }
+  }
+  function validImageURL(url) { return validMediaURL(url); }
+  function validPostURL(value) {
+    if (typeof value !== 'string' || value.length > 350) return false;
+    try {
+      const u = new URL(value);
+      return u.protocol === 'https:' && ['threads.com', 'www.threads.com', 'threads.net', 'www.threads.net'].includes(u.hostname.toLowerCase()) &&
+        (/^\/@gangnambab\/post\/[A-Za-z0-9_-]+\/?$/.test(u.pathname) || /^\/t\/[A-Za-z0-9_-]+\/?$/.test(u.pathname));
+    } catch (_) { return false; }
+  }
+  function seoulDate(value) {
+    const time = Date.parse(value);
+    if (!Number.isFinite(time)) return '';
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(time));
+    const pick = name => (parts.find(part => part.type === name) || {}).value;
+    return [pick('year'), pick('month'), pick('day')].join('-');
+  }
+  function decodeXml(value) {
+    return String(value || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/&(?:amp|lt|gt|quot|apos|#39|#x27);/gi, item => {
+        const dict = {'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&apos;':"'",'&#39;':"'",'&#x27;':"'"};
+        return dict[item.toLowerCase()] || item;
+      });
+  }
+  function elementContent(xml, name) {
+    const found = new RegExp('<' + name + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/' + name + '>', 'i').exec(xml);
+    return found ? decodeXml(found[1]).trim() : '';
+  }
+  function attr(tag, name) {
+    const m = new RegExp('(?:^|\\s)' + name + '\\s*=\\s*(["\\\'])(.*?)\\1','i').exec(tag);
+    return m ? decodeXml(m[2]) : '';
+  }
+  function videoFromDescription(description) {
+    const videos = [...String(description).matchAll(/<video\b([^>]*)>([\s\S]*?)<\/video>/gi)];
+    const result = [];
+    for (const v of videos) {
+      const source = /<source\b[^>]*>/i.exec(v[2]);
+      const videoUrl = source ? attr(source[0], 'src') : attr(v[0].split('>')[0] + '>', 'src');
+      const posterUrl = attr('<video ' + v[1] + '>', 'poster');
+      if (validMediaURL(videoUrl)) result.push({ videoUrl, posterUrl: validImageURL(posterUrl) ? posterUrl : '' });
+    }
+    return result;
+  }
+  function parseRss(xml) {
+    if (typeof xml !== 'string' || xml.length > 650000 || !/<rss\b|<feed\b/i.test(xml)) throw new Error('RSS 문서 형식을 확인할 수 없습니다.');
+    const items = [...xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)].slice(0, 80);
+    return { data: items.map(m => {
+      const raw = m[1], desc = elementContent(raw, 'description'), media = videoFromDescription(desc);
+      const postUrl = elementContent(raw, 'link').replace(/^https:\/\/www\.threads\.com\/t\/([A-Za-z0-9_-]+)\/?$/, 'https://www.threads.com/@gangnambab/post/$1');
+      const image = /<img\b[^>]*>/i.exec(desc);
+      const imgUrl = image ? attr(image[0], 'src') : '';
+      const title = elementContent(raw, 'title');
+      const pub = elementContent(raw, 'pubDate');
+      return { username: ACCOUNT, timestamp: pub, permalink: postUrl, text: title, media_type: media.length ? 'VIDEO' : imgUrl ? 'IMAGE' : 'TEXT_POST',
+        media_url: media.length ? media[0].videoUrl : imgUrl, thumbnail_url: media.length ? media[0].posterUrl : '', is_quote_post: false };
+    }) };
+  }
+  const MENU_HINT = /메뉴표|식단표|메뉴판|차림표|메뉴\s*공지|오늘의\s*메뉴|오늘\s*메뉴|금일\s*메뉴|점심\s*메뉴|daily\s*menu|menu\s*board/i;
+  const FOOD_HINT = /음식\s*사진|food\s*photo|실제\s*음식|메뉴\s*사진\s*아님|먹방/i;
+  function publicCandidate(post) {
+    const kind = post.media_type === 'VIDEO' ? 'video' : 'image';
+    const candidate = { kind, date: seoulDate(post.timestamp), postUrl: post.permalink, publishedAt: post.timestamp,
+      videoUrl: kind === 'video' ? post.media_url : '', imageUrl: kind === 'image' ? post.media_url : '',
+      posterUrl: validImageURL(post.thumbnail_url) ? post.thumbnail_url : '' };
+    const text = String(post.text || '') + ' ' + String(post.alt_text || '');
+    candidate.menuHint = MENU_HINT.test(text) && !FOOD_HINT.test(text);
+    return candidate;
+  }
+  function chooseMenu(json, date) {
+    if (!json || !Array.isArray(json.data) || !/^\d{4}-\d\d-\d\d$/.test(date)) throw new Error('Threads 게시물 응답 형식이 올바르지 않습니다.');
+    if (json.data.length > 100) throw new Error('Threads 게시물이 너무 많습니다.');
+    const candidates = json.data.filter(post => post && String(post.username || '').toLowerCase() === ACCOUNT && seoulDate(post.timestamp) === date &&
+      ['VIDEO', 'IMAGE'].includes(post.media_type) && validMediaURL(post.media_url) && validPostURL(post.permalink) && !post.is_quote_post && !post.reposted_post)
+      .map(publicCandidate).sort((a,b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+    const videos = candidates.filter(c => c.kind === 'video');
+    // Menu notices are normally video slideshows. Prefer explicit menu text when present.
+    const hinted = candidates.filter(c => c.menuHint);
+    let selected = null;
+    if (hinted.length === 1) selected = hinted[0];
+    else if (hinted.length > 1) return { ok: false, reason: 'ambiguous', alternatives: hinted.slice(0, 3) };
+    else if (videos.length === 1) selected = videos[0];
+    else if (candidates.length === 1) selected = candidates[0];
+    if (selected) return { ok: true, date, kind: selected.kind, imageUrl: selected.imageUrl, videoUrl: selected.videoUrl,
+      posterUrl: selected.posterUrl, postUrl: selected.postUrl, publishedAt: selected.publishedAt, confidence: selected.menuHint ? 'caption' : 'only_media', source: PAGE };
+    return { ok: false, reason: candidates.length > 1 ? 'ambiguous' : 'not_found', alternatives: candidates.slice(0, 3) };
+  }
+  const api = { ACCOUNT, PAGE, validImageURL, validMediaURL, validPostURL, seoulDate, parseRss, chooseMenu };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.LunchThreadsMenu = api;
+  return api;
+})(typeof window !== 'undefined' ? window : null);
 
 /* Append this file after core.js and lunchtime-source.js to create the copy/paste Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
@@ -592,6 +696,12 @@ const KAKAO_PROFILE_KEY = 'LUNCH_KAKAO_PROFILE';
 const KAKAO_PROFILE_CACHE_KEY = 'lunch_kakao_profile_v1';
 const KAKAO_PROFILE_TTL = 5 * 60000;
 const KAKAO_PROFILE_MIN_INTERVAL = 60000;
+const GANGNAM_TOKEN_PROPERTY = 'LUNCH_THREADS_ACCESS_TOKEN';
+const GANGNAM_RSS_FEED_PROPERTY = 'LUNCH_THREADS_RSS_FEED_URL';
+const GANGNAM_PUBLIC_FEEDS = ['https://rsshub.gneko.io/threads/gangnambab', 'https://rsshub.isrss.com/threads/gangnambab'];
+const GANGNAM_FORCE_THROTTLE = 'lunch_gangnam_refresh_';
+const GANGNAM_CACHE_PREFIX = 'lunch_gangnam_menu_v2_';
+const GANGNAM_ERROR = 'Threads 계정의 오늘 메뉴표를 아직 확인하지 못했어요.';
 const KAKAO_PROFILE_ERROR = '카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 잠시 후 다시 확인하거나 카카오 원문을 열어 주세요.';
 // Slack secrets are NEVER embedded in GitHub Pages files or generated Code.gs.
 // Set these in Apps Script > Project settings > Script properties.
@@ -712,6 +822,63 @@ function kakaoProfileResponse_(force) {
     return kakaoProfileResult_({ profile: record.profile, pending: false, error: KAKAO_PROFILE_ERROR });
   }
 }
+// A public RSSHub feed is the first attempt, so the restaurant need not authorize an app.
+// Public community-hosted feeds are not an official Meta service and can fail at any time.
+function gangnamRssUrls_(properties) {
+  const custom = String(properties.getProperty(GANGNAM_RSS_FEED_PROPERTY) || '').trim();
+  if (!custom) return GANGNAM_PUBLIC_FEEDS;
+  if (!/^https:\/\/(?:rsshub\.(?:gneko\.io|isrss\.com|app|uocat\.com))\/threads\/gangnambab(?:\?.*)?$/i.test(custom)) return [];
+  return [custom];
+}
+function gangnamFetchPosts_() {
+  const properties = PropertiesService.getScriptProperties();
+  const rssUrls = gangnamRssUrls_(properties);
+  let triedRss = false, fetchError = null;
+  for (const url of rssUrls) {
+    triedRss = true;
+    try {
+      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 12, headers: { Accept: 'application/rss+xml, application/xml, text/xml' } });
+      if (response.getResponseCode() !== 200) throw new Error('RSS HTTP ' + response.getResponseCode());
+      const raw = response.getContentText();
+      if (!raw || raw.length > 650000) throw new Error('RSS 용량 또는 내용 오류');
+      const posts = LunchThreadsMenu.parseRss(raw);
+      if (!posts.data.length) throw new Error('RSS에 게시물이 없습니다');
+      return { posts, source: 'rsshub' };
+    } catch (error) { fetchError = error; }
+  }
+  const token = properties.getProperty(GANGNAM_TOKEN_PROPERTY);
+  if (token && token.length >= 20) {
+    const api = 'https://graph.threads.net/v1.0/profile_posts?username=gangnambab&fields=id,username,media_type,media_url,thumbnail_url,permalink,timestamp,text,alt_text,is_quote_post&limit=50';
+    const response = UrlFetchApp.fetch(api, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }, muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 12 });
+    if (response.getResponseCode() !== 200) throw new Error('Threads API 공개 프로필 접근 권한 또는 토큰을 확인해 주세요.');
+    const raw = response.getContentText();
+    if (!raw || raw.length > 350000) throw new Error('Threads API 응답이 너무 큽니다.');
+    return { posts: JSON.parse(raw), source: 'meta_api' };
+  }
+  if (!rssUrls.length) throw new Error('RSS 주소 형식이 올바르지 않습니다.');
+  throw new Error(triedRss ? '공개 Threads RSS 서버를 연결하지 못했습니다.' : (fetchError && String(fetchError)) || '연결할 Threads 피드가 없습니다.');
+}
+function gangnamMenuResponse_(date, force) {
+  if (typeof LunchThreadsMenu === 'undefined') return { ok: false, reason: 'setup', error: '공유 서버를 업데이트해 주세요.' };
+  const today = LunchCore.today();
+  if (date > today) return { ok: false, reason: 'not_found', error: '아직 해당 날짜의 메뉴가 없어요.' };
+  if (date < LunchCore.shiftDate(today, -7)) return { ok: false, reason: 'not_found', error: '최근 7일 이내 메뉴만 자동으로 확인합니다.' };
+  const cache = CacheService.getScriptCache(), cacheKey = GANGNAM_CACHE_PREFIX + date;
+  try { const cached = cache.get(cacheKey); if (cached && (!force || cache.get(GANGNAM_FORCE_THROTTLE + date))) return JSON.parse(cached); } catch (_) {}
+  let reply;
+  try {
+    const result = gangnamFetchPosts_();
+    const selected = LunchThreadsMenu.chooseMenu(result.posts, date);
+    reply = selected.ok ? { ...selected, checkedAt: new Date().toISOString(), provider: result.source }
+      : { ok: false, date, reason: selected.reason, alternatives: selected.alternatives || [], provider: result.source,
+          error: selected.reason === 'ambiguous' ? '같은 날 올라온 게시물 중 메뉴 공지를 자동으로 구분하지 못했습니다.' : GANGNAM_ERROR };
+  } catch (_) {
+    reply = { ok: false, date, reason: 'feed_unavailable', error: '공개 Threads 피드가 일시적으로 응답하지 않아요. 다시 확인해 주세요.' };
+  }
+  try { cache.put(cacheKey, JSON.stringify(reply), reply.ok ? 300 : 120); cache.put(GANGNAM_FORCE_THROTTLE + date, '1', 60); } catch (_) {}
+  return reply;
+}
+
 function menuImageSlot_(date, scope) {
   if (!LunchCore.validDate(date) || !['day', 'week'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
   const start = scope === 'week' ? LunchCore.weekDates(date)[0] : date;
@@ -1137,7 +1304,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, gangnamMenu: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
   const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;
@@ -1160,6 +1327,7 @@ function doGet(e) {
     if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
     if (p.action === 'menu') return output_(menuResponse_(p.date), callback);
+    if (p.action === 'gangnamMenu') return output_(gangnamMenuResponse_(p.date, p.force === '1'), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);
     if (p.action === 'state') return output_(stateResponse_(p.date, p.receipt), callback);
     return output_({ ok: false, error: '지원하지 않는 조회입니다.' }, callback);

@@ -4,7 +4,7 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v2', kakao: 'sandsLunch.kakaoProfile.v1' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v2', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v2' };
   const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
   const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
@@ -30,6 +30,9 @@
   const menuRequests = new Map(), menuLoadingDates = new Set(), mealImageErrors = new Set(), expandedMenuDates = new Set();
   let kakaoProfile = cleanKakaoProfile(read(KEYS.kakao, null));
   let kakaoLoading = false, kakaoWaiting = false, kakaoError = '', kakaoPhotoError = '', kakaoRequest = null, lastKakaoAttempt = 0;
+  let gangnamMenus = read(KEYS.gangnam, {});
+  if (!gangnamMenus || typeof gangnamMenus !== 'object') gangnamMenus = {};
+  let gangnamLoading = false, gangnamAttempt = {}, gangnamRequests = {}, gangnamPhotoErrors = new Set();
   let connectedReady = false, dialogReturnFocus = null, selectedDecision = '', draftTime = '';
   const state = () => connection ? shared : local;
   const config = () => C.settings(state().settings);
@@ -73,7 +76,7 @@
     let content = `<p class="response-status${status ? ' is-' + status.kind : ''}">${mine ? `<span>${esc(mine.name)}님의 선택</span><strong>${dayReady() ? esc(status.label) : '확인 중…'}</strong>` : '내 이름을 고르고 아래 버튼으로 점심 여부를 알려 주세요.'}</p>`;
     content += `<div class="response-actions" role="group" aria-label="${esc(dateText(date))} 내 점심 선택"><button id="choiceIn" class="response-option is-in" data-action="setAvailability" data-id="in" ${attrs} aria-pressed="${status?.kind === 'in'}"><strong>함께 먹기</strong><small>같이 먹는 인원에 참여</small></button><button id="choiceSeparate" class="response-option is-separate" data-action="separate" ${attrs} aria-pressed="${status?.kind === 'separate'}"><strong>따로 먹기</strong><small>동료와 따로 또는 개별 식사</small></button><button id="choiceOut" class="response-option is-out" data-action="absence" ${attrs} aria-pressed="${status?.kind === 'out'}"><strong>안 먹기</strong><small>불참 사유는 선택사항</small></button></div>`;
     content += `<div class="response-secondary"><button class="text-button" data-action="setAvailability" data-id="pending" ${attrs}>선택 취소 · 미선택으로</button><button class="text-button" data-action="setAvailability" data-id="ceo" ${attrs}>대표님과 먹어요</button></div>`;
-    if (status?.kind === 'in') content += `<div class="response-cafeteria-picker"><strong>일반 점심 장소 · 두 곳 중 택 1</strong><div class="response-cafeteria-buttons">${C.PLACES.map(p => `<button class="${d.votes[identity] === p.id ? 'active' : ''}" data-action="vote" data-id="${p.id}" ${disabled ? 'disabled' : ''} aria-pressed="${d.votes[identity] === p.id}">${d.votes[identity] === p.id ? '✓ ' : ''}${p.name}</button>`).join('')}</div><small>선택한 곳은 내 이름으로 저장돼요. 다른 곳을 누르면 바뀝니다.</small></div>`;
+    if (status?.kind === 'in') content += `<div class="response-cafeteria-picker"><strong>일반 점심 장소 · 세 곳 중 택 1</strong><div class="response-cafeteria-buttons">${C.PLACES.map(p => `<button class="${d.votes[identity] === p.id ? 'active' : ''}" data-action="vote" data-id="${p.id}" ${disabled ? 'disabled' : ''} aria-pressed="${d.votes[identity] === p.id}">${d.votes[identity] === p.id ? '✓ ' : ''}${p.name}</button>`).join('')}</div><small>선택한 곳은 내 이름으로 저장돼요. 다른 곳을 누르면 바뀝니다.</small></div>`;
     if (status?.kind === 'separate') { const group = C.separateGroup(identity, d); content += `<div class="personal-ceo-notice personal-separate-notice"><strong>${group.members.length > 1 ? group.members.length + '명 모임' : '따로 먹는 점심'} · ${group.venue ? esc(group.venue.name) : '장소 미정'}</strong><a href="#guideSection" class="ceo-guide-jump">과천 맛집에서 따로 먹을 장소 고르기 ↓</a><button class="secondary-button" data-action="separate" ${attrs}>함께 먹을 동료 관리</button></div>`; }
     if (status?.kind === 'ceo') content += `<div class="personal-ceo-notice"><strong>${target}은 대표님과 점심 일정이 있어요.</strong><a href="#guideSection" class="ceo-guide-jump">아래 과천 맛집에서 점심 장소 고르기 ↓</a><button id="cancelMyCeo" class="secondary-button" data-action="setAvailability" data-id="pending" ${attrs}>내 대표님 점심 취소</button><small>취소하면 미선택으로 이동해요. 이후 함께 먹기·따로 먹기·안 먹기를 골라 주세요.</small></div>`;
     else if (mine && d.overrides[mine.id] === 'pending' && !d.ceoCancelled && date <= config().scheduleEnd && config().ceoDays[mine.id].includes(C.weekday(date))) content += `<div class="personal-ceo-notice"><strong>내 기본 대표님 점심은 해제되어 있어요.</strong><button class="secondary-button" data-action="setAvailability" data-id="auto" ${attrs}>내 기본 대표님 일정 복원</button></div>`;
@@ -123,7 +126,7 @@
     $('ceoCancelLabel').textContent = `${isToday ? '오늘' : '이날'} 대표님 점심 전체 취소${d.ceoCancelled ? '됨' : ''}`;
     $('ceoCancelled').setAttribute('aria-label', dateText(date) + ' 기본 대표님과 점심 전체 취소');
     $('ceoControlHint').textContent = d.ceoCancelled ? '기본 대표님 일정이 미선택으로 바뀌었어요. 각자 점심 여부를 선택해 주세요.' : '전체 일정이 취소된 날에 체크해 주세요. 내 일정만 취소할 때는 위의 개인 취소 버튼을 이용하세요.';
-    $('availabilityHint').textContent = !ready ? '선택한 날짜의 공유 현황을 확인하고 있어요.' : date > s.scheduleEnd ? '대표님 기본 일정의 적용 기간이 지났어요. 기본 요일 설정을 확인해 주세요.' : '일반 점심은 메가존·런치타임 중 하나를, 대표님 점심은 아래 과천 맛집에서 따로 확정해요.';
+    $('availabilityHint').textContent = !ready ? '선택한 날짜의 공유 현황을 확인하고 있어요.' : date > s.scheduleEnd ? '대표님 기본 일정의 적용 기간이 지났어요. 기본 요일 설정을 확인해 주세요.' : '일반 점심은 메가존·런치타임·강남밥상 중 하나를, 대표님 점심은 아래 과천 맛집에서 따로 확정해요.';
     $('dailySaveNote').textContent = connection ? !ready ? '공유 현황 확인 중…' : busy ? '팀에 저장 중…' : `총 ${MEMBERS.length}명 · 팀 공유` : `총 ${MEMBERS.length}명 · 이 기기에 저장`;
     const members = MEMBERS.map(m => ({ ...m, status: dailyStatus(m, date) }));
     const groups = [['in', '함께 점심'], ['ceo', '대표님과 점심'], ['out', isToday ? '오늘 안 먹음' : '이날 안 먹음'], ['pending', '미선택']];
@@ -222,21 +225,60 @@
   function renderLunchImage() {
     return `<div class="lunch-image-panel">${renderKakaoProfile()}</div>`;
   }
+  function gangnamMediaHTML(item, suffix = '') {
+    const valid = window.LunchThreadsMenu;
+    if (!valid?.validPostURL(item?.postUrl)) return '';
+    if (item.kind === 'video' && valid.validMediaURL(item.videoUrl)) {
+      const poster = valid.validImageURL(item.posterUrl) ? ` poster="${esc(item.posterUrl)}"` : '';
+      return `<div class="gangnam-media-wrap"><video class="gangnam-menu-video" id="gangnamMenuVideo${esc(suffix)}" controls muted playsinline preload="metadata"${poster} aria-label="강남밥상 메뉴 공지 게시물 영상. 일시정지하거나 재생 위치를 이동해서 메뉴표를 보세요."><source src="${esc(item.videoUrl)}" type="video/mp4">이 브라우저는 영상 재생을 지원하지 않습니다.</video><p class="gangnam-menu-meta">카카오 메뉴 공지 화면을 담은 Threads 게시물입니다. 영상 속 메뉴표가 보이는 장면에서 정지해 주세요.</p></div>`;
+    }
+    if (item.kind === 'image' && valid.validImageURL(item.imageUrl)) {
+      return `<button class="menu-photo-button gangnam-photo-button" data-action="viewGangnamMenu" aria-label="강남밥상 메뉴 사진 크게 보기"><img id="gangnamMenuPhoto" src="${esc(item.imageUrl)}" alt="강남밥상 오늘의 식단 공지" loading="lazy" referrerpolicy="no-referrer"><span>메뉴 사진 확대 ↗</span></button>`;
+    }
+    return '';
+  }
+  function renderGangnamMenu() {
+    const entry = gangnamMenus[date], supported = !!connection && connectedReady && shared.features.gangnamMenu;
+    const ready = entry?.ok && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
+      (entry.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(entry.videoUrl) : window.LunchThreadsMenu.validImageURL(entry.imageUrl)) &&
+      window.LunchThreadsMenu.seoulDate(entry.publishedAt) === date;
+    let content = '<div class="gangnam-menu-panel"><div class="gangnam-menu-heading"><span class="gangnam-menu-badge">THREADS</span><strong>강남밥상 메뉴 공지</strong><span class="auto-menu-badge">자동 조회</span></div>';
+    if (ready && !(entry.kind === 'image' && gangnamPhotoErrors.has(entry.imageUrl))) {
+      content += gangnamMediaHTML(entry);
+      content += `<p class="gangnam-menu-meta">${esc(dateText(date))} 게시 · 최신 조회 ${esc(timeText(entry.checkedAt || entry.publishedAt))}</p>`;
+    } else if (entry?.reason === 'ambiguous' && Array.isArray(entry.alternatives) && entry.alternatives.length) {
+      content += '<p class="gangnam-menu-meta">오늘 게시물 여러 개를 확인했지만 영상 속 글자를 자동으로 판별할 수 없어 메뉴표를 특정하지 못했습니다. 대신 게시물을 이 화면에서 바로 확인할 수 있어요.</p>';
+      content += `<div class="gangnam-post-choices">${entry.alternatives.filter(p => window.LunchThreadsMenu?.validPostURL(p.postUrl)).map((p,i) => `<details ${i===0 ? 'open' : ''}><summary>오늘 게시물 ${i+1} · ${esc(timeText(p.publishedAt))}</summary>${gangnamMediaHTML(p,'Alt'+i)}</details>`).join('')}</div>`;
+    } else {
+      const title = !connection ? '팀 공유 연결 후 자동으로 표시됩니다' : !connectedReady ? '팀 공유 연결을 확인하고 있어요…' : !shared.features.gangnamMenu ? '공유 서버 업데이트가 필요합니다' : gangnamLoading ? 'Threads의 오늘 게시물을 확인하고 있어요…' : entry?.reason === 'feed_unavailable' ? 'Threads 자동 피드에 연결되지 않았어요' : entry?.reason === 'not_found' ? '오늘 올라온 메뉴 게시물을 아직 못 찾았어요' : '아직 확인된 메뉴 게시물이 없어요';
+      content += `<div class="image-empty"><strong>${title}</strong><p>${entry?.reason === 'feed_unavailable' ? '공개 피드 제공 서버에 따라 일시적으로 조회가 실패할 수 있습니다.' : '업로드 후 자동으로 표시되며, 정확한 메뉴 날짜를 확인해 주세요.'}</p></div>`;
+    }
+    if (connectedReady && !shared.features.gangnamMenu) content += '<p class="inline-warning">강남밥상 자동 게시물 표시를 위해 <a href="setup.html#update">공유 서버를 업데이트해 주세요 ↗</a></p>';
+    content += `<div class="gangnam-menu-actions"><button class="text-button" data-action="refreshGangnamMenu" ${!supported || gangnamLoading ? 'disabled' : ''}>${gangnamLoading ? '확인 중…' : 'Threads 새 게시물 확인 ↻'}</button><a href="https://www.threads.com/@gangnambab" target="_blank" rel="noopener noreferrer">원문 링크(예비) ↗</a></div></div>`;
+    return content;
+  }
+  function viewGangnamMenu() {
+    const entry = gangnamMenus[date];
+    if (!entry?.ok || entry.kind !== 'image' || entry.date !== date || !window.LunchThreadsMenu?.validImageURL(entry.imageUrl)) return;
+    openDialog('강남밥상 · ' + dateText(date) + ' 메뉴표', `<div class="full-menu-image"><img id="gangnamMenuFull" src="${esc(entry.imageUrl)}" alt="강남밥상 메뉴표" referrerpolicy="no-referrer"></div><p id="gangnamFullError" class="inline-warning" hidden>사진을 표시하지 못했어요.</p>`, true);
+  }
   function renderMenuCards() {
     const d = day(), meStatus = identity && C.memberStatus(identity, date, d, config());
     $('menuTitle').textContent = date === C.today() ? '오늘 구내식당 식단' : '선택한 날의 구내식당 식단';
     const activeDates = menuView === 'week' ? C.weekDates(date) : [date];
     menuLoading = activeDates.some(d => menuLoadingDates.has(d));
-    $('refreshMenu').disabled = menuLoading || kakaoLoading; $('refreshMenu').textContent = menuLoading || kakaoLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
+    $('refreshMenu').disabled = menuLoading || kakaoLoading || gangnamLoading; $('refreshMenu').textContent = menuLoading || kakaoLoading || gangnamLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
     $('restaurantCards').innerHTML = C.PLACES.map((p, i) => {
       const chosen = d.votes[identity] === p.id, note = d.notes[p.id]; let content = '';
       if (p.id === 'megazone') {
         content = `<div class="menu-tabs" role="group" aria-label="메가존 식단 보기"><button data-action="menuView" data-id="day" aria-pressed="${menuView === 'day'}">${date === C.today() ? '오늘 식단' : '선택한 날 식단'}</button><button data-action="menuView" data-id="week" aria-pressed="${menuView === 'week'}">${C.weekDates(date)[0] === C.weekDates(C.today())[0] ? '이번 주' : '선택한 주'} 식단</button></div>${menuView === 'week' ? renderMegaWeek() : renderMegaDay()}`;
       } else if (p.id === 'lunchtime') {
         content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>런치타임 카카오 채널</strong><p>점심판을 열 때 자동 조회 · 열어 두면 5분마다 확인</p></div><span class="arrow">↗</span></a>${renderLunchImage()}`;
+      } else if (p.id === 'gangnambab') {
+        content = renderGangnamMenu();
       } else content = `<p class="channel-info">${esc(p.subtitle || '동료가 제안한 오늘의 다른 식당이에요.')}</p>`;
       if (note) content += `<div class="menu-note"><strong>${esc(dateText(date))} · 함께 적은 메뉴 메모</strong>${esc(note)}</div>`;
-      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.id === 'megazone' ? `<button data-action="source">실시간 식단 ↗</button>` : p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">지도 ↗</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
+      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.id === 'megazone' ? `<button data-action="source">실시간 식단 ↗</button>` : p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
     }).join('');
   }
   function renderDecision() {
@@ -245,8 +287,8 @@
     const total = Object.values(votes).reduce((count, list) => count + list.length, 0);
     $('decisionTitle').textContent = '일반 점심 장소 선택 현황';
     $('voteSummary').textContent = attending.length
-      ? `함께 점심 ${attending.length}명 중 ${total}명 장소 선택 · 메가존 / 런치타임 중 택 1`
-      : '일반 점심 참석자가 아직 없어요. 함께 먹기를 선택하면 두 곳 중 고를 수 있어요.';
+      ? `함께 점심 ${attending.length}명 중 ${total}명 장소 선택 · 메가존 / 런치타임 / 강남밥상 중 택 1`
+      : '일반 점심 참석자가 아직 없어요. 함께 먹기를 선택하면 세 곳 중 고를 수 있어요.';
     $('voteResults').innerHTML = C.PLACES.map(p => `<div class="result-row"><div class="result-heading"><span>${esc(p.name)}</span><b>${votes[p.id].length}명</b></div><div class="result-track"><div class="result-bar" style="width:${attending.length ? votes[p.id].length / attending.length * 100 : 0}%"></div></div><div class="voter-names">${votes[p.id].length ? MEMBERS.filter(m => votes[p.id].includes(m.id)).map(m => esc(m.name)).join(' · ') : '아직 선택한 사람이 없어요'}</div></div>`).join('');
     const undecided = attending.filter(m => !C.PLACES.some(p => p.id === d.votes[m.id]));
     $('decisionContent').innerHTML = `<div class="lunch-choice-note">${undecided.length ? `<strong>장소 미선택 ${undecided.length}명</strong><p>${undecided.map(m => esc(m.name)).join(' · ')}</p>` : '<strong>일반 점심 참석자 모두 장소를 골랐어요.</strong>'}<p>각자 선택한 식당으로 나뉘어 점심을 먹어요. 단일 장소 확정은 하지 않습니다.</p></div>`;
@@ -402,7 +444,7 @@
       const before = JSON.stringify(shared);
       const res = await jsonp({ action: 'state', date: requestDate }, target); if (target !== connection) return;
       mergeResponse(res); if (before !== JSON.stringify(shared)) render(); else renderConnection();
-      loadKakaoProfile(!lastKakaoAttempt);
+      loadKakaoProfile(!lastKakaoAttempt); loadGangnamMenu(requestDate);
     }
     catch (e) { if (target === connection) { syncError = e.message; renderConnection(); } }
     finally { syncing = false; renderConnection(); if (requestDate !== date && target === connection) sync(); }
@@ -479,6 +521,34 @@
     });
     return request.promise;
   }
+  function loadGangnamMenu(when = date, force = false) {
+    const target = connection;
+    if (!target || !connectedReady || !shared.features.gangnamMenu || !C.validDate(when)) return Promise.resolve();
+    if (gangnamRequests[when]) return gangnamRequests[when];
+    if (!force && gangnamAttempt[when] && Date.now() - gangnamAttempt[when] < 5 * 60000) return Promise.resolve();
+    gangnamAttempt[when] = Date.now(); gangnamLoading = true; renderMenuCards();
+    const task = Promise.resolve().then(async () => {
+      try {
+        const result = await jsonp({ action: 'gangnamMenu', date: when, force: force ? '1' : '0' }, target);
+        if (target !== connection) return;
+        if (result?.ok && result.date === when && window.LunchThreadsMenu?.validPostURL(result.postUrl) && window.LunchThreadsMenu?.seoulDate(result.publishedAt) === when &&
+            (result.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(result.videoUrl) : window.LunchThreadsMenu.validImageURL(result.imageUrl))) {
+          gangnamMenus[when] = { ...result };
+          if (result.kind === 'image') gangnamPhotoErrors.delete(result.imageUrl);
+        } else if (result?.reason === 'ambiguous' && Array.isArray(result.alternatives)) {
+          const alternatives = result.alternatives.filter(p => window.LunchThreadsMenu?.validPostURL(p.postUrl) && window.LunchThreadsMenu?.seoulDate(p.publishedAt) === when &&
+            (p.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(p.videoUrl) : window.LunchThreadsMenu.validImageURL(p.imageUrl))).slice(0,3);
+          gangnamMenus[when] = { ok: false, date: when, reason: 'ambiguous', alternatives };
+        } else {
+          gangnamMenus[when] = { ok: false, date: when, reason: result?.reason || 'unavailable' };
+        }
+        try { write(KEYS.gangnam, Object.fromEntries(Object.entries(gangnamMenus).sort(([a],[b]) => b.localeCompare(a)).slice(0, 14))); } catch (_) {}
+      } catch (_) { if (target === connection) gangnamMenus[when] = { ok: false, reason: 'unavailable' }; }
+      finally { if (gangnamRequests[when] === task) delete gangnamRequests[when]; gangnamLoading = Object.keys(gangnamRequests).length > 0; renderMenuCards(); }
+    });
+    gangnamRequests[when] = task;
+    return task;
+  }
   function viewKakaoProfile() {
     if (!kakaoProfile) return;
     openDialog('런치타임 · 카카오 최신 프로필 사진', `<p class="dialog-copy">마지막 확인 ${esc(timeText(kakaoProfile.checkedAt))}<br>${date !== C.today() ? '선택한 날짜의 식단이 아니에요. ' : ''}사진에 적힌 식단 날짜를 확인해 주세요.${kakaoError ? '<br>다시 확인하지 못해 마지막으로 가져온 사진입니다.' : ''}</p><div class="full-menu-image"><img id="kakaoProfileFull" src="${esc(kakaoProfile.imageUrl)}" alt="런치타임 카카오 프로필 식단. 이미지 속 날짜 확인이 필요합니다." referrerpolicy="no-referrer"></div><p id="kakaoFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 아래 카카오 원문에서 확인해 주세요.</p><p class="dialog-copy"><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 채널 원문 열기 ↗</a></p>`, true);
@@ -517,7 +587,7 @@
   }
   function changeDate(next) {
     if (!C.validDate(next)) { toast('올바른 날짜를 선택해 주세요.'); return; }
-    date = next; followsToday = date === C.today(); selectedDecision = ''; draftTime = ''; render(); sync(); loadMenu();
+    date = next; followsToday = date === C.today(); selectedDecision = ''; draftTime = ''; render(); sync(); loadMenu(); loadGangnamMenu(date);
   }
   function setIdentity(id) {
     if (!MEMBERS.some(m => m.id === id)) return;
@@ -529,7 +599,7 @@
     if (!C.validDate(targetDate)) return;
     const member = MEMBERS.find(m => m.id === identity), current = dailyStatus(member, targetDate).kind;
     const selectedDay = targetDate === C.today() ? '오늘' : '이날';
-    const options = [['in', selectedDay + ' 함께 먹어요', '일반 점심으로 메가존 또는 런치타임 중 골라요'], ['separate', selectedDay + ' 따로 먹어요', '동료와 따로 먹거나 개별 식사해요'], ['out', selectedDay + ' 점심 안 먹어요', '연차·반차·외근·출장 등 사유는 선택사항'], ['pending', '선택 취소 · 미선택으로', '내 대표님 점심 취소도 미선택으로 바꿔요'], ['ceo', selectedDay + '은 대표님과 점심', '대표님과 점심으로 직접 지정해요'], ['auto', '기본 일정 따르기', '기본 대표님 일정이 없으면 미선택이 됩니다']];
+    const options = [['in', selectedDay + ' 함께 먹어요', '일반 점심으로 메가존·런치타임·강남밥상 중 골라요'], ['separate', selectedDay + ' 따로 먹어요', '동료와 따로 먹거나 개별 식사해요'], ['out', selectedDay + ' 점심 안 먹어요', '연차·반차·외근·출장 등 사유는 선택사항'], ['pending', '선택 취소 · 미선택으로', '내 대표님 점심 취소도 미선택으로 바꿔요'], ['ceo', selectedDay + '은 대표님과 점심', '대표님과 점심으로 직접 지정해요'], ['auto', '기본 일정 따르기', '기본 대표님 일정이 없으면 미선택이 됩니다']];
     openDialog(nameOf(identity) + '님의 ' + dateText(targetDate), `<p class="dialog-copy">${esc(dateText(targetDate))}의 일정만 바꿉니다.</p><div class="availability-options">${options.map(([id, title, sub]) => `<button data-action="${id === 'out' ? 'absence' : id === 'separate' ? 'separate' : 'setAvailability'}" data-id="${id}" data-date="${targetDate}" data-member="${identity}" class="${current === id ? 'active' : ''}">${title}<small>${sub}</small></button>`).join('')}</div>`);
   }
   function showAbsence(targetDate = date, actor = identity) {
@@ -683,6 +753,8 @@
     else if (action === 'viewMegaMeal') viewMegaMeal(id, b.dataset.date);
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
+    else if (action === 'refreshGangnamMenu') loadGangnamMenu(date, true);
+    else if (action === 'viewGangnamMenu') viewGangnamMenu();
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }
     else if (action === 'settings') showSettings();
@@ -698,7 +770,7 @@
     }
     else if (action === 'disconnect') {
       if (busy) return toast('저장이 끝난 뒤 연결을 해제해 주세요.');
-      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
+      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; gangnamRequests = {}; gangnamLoading = false; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
     }
     else if (action === 'random') {
       const counts = C.tally(date, day(), config()), max = Math.max(0, ...Object.values(counts).map(a => a.length));
@@ -722,7 +794,7 @@
       if (result) { closeDialog(); toast(`${members.length}명에게 따로 먹기 초대를 보냈어요. 각자 수락하면 모임에 합류합니다.`); }
       else submit.disabled = false;
     }
-    else if (form.id === 'decisionForm') { toast('일반 점심은 메가존 또는 런치타임에서 각자 선택해 주세요.'); }
+    else if (form.id === 'decisionForm') { toast('일반 점심은 메가존·런치타임·강남밥상 중 선택해 주세요.'); }
     else if (form.id === 'absenceForm') {
       if (form.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
       const targetDate = form.dataset.date, reason = f.get('reason') === 'custom' ? f.get('customReason') : f.get('reason'), submit = form.querySelector('button');
@@ -750,7 +822,7 @@
   $('guideSearch').addEventListener('input', e => { guideQuery = e.target.value; guideLimit = 6; renderGuide(); });
   $('dateInput').addEventListener('change', e => changeDate(e.target.value));
   $('prevDate').onclick = () => changeDate(C.shiftDate(date, -1)); $('nextDate').onclick = () => changeDate(C.shiftDate(date, 1)); $('todayBtn').onclick = () => changeDate(C.today());
-  $('settingsBtn').onclick = showSettings; $('refreshMenu').onclick = () => { loadMenu(true); loadKakaoProfile(true); };
+  $('settingsBtn').onclick = showSettings; $('refreshMenu').onclick = () => { loadMenu(true); loadKakaoProfile(true); loadGangnamMenu(date, true); };
   $('ceoCancelled').onchange = async e => {
     const checked = e.target.checked, targetDate = date;
     if (e.target.disabled) return;
@@ -773,10 +845,27 @@
     else if (e.target.id === 'kakaoProfilePhoto' && kakaoProfile && e.target.getAttribute('src') === kakaoProfile.imageUrl) {
       kakaoPhotoError = kakaoProfile.imageUrl; renderMenuCards();
     } else if (e.target.id === 'kakaoProfileFull') { e.target.hidden = true; if ($('kakaoFullError')) $('kakaoFullError').hidden = false; }
+    else if (e.target.id === 'gangnamMenuPhoto') { gangnamPhotoErrors.add(e.target.getAttribute('src')); renderMenuCards(); }
+    else if (e.target.id === 'gangnamMenuFull') { e.target.hidden = true; if ($('gangnamFullError')) $('gangnamFullError').hidden = false; }
+    else if (e.target.classList?.contains('gangnam-menu-video')) {
+      const wrap = e.target.closest('.gangnam-media-wrap');
+      if (wrap && !wrap.querySelector('.gangnam-video-error')) {
+        wrap.insertAdjacentHTML('beforeend', '<p class="inline-warning gangnam-video-error">Threads 동영상 주소가 만료됐거나 외부 사이트 재생이 제한됐습니다. 아래 원문 링크에서 확인해 주세요.</p>');
+      }
+    }
   }, true);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMenu(); loadKakaoProfile(); } });
+  // In the video slideshow the menu is often visible near the beginning. The
+  // browser may refuse preloading/seeking on mobile, in which case controls remain.
+  document.addEventListener('loadedmetadata', e => {
+    const video = e.target;
+    if (!video?.classList?.contains('gangnam-menu-video') || video.dataset.previewAttempted) return;
+    video.dataset.previewAttempted = '1';
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    try { video.currentTime = Math.min(Math.max(0.8, video.duration * .10), Math.max(0, video.duration - .2)); video.pause(); } catch (_) {}
+  }, true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMenu(); loadKakaoProfile(); loadGangnamMenu(date); } });
   function checkMidnight() { const now = C.today(); if (now !== lastToday) { lastToday = now; if (followsToday) changeDate(now); else renderMembers(); } }
   setInterval(() => { checkMidnight(); sync(); }, 30000);
-  setInterval(() => { if (!document.hidden) { loadMenu(); loadKakaoProfile(); } }, 5 * 60000);
+  setInterval(() => { if (!document.hidden) { loadMenu(); loadKakaoProfile(); loadGangnamMenu(date); } }, 5 * 60000);
   render(); handleFragment(); sync(); loadMenu();
 })();

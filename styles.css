@@ -1434,3 +1434,24 @@ footer { font-size:.9375rem; padding:26px 0 36px; }
   .pair-detail-actions>* { width:100%; min-width:0; }
   .pair-detail-actions .text-button { border:1px solid var(--line); border-radius:10px; padding:12px; }
 }
+
+/* Gangnambab: one verified daily menu chart, without dish photos/videos. */
+.gangnam-menu-panel{background:#f5f8ff;border:1px solid #cad8ec;border-radius:15px;padding:20px;margin:18px 0;color:#30384a}
+.gangnam-menu-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:19px}
+.gangnam-menu-badge{background:#314d77;color:white;border-radius:7px;padding:5px 8px;letter-spacing:.04em;font-weight:800;font-size:11px}
+.gangnam-menu-actions{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.gangnam-menu-actions a{font-size:15px;color:#365985;font-weight:700}
+.gangnam-menu-meta{color:#555e6d;font-size:14px;margin:12px 0 0}
+.gangnam-photo-button{max-width:100%;margin-top:14px}
+.gangnam-photo-button img{width:100%;max-height:400px;object-fit:contain;border-radius:10px}
+@media(max-width:550px){.gangnam-menu-panel{padding:16px}.gangnam-menu-heading{font-size:18px}.gangnam-photo-button img{max-height:380px}}
+
+/* 2026-10-20: show source Threads video in Lunch Club without leaving the site. */
+.gangnam-media-wrap{margin-top:14px;display:grid;justify-items:center;gap:8px}
+.gangnam-menu-video{width:min(100%,400px);max-height:490px;display:block;background:#161a27;border:1px solid #c4d0e0;border-radius:12px;object-fit:contain}
+.gangnam-menu-panel .gangnam-menu-meta{font-size:14px;line-height:1.55;margin-top:4px}
+.gangnam-post-choices{display:grid;gap:10px;margin-top:14px}
+.gangnam-post-choices details{border:1px solid #cad8ec;border-radius:12px;padding:10px;background:#fff}
+.gangnam-post-choices summary{font-size:16px;font-weight:750;cursor:pointer;padding:7px 3px}
+.gangnam-menu-video:focus-visible{outline:3px solid #314d77;outline-offset:3px}
+@media(max-width:560px){.gangnam-menu-video{max-height:440px}.gangnam-media-wrap{margin-top:12px}}

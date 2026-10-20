@@ -1,0 +1,47 @@
+SANDS Lunch Club - 강남밥상 Threads 게시물 자동 보기 (2026-10-20)
+
+[이번에 달라진 점]
+- 메가존 / 런치타임 / 강남밥상 3개 식당 중 1곳 선택
+- 강남밥상은 Threads의 당일 게시물을 Google Apps Script가 확인해, 게시물에 포함된 영상 슬라이드를 Lunch Club 화면 안에서 표시
+- 영상은 메뉴표 화면 근처에서 정지 표시를 시도하지만, 이 시점이 실제 메뉴표인지 자동 식별한 것은 아닙니다. 필요하면 영상 위치를 옮기고 일시정지하세요.
+- 음식 게시물과 메뉴 공지를 구분할 설명이 없고 여러 게시물이 있으면 모두 내부 펼쳐보기로 제공. Threads 방문은 예비용 링크로만 남김
+- 기존 점심 참석·모임·초대, Slack·Google Drive 알림, 확대 글씨와 섹션 구분, 런치타임 자동 식단 유지
+
+[왜 RSSHub?]
+- Meta 공식 API는 제3자 공개 계정을 읽는 권한을 얻으려면 심사·액세스 토큰이 필요할 수 있습니다.
+- RSSHub(커뮤니티 서비스)는 공개 Threads 프로필에서 RSS를 생성할 수 있으며 메뉴 게시물의 영상 URL을 RSS에 포함하는 기능을 구현하고 있습니다.
+- 이 소스는 Meta 공식 기능이 아닙니다. 피드 접속, 새 게시물 갱신, 영상 CDN 허용은 서비스 제공자 정책에 따라 불안정할 수 있습니다. 실제 강남밥상 계정 대상으로 정상 조회 검증은 아직 불가능했습니다.
+- 실제 사용 환경에서 피드 조회가 안 되면 'Threads 자동 피드에 연결되지 않았어요'라고 표시됩니다. 자동 조회 성공을 확약하는 완성본은 아닙니다.
+
+[GitHub 적용]
+1. ZIP 압축을 해제합니다.
+2. GitHub jsj-sands/lunch-club 저장소에서 Add file > Upload files를 선택합니다.
+3. ZIP 안의 다음 6개 파일을 기존 파일과 같은 위치에 업로드하고 Commit changes 합니다.
+   index.html, core.js, styles.css, app.js, threads-menu-source.js, setup.html
+4. 이전에 Lunch Club 공유 연결을 설정한 브라우저로 https://jsj-sands.github.io/lunch-club/setup.html#update 접속합니다.
+5. 공유 서버 코드 전체 복사 > 기존 Google Apps Script 프로젝트 Code.gs 전체 교체 > 저장합니다.
+6. Apps Script의 배포 > 배포 관리 > 기존 웹 앱 수정(연필) > 버전 새 버전 > 배포합니다.
+   새로운 프로젝트/웹 앱을 만들거나 팀 키를 바꾸지 마세요.
+7. Lunch Club을 Ctrl+Shift+R로 강력 새로고침합니다. 오늘 날짜 강남밥상 카드에서 자동으로 게시물이 뜨는지 확인합니다.
+
+[별도 설정]
+- 기본 RSSHub 피드는 별도 API 토큰이나 설정 없이 시도합니다.
+- RSSHub 기본 경로 2개(순서대로):
+  https://rsshub.gneko.io/threads/gangnambab
+  https://rsshub.isrss.com/threads/gangnambab
+- 사용 중인 RSSHub 인스턴스를 지정하려면 기존 Apps Script > 프로젝트 설정 > 스크립트 속성에
+  속성 LUNCH_THREADS_RSS_FEED_URL / 값 https://rsshub.uocat.com/threads/gangnambab 등을 설정합니다.
+  이 속성을 추가하면 기본 두 URL 대신 지정한 URL만 사용합니다. 서비스가 실제로 작동하는지는 직접 확인해야 합니다.
+- 공식 Meta Threads API의 제3자 프로필 조회 심사 승인을 받은 사용자만 LUNCH_THREADS_ACCESS_TOKEN을 선택적으로 설정할 수 있습니다.
+  토큰은 GitHub에 올리지 말고 Apps Script 비공개 스크립트 속성에만 보관하세요.
+- 기존 LUNCH_DRIVE_MEMBER_EMAILS / LUNCH_SLACKBOT_FORWARD_EMAILS 등 속성은 수정하지 않습니다.
+
+[실제 확인 방법]
+1. 정상일 때: 강남밥상 'Threads' 메뉴 공지에 비디오가 표시되고 재생·일시정지가 가능합니다.
+2. 당일 동영상이 2개 이상 올라오고 분류가 어려우면 '오늘 게시물 1', '오늘 게시물 2'가 보입니다.
+3. 아직 게시되지 않았으면 '오늘 올라온 메뉴 게시물을 아직 못 찾았어요'라고 나옵니다.
+4. 피드 접속이 불가능하면 'Threads 자동 피드에 연결되지 않았어요'라고 나옵니다.
+5. 영상이 로드되지 않으면 CDN 접근이 제한된 것입니다. 이 경우 원문 링크가 예비로 제공됩니다.
+6. 원본 날짜는 Threads 게시 날짜(KST)를 기준으로 검사합니다. 게시물이 전날 올라와 다음날 메뉴를 안내하는 방식이면 추가 개선이 필요합니다.
+
+**중요: 이 판은 외부 SNS 계정 소유자의 협조와 직원의 수동 입력 없이 작동하도록 시도한 코드입니다. 실제 자동 제공과 영상 표시가 확인된 상태는 아닙니다.**

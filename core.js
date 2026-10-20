@@ -31,7 +31,8 @@
   const WELPLAN = 'https://welplan.pmh.codes/restaurants/welstory/REST007327/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
     { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: WELPLAN, type: 'cafeteria' },
-    { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' }
+    { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' },
+    { id: 'gangnambab', name: '강남밥상', subtitle: 'Threads 최신 게시물 · 메뉴 공지 화면 자동 보기', url: 'https://www.threads.com/@gangnambab', menuUrl: 'https://www.threads.com/@gangnambab', type: 'cafeteria' }
   ];
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
   function validDate(date) {
@@ -250,7 +251,7 @@
       }
       case 'vote':
         if (!memberStatus(op.actor, date, d, config).in) throw new Error('오늘 함께 먹는 상태로 바꾼 뒤 선택해 주세요.');
-        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 메가존 또는 런치타임만 선택할 수 있어요.');
+        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 메가존·런치타임·강남밥상 중 선택해 주세요.');
         d.votes[op.actor] = p.placeId; break;
       case 'ceoDecision': {
         if (memberStatus(op.actor, date, d, config).kind !== 'ceo') throw new Error('해당 날짜의 대표님 점심 참석자만 장소를 확정할 수 있어요.');
