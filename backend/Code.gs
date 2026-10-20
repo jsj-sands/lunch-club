@@ -21,6 +21,7 @@
   ];
   const MEMBER_IDS = new Set(MEMBERS.map(m => m.id));
   const PAIR_ID = /^pair_[a-f0-9]{24}$/;
+  const JOIN_ID = /^join_[a-f0-9]{24}$/;
   const OVERRIDE_VALUES = ['in', 'out', 'ceo', 'pending', 'separate'];
   const GUIDE_ID = /^guide_(\d{5,20})$/;
   const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -58,7 +59,7 @@
     MEMBERS.forEach(m => { if (v.ceoDays && Array.isArray(v.ceoDays[m.id])) out.ceoDays[m.id] = [...new Set(v.ceoDays[m.id].filter(n => Number.isInteger(n) && n >= 1 && n <= 5))]; });
     return out;
   }
-  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, ceoDecision: null, separateVenues: {}, notes: {}, pairs: [], revision: 0, updatedAt: null }; }
+  function emptyDay() { return { ceoCancelled: false, overrides: {}, absenceReasons: {}, votes: {}, extras: [], decision: null, ceoDecision: null, separateVenues: {}, notes: {}, pairs: [], joinRequests: [], revision: 0, updatedAt: null }; }
   function safeUrl(url) {
     if (!url) return '';
     const value = String(url).trim();
@@ -102,6 +103,17 @@
       pairIds.add(pair.id); leaders.add(pair.from); occupied.add(pair.from); occupied.add(pair.to);
       d.pairs.push({ id: pair.id, from: pair.from, to: pair.to, status });
     }));
+    const requestIds = new Set(), requesters = new Set();
+    (Array.isArray(v.joinRequests) ? v.joinRequests : []).slice(0, MEMBERS.length * MEMBERS.length).forEach(item => {
+      if (!item || item.status !== 'pending' || typeof item.id !== 'string' || !JOIN_ID.test(item.id)
+          || !MEMBER_IDS.has(item.from) || !MEMBER_IDS.has(item.to) || item.from === item.to
+          || d.overrides[item.to] !== 'separate' || d.pairs.some(pair => pair.to === item.to && pair.status === 'accepted') || pairIds.has('pair_' + item.id.slice(5))
+          || d.pairs.some(pair => pair.to === item.from && pair.status === 'accepted')
+          || d.pairs.some(pair => pair.from === item.from) || requestIds.has(item.id) || requesters.has(item.from)) return;
+      requestIds.add(item.id); requesters.add(item.from);
+      d.joinRequests.push({ id: item.id, from: item.from, to: item.to, status: 'pending',
+        at: typeof item.at === 'string' ? item.at.slice(0, 40) : '' });
+    });
     MEMBERS.forEach(m => {
       const venue = v.separateVenues && v.separateVenues[m.id];
       if (d.overrides[m.id] !== 'separate' || !venue || typeof venue !== 'object' || Array.isArray(venue)) return;
@@ -127,6 +139,8 @@
   }
   function pairFor(id, day) { return cleanDay(day).pairs.find(pair => pair.from === id || pair.to === id) || null; }
   function incomingPairs(id, day) { return cleanDay(day).pairs.filter(pair => pair.to === id && pair.status === 'pending'); }
+  function incomingJoinRequests(id, day) { return cleanDay(day).joinRequests.filter(request => request.to === id); }
+  function myJoinRequest(id, day) { return cleanDay(day).joinRequests.find(request => request.from === id) || null; }
   function separateGroup(id, day) {
     const d = cleanDay(day);
     const joined = d.pairs.find(pair => pair.to === id && pair.status === 'accepted');
@@ -150,6 +164,7 @@
       case 'availability':
         if (!['auto'].concat(OVERRIDE_VALUES).includes(p.value)) throw new Error('참석 상태를 확인해 주세요.');
         d.pairs = d.pairs.filter(pair => pair.from !== op.actor && pair.to !== op.actor);
+        d.joinRequests = d.joinRequests.filter(request => request.from !== op.actor && request.to !== op.actor);
         delete d.separateVenues[op.actor];
         if (p.value === 'auto') delete d.overrides[op.actor]; else d.overrides[op.actor] = p.value;
         if (p.value === 'out') d.absenceReasons[op.actor] = String(p.reason || '').trim().slice(0, 60);
@@ -202,8 +217,37 @@
             d.overrides[pair.from] = 'separate'; d.overrides[pair.to] = 'separate';
             delete d.separateVenues[pair.to];
             delete d.absenceReasons[pair.from]; delete d.absenceReasons[pair.to];
+            d.joinRequests = d.joinRequests.filter(request => request.from !== pair.to);
           } else d.pairs = d.pairs.filter(item => item.id !== pair.id);
         }
+        break;
+      }
+      case 'joinRequest': {
+        if (typeof p.id !== 'string' || !JOIN_ID.test(p.id) || !MEMBER_IDS.has(p.to) || p.to === op.actor) throw new Error('참여 요청 정보를 확인해 주세요.');
+        if (d.joinRequests.some(req => req.id === p.id)) throw new Error('중복된 요청입니다. 화면을 새로고침해 주세요.');
+        if (memberStatus(p.to, date, d, config).kind !== 'separate' || d.pairs.some(pair => pair.to === p.to && pair.status === 'accepted')) throw new Error('모임을 만든 분에게 참여 요청해 주세요.');
+        if (pairFor(op.actor, d)) throw new Error('이미 다른 모임에 참여했거나 초대받았어요. 먼저 처리해 주세요.');
+        if (d.joinRequests.some(req => req.from === op.actor)) throw new Error('이미 참여 요청 대기 중인 모임이 있어요. 먼저 취소해 주세요.');
+        d.joinRequests.push({ id: p.id, from: op.actor, to: p.to, status: 'pending', at: now || new Date().toISOString() });
+        break;
+      }
+      case 'joinApprove':
+      case 'joinReject':
+      case 'joinWithdraw': {
+        if (typeof p.requestId !== 'string' || !JOIN_ID.test(p.requestId)) throw new Error('참여 요청 번호를 확인해 주세요.');
+        const req = d.joinRequests.find(item => item.id === p.requestId);
+        if (!req) throw new Error('요청이 이미 처리됐어요. 새로고침해 주세요.');
+        if (op.type === 'joinWithdraw' ? req.from !== op.actor : req.to !== op.actor)
+          throw new Error(op.type === 'joinWithdraw' ? '내가 보낸 요청만 취소할 수 있어요.' : '모임 생성자만 요청을 처리할 수 있어요.');
+        if (op.type === 'joinApprove') {
+          if (memberStatus(req.to, date, d, config).kind !== 'separate') throw new Error('모임 생성자가 현재 따로 먹기 상태가 아니에요.');
+          if (pairFor(req.from, d)) throw new Error('요청자가 이미 다른 모임에 들어가 있거나 초대받았어요.');
+          const pairId = 'pair_' + req.id.slice(5);
+          if (d.pairs.some(pair => pair.id === pairId)) throw new Error('중복된 요청 번호입니다. 새로고침해 주세요.');
+          d.pairs.push({ id: pairId, from: req.to, to: req.from, status: 'accepted' });
+          d.overrides[req.from] = 'separate'; delete d.absenceReasons[req.from]; delete d.separateVenues[req.from];
+        }
+        d.joinRequests = d.joinRequests.filter(item => item.id !== req.id && (op.type !== 'joinApprove' || item.to !== req.from));
         break;
       }
       case 'vote':
@@ -268,8 +312,9 @@
     return block.split(/^## /m)[0].split('\n').filter(x => /^- /.test(x)).map(x => x.slice(2).trim()).filter(Boolean).slice(0, 12);
   }
   function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
-  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, separateGroup, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
 });
+
 
 /* Public channel metadata only. No login, friend relationship, or menu date is inferred.
  * Fetch HOME_ENDPOINT on the server: browser Origin requests omit the public OG data.
@@ -462,6 +507,7 @@
   });
 });
 
+
 /* Append this file after core.js and lunchtime-source.js to create the copy/paste Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
 const DATA_PREFIX = 'LUNCH_DAY_';
@@ -478,6 +524,11 @@ const KAKAO_PROFILE_CACHE_KEY = 'lunch_kakao_profile_v1';
 const KAKAO_PROFILE_TTL = 5 * 60000;
 const KAKAO_PROFILE_MIN_INTERVAL = 60000;
 const KAKAO_PROFILE_ERROR = '카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 잠시 후 다시 확인하거나 카카오 원문을 열어 주세요.';
+// Slack secrets are NEVER embedded in GitHub Pages files or generated Code.gs.
+// Set these in Apps Script > Project settings > Script properties.
+const SLACK_TOKEN_PROPERTY = 'LUNCH_SLACK_BOT_TOKEN';
+const SLACK_USERS_PROPERTY = 'LUNCH_SLACK_MEMBER_IDS';
+const LUNCH_SITE_URL = 'https://jsj-sands.github.io/lunch-club/';
 
 function initializeLunchClub() {
   if (!/^[a-f0-9]{48,64}$/.test(TEAM_KEY)) throw new Error('setup.html의 코드 복사 버튼으로 만든 코드를 붙여넣어 주세요.');
@@ -790,12 +841,68 @@ function prune_(properties, all, keepDate) {
   });
   pruneMenuImages_(properties, all, keepDate);
 }
+function slackNotices_(op, before, after, date) {
+  const memberName = id => (LunchCore.MEMBERS.find(item => item.id === id) || {}).name || '';
+  const from = memberName(op.actor), payload = op.payload || {}, day = Number(date.slice(8)), month = Number(date.slice(5, 7));
+  const dayLabel = month + '월 ' + day + '일', link = LUNCH_SITE_URL + '?date=' + date;
+  const note = (to, text) => to && memberName(to) ? { to: to, text: '[SANDS Lunch Club] ' + dayLabel + '\n' + text + '\n점심판에서 확인: ' + link } : null;
+  let out = [];
+  if (op.type === 'pairInvite' || op.type === 'groupInvite') {
+    const invitees = op.type === 'pairInvite' ? [payload.to] : (payload.invites || []).map(item => item.to);
+    out = invitees.map(to => note(to, from + '님이 따로 먹는 점심에 초대했어요. 점심판에서 수락하거나 거절해 주세요.'));
+  } else if (op.type === 'joinRequest') {
+    out = [note(payload.to, from + '님이 내가 만든 따로 먹기 모임에 참여하고 싶어 해요. 점심판에서 승인하거나 거절해 주세요.')];
+  } else if (['joinApprove', 'joinReject', 'joinWithdraw'].includes(op.type)) {
+    const request = before.joinRequests.find(item => item.id === payload.requestId);
+    if (request) out = [op.type === 'joinApprove' ? note(request.from, memberName(request.to) + '님이 참여 요청을 승인했어요! 따로 먹기 모임으로 이동했습니다.')
+      : op.type === 'joinReject' ? note(request.from, memberName(request.to) + '님이 모임 참여 요청을 거절했어요.')
+      : note(request.to, from + '님이 모임 참여 요청을 취소했어요.')];
+  } else if (['pairAccept', 'pairDecline', 'pairCancel'].includes(op.type)) {
+    const pair = before.pairs.find(item => item.id === payload.pairId);
+    if (pair) out = [op.type === 'pairAccept' ? note(pair.from, from + '님이 따로 먹기 초대를 수락했어요.')
+      : op.type === 'pairDecline' ? note(pair.from, from + '님이 초대를 거절했어요.')
+      : note(pair.to, from + '님이 초대를 취소했어요.')];
+  }
+  return out.filter(Boolean);
+}
+function slackCall_(token, method, payload) {
+  const response = UrlFetchApp.fetch('https://slack.com/api/' + method, {
+    method: 'post', contentType: 'application/json; charset=utf-8',
+    headers: { Authorization: 'Bearer ' + token },
+    payload: JSON.stringify(payload), muteHttpExceptions: true, timeoutSeconds: 8
+  });
+  if (response.getResponseCode() !== 200) throw new Error('Slack status ' + response.getResponseCode());
+  const data = JSON.parse(response.getContentText());
+  if (!data.ok) throw new Error('Slack API: ' + String(data.error || 'unknown').slice(0, 60));
+  return data;
+}
+function sendSlackNotices_(notices, all) {
+  if (!notices.length) return;
+  const token = all[SLACK_TOKEN_PROPERTY];
+  if (typeof token !== 'string' || !/^xoxb-[A-Za-z0-9-]{10,}$/.test(token)) return;
+  let users = {};
+  try { users = JSON.parse(all[SLACK_USERS_PROPERTY] || '{}'); } catch (_) { return; }
+  if (!users || typeof users !== 'object' || Array.isArray(users)) return;
+  notices.forEach(item => {
+    const userId = users[item.to];
+    if (typeof userId !== 'string' || !/^[UW][A-Z0-9]{8,24}$/.test(userId)) return;
+    try {
+      const dm = slackCall_(token, 'conversations.open', { users: userId });
+      const channel = dm.channel && dm.channel.id;
+      if (!channel || !/^D[A-Z0-9]{8,24}$/.test(channel)) throw new Error('Slack DM channel');
+      slackCall_(token, 'chat.postMessage', { channel: channel, text: item.text, unfurl_links: false, unfurl_media: false });
+    } catch (error) {
+      // Notifications are optional. A Slack failure cannot roll back a stored meal selection.
+      console.log('Lunch Club Slack notice failed for ' + item.to + ': ' + String(error.message || error).slice(0, 80));
+    }
+  });
+}
 function stateResponse_(date, receiptId) {
   const all = PropertiesService.getScriptProperties().getProperties(), cfg = getConfig_(all), dates = LunchCore.weekDates(date);
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 5, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
   const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;
@@ -824,7 +931,7 @@ function doGet(e) {
   } catch (error) { return output_({ ok: false, error: error.message || '조회에 실패했어요. 다시 시도해 주세요.' }, callback); }
 }
 function doPost(e) {
-  let lock;
+  let lock, notices = [], storedProperties = null;
   try {
     const raw = e && e.postData && e.postData.contents;
     if (typeof raw !== 'string' || !raw || raw.length > MENU_IMAGE_MAX_REQUEST) throw new Error('요청 크기가 올바르지 않습니다.');
@@ -847,7 +954,11 @@ function doPost(e) {
         if (!LunchCore.validDate(p.scheduleEnd) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(p.meetingTime || '') || !p.ceoDays) throw new Error('기본 일정 정보를 확인해 주세요.');
         const newConfig = { settings: LunchCore.settings(p), revision: cfg.revision + 1 };
         properties.setProperty('LUNCH_CONFIG', JSON.stringify(newConfig));
-      } else record.data = LunchCore.applyOperation(record.data, body.date, cfg.settings, body.op, new Date().toISOString());
+      } else {
+        const before = record.data;
+        record.data = LunchCore.applyOperation(before, body.date, cfg.settings, body.op, new Date().toISOString());
+        notices = slackNotices_(body.op, before, record.data, body.date);
+      }
       receipt = { ok: true, at: new Date().toISOString() };
     } catch (error) { receipt = { ok: false, error: String(error.message).slice(0, 160), at: new Date().toISOString() }; }
     const ids = Object.keys(record.receipts); while (ids.length >= 16) delete record.receipts[ids.shift()];
@@ -855,6 +966,10 @@ function doPost(e) {
     // A confirmed image deletion must affect only that image, even if other slots are old.
     if (body.op.type !== 'menuImageDelete') prune_(properties, all, body.date);
     saveRecord_(properties, all, body.date, record);
+    if (receipt.ok && notices.length) storedProperties = all;
+    // Slack requests happen after the transaction is durable and after releasing the lock.
+    lock.releaseLock();
+    if (storedProperties) sendSlackNotices_(notices, storedProperties);
     return output_({ ok: true, accepted: true });
   } catch (error) { return output_({ ok: false, error: error.message || '저장하지 못했어요. 다시 시도해 주세요.' }); }
   finally { if (lock && lock.hasLock()) lock.releaseLock(); }

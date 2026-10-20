@@ -220,7 +220,7 @@ test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 �
     revision:42, updatedAt:'2026-10-19T02:00:00Z'
   };
   const before = JSON.stringify(legacy), restored = C.cleanDay(legacy);
-  assert.deepEqual(restored,{...legacy,ceoDecision:null,separateVenues:{},pairs:[]});
+  assert.deepEqual(restored,{...legacy,ceoDecision:null,separateVenues:{},pairs:[],joinRequests:[]});
   assert.equal(JSON.stringify(legacy),before);
   assert.deepEqual(C.participants(monday,restored,settings).map(m => m.id),['seongjun']);
   assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[]});
@@ -467,4 +467,74 @@ test('다중 초대에서 대상 중복·중복 그룹 가입·잘못된 식당�
   d=apply(d,'separateVenue','seongjun',place);
   d=apply(d,'separateUnconfirm','seongjun',{});
   assert.deepEqual(d.separateVenues,{});
+});
+
+const joinId = n => 'join_' + n.toString(16).padStart(24, '0');
+test('공개된 따로 먹는 모임에 참여 요청 시 원래의 함께 점심 상태는 승인 전까지 유지되고 승인 시 이동한다', () => {
+  let d = choose(C.emptyDay(), 'juri', 'in');
+  d = apply(d,'vote','juri',{placeId:'megazone'});
+  d = choose(d,'seongjun','separate');
+  d = apply(d,'joinRequest','juri',{id:joinId(1),to:'seongjun'});
+  assert.equal(C.myJoinRequest('juri',d).to,'seongjun');
+  assert.equal(C.incomingJoinRequests('seongjun',d).length,1);
+  assert.equal(C.memberStatus('juri',monday,d,settings).kind,'in');
+  assert.deepEqual(C.tally(monday,d,settings).megazone,['juri']);
+  d = apply(d,'joinApprove','seongjun',{requestId:joinId(1)});
+  assert.equal(d.joinRequests.length,0);
+  assert.deepEqual(C.separateGroup('juri',d).members,['seongjun','juri']);
+  assert.equal(C.memberStatus('juri',monday,d,settings).kind,'separate');
+  assert.deepEqual(C.participants(monday,d,settings),[]);
+  assert.deepEqual(C.tally(monday,d,settings).megazone,[]);
+  assert.equal(d.votes.juri,'megazone','기존 개인 선택 기록은 보관하지만 집계에서는 빼야 한다');
+});
+test('손주리가 초대를 수락하면 초록색 함께 점심에서 빠지고 따로 먹는 모임으로 이동한다', () => {
+  let d=choose(C.emptyDay(),'juri','in');
+  d=apply(d,'vote','juri',{placeId:'lunchtime'});
+  d=invite(d,'seongjun','juri',10);
+  assert.equal(C.memberStatus('juri',monday,d,settings).kind,'in');
+  assert.deepEqual(C.tally(monday,d,settings).lunchtime,['juri']);
+  d=apply(d,'pairAccept','juri',{pairId:pairId(10)});
+  const loaded=C.cleanDay(JSON.parse(JSON.stringify(d)));
+  assert.equal(C.memberStatus('juri',monday,loaded,settings).kind,'separate');
+  assert.deepEqual(C.tally(monday,loaded,settings).lunchtime,[]);
+  assert.deepEqual(C.separateGroup('juri',loaded).members,['seongjun','juri']);
+});
+test('참여 요청 승인/거절/취소 권한, 중복 참여 요청과 다른 모임 가입을 방지한다', () => {
+  let d=choose(C.emptyDay(),'seongjun','separate');
+  d=apply(d,'joinRequest','juri',{id:joinId(12),to:'seongjun'});
+  const frozen=JSON.stringify(d);
+  assert.throws(()=>apply(d,'joinApprove','yunchul',{requestId:joinId(12)}),/생성자만/);
+  assert.throws(()=>apply(d,'joinReject','juri',{requestId:joinId(12)}),/생성자만/);
+  assert.throws(()=>apply(d,'joinWithdraw','seongjun',{requestId:joinId(12)}),/내가 보낸/);
+  assert.throws(()=>apply(d,'joinRequest','juri',{id:joinId(13),to:'seongjun'}),/대기 중/);
+  assert.throws(()=>apply(d,'joinRequest','yunchul',{id:joinId(12),to:'seongjun'}),/중복/);
+  assert.throws(()=>apply(d,'joinRequest','juri',{id:joinId(14),to:'jingi'}),/모임을 만든/);
+  assert.equal(JSON.stringify(d),frozen);
+  d=apply(d,'joinWithdraw','juri',{requestId:joinId(12)});
+  assert.equal(C.myJoinRequest('juri',d),null);
+  assert.throws(()=>apply(d,'joinApprove','seongjun',{requestId:joinId(12)}),/이미 처리/);
+  d=apply(d,'joinRequest','juri',{id:joinId(15),to:'seongjun'});
+  d=apply(d,'joinReject','seongjun',{requestId:joinId(15)});
+  assert.equal(C.memberStatus('juri',monday,d,settings).kind,'ceo');
+  assert.equal(d.pairs.length,0);
+});
+test('두 명의 요청을 각각 승인하고, 하위 멤버에게 보낸 잘못된 합류 요청을 막는다', () => {
+  let d=choose(C.emptyDay(),'seongjun','separate');
+  d=apply(d,'joinRequest','juri',{id:joinId(101),to:'seongjun'});
+  d=apply(d,'joinRequest','hyunsu',{id:joinId(102),to:'seongjun'});
+  d=apply(d,'joinApprove','seongjun',{requestId:joinId(101)});
+  assert.throws(()=>apply(d,'joinRequest','jingi',{id:joinId(103),to:'juri'}),/모임을 만든/);
+  d=apply(d,'joinApprove','seongjun',{requestId:joinId(102)});
+  assert.deepEqual(C.separateGroup('hyunsu',d).members,['seongjun','juri','hyunsu']);
+  assert.equal(d.joinRequests.length,0);
+  assert.equal(new Set(d.pairs.map(x=>x.id)).size,2);
+});
+test('모임 생성자가 상태를 변경하면 합류 대기 요청은 취소되며, 기존 날짜 기록은 별도 유지된다',()=>{
+  let d=choose(C.emptyDay(),'seongjun','separate');
+  d=apply(d,'joinRequest','juri',{id:joinId(110),to:'seongjun'});
+  const old=C.cleanDay(JSON.parse(JSON.stringify(d)));
+  d=choose(d,'seongjun','in');
+  assert.deepEqual(d.joinRequests,[]);
+  assert.deepEqual(C.cleanDay(JSON.parse(JSON.stringify(d))).joinRequests,[]);
+  assert.equal(old.joinRequests.length,1);
 });

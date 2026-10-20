@@ -1,0 +1,68 @@
+SANDS Lunch Club | Slack 개인 DM 설정 가이드
+=========================================
+
+[1. 어디에 무엇을 설정하나요?]
+1) Slack 관리자가 https://api.slack.com/apps 에서 SANDS Lunch Club 앱 생성
+2) OAuth & Permissions > Bot Token Scopes > chat:write / im:write 추가
+3) Install to Workspace > Bot User OAuth Token (xoxb-...)을 확인
+4) 기존 Google Apps Script 편집기에서 프로젝트 설정(톱니) > 스크립트 속성 선택
+5) 아래 이름으로 속성 두 개 등록
+
+   LUNCH_SLACK_BOT_TOKEN
+   값: xoxb-... (실제 슬랙 봇 토큰)
+
+   LUNCH_SLACK_MEMBER_IDS
+   값: 아래 JSON 예시에서 각 직원의 정확한 Slack 멤버 ID로 교체한 문자열
+
+{
+  "seongjun": "U012345670",
+  "juri": "U012345671",
+  "hyunsu": "U012345672",
+  "yunchul": "U012345673",
+  "jingi": "U012345674",
+  "minjun": "U012345675",
+  "seongeun": "U012345676",
+  "yunseok": "U012345677",
+  "jiwoo": "U012345678",
+  "hyunju": "U012345679"
+}
+
+[직원 내부 ID 대응표]
+seongjun     = 조성준
+juri         = 손주리
+hyunsu       = 윤현수
+yunchul      = 김윤철
+jingi        = 천진기
+minjun       = 최민준
+seongeun     = 오성은
+yunseok      = 장윤석
+jiwoo        = 서지우
+hyunju       = 조현주
+
+* U01234567... 값은 전부 예시입니다. 실제 Slack ID가 아닙니다.
+* Slack 직원 프로필의 메뉴에서 '멤버 ID 복사' 기능을 이용하세요.
+* 해당 속성에 누락된 직원에게는 DM이 가지 않지만 웹앱 안의 알림은 계속 표시됩니다.
+* Slack 봇 토큰은 절대로 GitHub, setup.html, README, 채팅방에 붙여넣지 마세요.
+
+[3. 사이트 서버 업데이트 (필수)]
+- 이번 ZIP을 압축 풀고 GitHub 저장소에 파일을 교체합니다.
+- 업데이트된 사이트의 setup.html#update 를 기존 연결을 저장했던 브라우저에서 엽니다.
+- 공유 서버 코드 전체 복사 > 기존 Google Apps Script Code.gs 전체 교체
+- 배포 > 배포 관리 > 기존 웹 앱 선택 > 연필 편집 > 새 버전 > 배포
+- 기존 팀 키와 웹 앱 /exec 주소는 그대로 유지하세요.
+
+[4. 어떤 이벤트에 DM이 오나요?]
+- '따로 먹기'로 동료를 직접 초대 → 초대받은 직원에게 DM
+- 다른 직원이 공개된 따로 먹기 모임에 참여 요청 → 모임 최초 생성자에게 DM
+- 초대 수락 또는 거절 → 초대한 직원에게 DM
+- 참여 요청 승인 또는 거절 → 참여 요청한 직원에게 DM
+- 참여 요청 취소 → 모임 생성자에게 DM
+
+DM에는 날짜와 점심판 링크가 포함됩니다. 실제 수락과 승인은 웹에서 합니다.
+Slack 연동이 설정되지 않았거나 문제가 생겨도 요청·초대 기록은 저장되고 사이트 내 알림은 표시됩니다.
+Slack 전송은 재시도되지 않습니다. 실패 시 Apps Script 실행 로그를 확인하세요.
+
+[중요: 신원 검증 수준]
+현재 점심판은 이름 선택만 하며 Slack 로그인으로 신원을 검증하지 않습니다.
+공유 링크와 팀 키를 아는 직원은 다른 직원의 이름으로 참여 요청 및 승인을 할 수 있습니다.
+따라서 보안/인사 승인 같은 중요한 목적으로 사용하지 마세요.

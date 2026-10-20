@@ -1040,3 +1040,15 @@ button.mega-meal-photo:not(:disabled):hover{background:var(--brand-pale)}
 .guide-card.is-ceo-picked .guide-card-actions .guide-ceo-action:disabled{background:var(--brand);color:var(--white);border-color:var(--brand);opacity:1}
 .guide-card.is-separate-picked .guide-card-actions .guide-separate-action:disabled{background:var(--separate-ink);color:var(--white);border-color:var(--separate-line);opacity:1}
 @media(max-width:500px){.pair-member-options{grid-template-columns:1fr}}
+
+/* Request-to-join inbox, with separate group owners and invited teammates. */
+#peopleSection .pair-alert-title{margin:2px 0 0;font-size:12px;font-weight:750;color:var(--separate-ink)}
+#peopleSection .pair-invitation.is-join-request{border-color:var(--brand-line);background:var(--brand-wash)}
+#peopleSection .pair-invitation.is-join-wait{background:var(--paper)}
+#peopleSection .pair-invitation .button-row{max-width:none;flex-wrap:wrap}
+#peopleSection .separate-board-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#peopleSection .separate-board-actions .separate-guide-link{font-size:11px;color:var(--separate-ink);font-weight:700}
+#peopleSection .lunch-pair button[data-action="joinRequest"]{background:var(--brand-wash);border-color:var(--brand-line);color:var(--brand-deep)}
+.pair-detail-actions .pair-join-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap;flex-basis:100%;padding:9px 10px;background:var(--brand-wash);border:1px solid var(--brand-line);border-radius:10px}
+.pair-detail-actions .pair-join-row>strong{font-size:12px;flex:1 1 100%}
+.pair-detail-actions button{white-space:normal}

@@ -18,7 +18,7 @@ const kakaoKey = 'sandsLunch.kakaoProfile.v1';
 const kakaoChannel = 'https://pf.kakao.com/_xbbMPn';
 const kakaoImage = 'https://k.kakaocdn.net/dn/lunch-profile/fixture/img_m.jpg';
 const connection = { url: 'https://script.google.com/macros/s/test_deployment/exec', key: 'a'.repeat(64) };
-const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true };
+const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNQAAAABJRU5ErkJggg==';
 // A valid 2 x 2 JPEG returned by the canvas fixture. Pixel rendering is not tested.
 const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7CooorID/2Q==';
@@ -1630,4 +1630,77 @@ test('일반 점심 인원도 맛집 카드에서 따로 먹기로 전환하여 
   assert.deepEqual(C.tally(target,d,C.settings()).megazone,[]);
   assert.equal(ui.element('appDialog').open,false);
   assert.match(ui.element('pairBoard').innerHTML,new RegExp(place.name));
+});
+
+test('다른 동료가 모임에 참여 요청하면 생성자에게 처리 알림이 뜨고 승인할 때 일반 점심 인원에서 빠진다',async()=>{
+ const target='2026-10-20',ui=await boot({identity:'seongjun'});
+ await ui.chooseDate(target);
+ await ui.press('choiceSeparate');
+ await ui.action('setAvailability','separate',{'data-date':target});
+ assert.match(ui.element('pairBoard').innerHTML,/조성준/);
+ await ui.selectIdentity('juri');
+ await ui.action('setAvailability','in',{'data-date':target});
+ await ui.action('vote','megazone');
+ assert.deepEqual(dailyMembers(ui,'in'),['juri']);
+ assert.match(ui.element('pairBoard').innerHTML,/이 모임에 참여 요청/);
+ await ui.action('joinRequest','seongjun',{'data-date':target});
+ let d=ui.saved(localKey).days[target];
+ assert.equal(d.joinRequests.length,1);
+ assert.equal(d.overrides.juri,'in');
+ assert.deepEqual(dailyMembers(ui,'in'),['juri'],'승인 전에는 초록색 함께 점심에 남아야 한다');
+ assert.match(ui.element('pairInvitations').innerHTML,/승인을 기다리고/);
+ const requestId=d.joinRequests[0].id;
+ await ui.selectIdentity('seongjun');
+ assert.match(ui.element('pairInvitations').innerHTML,/손주리님의 모임 참여 요청/);
+ assert.match(ui.element('myResponseTitle').textContent,/🔔 1건/);
+ await ui.action('joinApprove',requestId,{'data-member':'seongjun','data-date':target});
+ d=ui.saved(localKey).days[target];
+ assert.equal(d.joinRequests.length,0);
+ assert.equal(d.overrides.juri,'separate');
+ assert.deepEqual(dailyMembers(ui,'in'),[]);
+ assert.match(visibleText(ui.element('pairBoard').innerHTML),/2명이 따로 점심/);
+ assert.match(ui.element('pairBoard').innerHTML,/손주리/);
+ assert.equal(ui.element('myResponseTitle').textContent,'오늘 점심, 어떻게 할까요?');
+});
+
+test('초대받은 손주리는 알림에서 수락 후 함께 점심에서 빠지며 거절 전에는 그대로 남는다',async()=>{
+ const target='2026-10-20',ui=await boot({identity:'juri'});
+ await ui.chooseDate(target);
+ await ui.action('setAvailability','in',{'data-date':target});
+ await ui.action('vote','lunchtime');
+ await ui.selectIdentity('seongjun');
+ await ui.press('choiceSeparate');
+ ui.element('pairPartner-juri').checked=true;
+ await ui.dispatch('submit',ui.element('pairInviteForm'));
+ const d=ui.saved(localKey).days[target];
+ const pairId=d.pairs.find(pair=>pair.to==='juri').id;
+ assert.deepEqual(dailyMembers(ui,'in'),['juri']);
+ await ui.selectIdentity('juri');
+ assert.match(ui.element('pairInvitations').innerHTML,/조성준님의 따로 먹기 초대/);
+ assert.match(ui.element('myResponseTitle').textContent,/🔔 1건/);
+ await ui.action('pairAccept',pairId,{'data-member':'juri','data-date':target});
+ assert.deepEqual(dailyMembers(ui,'in'),[]);
+ assert.equal(ui.saved(localKey).days[target].overrides.juri,'separate');
+ assert.match(ui.element('pairBoard').innerHTML,/손주리/);
+ assert.equal(ui.element('pairInvitations').innerHTML,'');
+});
+
+test('합류 요청 거절·요청 취소는 함께 점심 선택을 바꾸지 않고, 타 모임 요청 중이면 중복 요청하지 않는다',async()=>{
+ const target='2026-10-20',ui=await boot({identity:'seongjun'});
+ await ui.chooseDate(target);
+ await ui.press('choiceSeparate');
+ await ui.action('setAvailability','separate',{'data-date':target});
+ await ui.selectIdentity('juri');
+ await ui.action('setAvailability','in',{'data-date':target});
+ await ui.action('joinRequest','seongjun',{'data-date':target});
+ let req=ui.saved(localKey).days[target].joinRequests[0];
+ await ui.action('joinWithdraw',req.id,{'data-member':'juri','data-date':target});
+ assert.equal(ui.saved(localKey).days[target].joinRequests.length,0);
+ assert.deepEqual(dailyMembers(ui,'in'),['juri']);
+ await ui.action('joinRequest','seongjun',{'data-date':target});
+ req=ui.saved(localKey).days[target].joinRequests[0];
+ await ui.selectIdentity('seongjun');
+ await ui.action('joinReject',req.id,{'data-member':'seongjun','data-date':target});
+ assert.deepEqual(dailyMembers(ui,'in'),['juri']);
+ assert.deepEqual(ui.saved(localKey).days[target].joinRequests,[]);
 });

@@ -24,7 +24,7 @@ test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요
 });
 test('버전 5 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,5);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true});
+ assert.equal(state.serverVersion,6);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
@@ -118,7 +118,7 @@ test('기존 버전의 저장된 일일 기록·영수증·사용자 일정은 �
  s.store['LUNCH_DAY_'+DATE]=JSON.stringify({parts:1,generation:'legacy'});
  s.store['LUNCH_DAY_'+DATE+'_legacy_0']=JSON.stringify({data,receipts:{[oldReceipt]:{ok:true,at:data.updatedAt}}});
  const restored=s.get({receipt:oldReceipt});
- assert.deepEqual(restored.days[DATE],{...data,ceoDecision:null,separateVenues:{},pairs:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
+ assert.deepEqual(restored.days[DATE],{...data,ceoDecision:null,separateVenues:{},pairs:[],joinRequests:[]});assert.equal(restored.receipt.ok,true);assert.equal(restored.configRevision,9);
  for(const [id,days] of Object.entries(cfg.ceoDays))assert.deepEqual(restored.settings.ceoDays[id],days);
  assert.equal(restored.settings.scheduleEnd,cfg.scheduleEnd);assert.equal(restored.settings.meetingTime,cfg.meetingTime);
  s.post('pairInvite','yunchul',{id:'pair_'+'b'.repeat(24),to:'jiwoo'});const latest=s.get({receipt:oldReceipt});
@@ -171,4 +171,73 @@ test('Google 공유 서버는 3명 이상 모임과 모임별 맛집 장소를 �
  s.post('availability','jiwoo',{value:'pending'});
  assert.equal(s.get().days[DATE].separateVenues.seongjun.name,'테스트 식당');
  assert.equal(s.locked(),false);
+});
+
+test('여러 직원이 만든 합류 요청과 승인 상태를 공유 서버가 날짜별로 전달한다',()=>{
+ const s=server(),join='join_'+'d'.repeat(24),tuesday='2026-10-20';
+ s.post('availability','seongjun',{value:'separate'},{date:tuesday});
+ s.post('availability','juri',{value:'in'},{date:tuesday});
+ s.post('vote','juri',{placeId:'megazone'},{date:tuesday});
+ const requested=s.post('joinRequest','juri',{id:join,to:'seongjun'},{date:tuesday});
+ assert.equal(s.get({date:tuesday,receipt:requested.body.op.id}).receipt.ok,true);
+ assert.deepEqual(s.get({date:tuesday}).days[tuesday].joinRequests.map(x=>x.from),['juri']);
+ assert.equal(s.context.LunchCore.tally(tuesday,s.get({date:tuesday}).days[tuesday],s.get().settings).megazone.join(','),'juri');
+ const approved=s.post('joinApprove','seongjun',{requestId:join},{date:tuesday});
+ assert.equal(s.get({date:tuesday,receipt:approved.body.op.id}).receipt.ok,true);
+ assert.deepEqual(s.get({date:tuesday}).days[tuesday].joinRequests,[]);
+ assert.equal(s.get({date:tuesday}).days[tuesday].overrides.juri,'separate');
+ assert.equal(s.context.LunchCore.tally(tuesday,s.get({date:tuesday}).days[tuesday],s.get().settings).megazone.length,0);
+ assert.equal(s.get({date:DATE}).days[DATE].pairs.length,0);
+});
+
+test('Slack 설정 전에는 외부 발송 없이 초대 및 참여 요청이 저장된다',()=>{
+ const s=server();
+ s.post('availability','seongjun',{value:'separate'});
+ const invited=s.post('pairInvite','seongjun',{id:'pair_'+'a'.repeat(24),to:'juri'});
+ assert.equal(s.get({receipt:invited.body.op.id}).receipt.ok,true);
+ const requested=s.post('joinRequest','yunchul',{id:'join_'+'b'.repeat(24),to:'seongjun'});
+ assert.equal(s.get({receipt:requested.body.op.id}).receipt.ok,true);
+ assert.equal(s.fetches(),0);
+ assert.equal(s.locked(),false);
+});
+
+test('Slack 봇 설정 시 초대자는 수락 DM, 초대받은 사람은 초대 DM, 모임 생성자는 참여 요청 DM을 받는다',()=>{
+ const s=server(),events=[];
+ s.store.LUNCH_SLACK_BOT_TOKEN='xoxb-example-test-token-123456789';
+ s.store.LUNCH_SLACK_MEMBER_IDS=JSON.stringify({seongjun:'U1234567890',juri:'U2234567890',yunchul:'U3234567890'});
+ s.context.UrlFetchApp.fetch=(url,opts)=>{
+  events.push({url,payload:JSON.parse(opts.payload),token:opts.headers.Authorization});
+  return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(url.endsWith('/conversations.open')?{ok:true,channel:{id:'D1234567890'}}:{ok:true})};
+ };
+ s.post('availability','seongjun',{value:'separate'});
+ const invited=s.post('pairInvite','seongjun',{id:'pair_'+'b'.repeat(24),to:'juri'});
+ assert.equal(events.length,2);
+ assert.equal(events[0].payload.users,'U2234567890');
+ assert.match(events[1].payload.text,/초대했어요/);
+ assert.match(events[1].payload.text,/2026-10-19/);
+ assert.ok(!JSON.stringify(s.get()).includes('xoxb-example'));
+ s.context.doPost({postData:{contents:JSON.stringify(invited.body)}});
+ assert.equal(events.length,2,'중복 저장/재시도는 새 DM을 발송하면 안 된다');
+ s.post('pairAccept','juri',{pairId:'pair_'+'b'.repeat(24)});
+ assert.equal(events[2].payload.users,'U1234567890');
+ assert.match(events[3].payload.text,/수락/);
+ s.post('joinRequest','yunchul',{id:'join_'+'a'.repeat(24),to:'seongjun'});
+ assert.equal(events[4].payload.users,'U1234567890');
+ assert.match(events[5].payload.text,/참여하고 싶어/);
+ s.post('joinApprove','seongjun',{requestId:'join_'+'a'.repeat(24)});
+ assert.equal(events[6].payload.users,'U3234567890');
+ assert.match(events[7].payload.text,/승인/);
+ assert.equal(s.locked(),false);
+});
+
+test('Slack 발송 실패는 점심 상태 저장을 취소하지 않고 봇 토큰을 응답에 포함하지 않는다',()=>{
+ const s=server();
+ s.store.LUNCH_SLACK_BOT_TOKEN='xoxb-example-test-token-123456789';
+ s.store.LUNCH_SLACK_MEMBER_IDS=JSON.stringify({juri:'U2234567890'});
+ s.context.UrlFetchApp.fetch=(url,opts)=>{throw new Error('Slack denied');};
+ const invite=s.post('pairInvite','seongjun',{id:'pair_'+'b'.repeat(24),to:'juri'});
+ assert.equal(s.get({receipt:invite.body.op.id}).receipt.ok,true);
+ assert.equal(s.get().days[DATE].pairs.length,1);
+ assert.equal(s.locked(),false);
+ assert.ok(!JSON.stringify(s.get()).includes('xoxb-'));
 });
