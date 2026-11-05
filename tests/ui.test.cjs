@@ -7,7 +7,7 @@ const { webcrypto } = require('node:crypto');
 const C = require('../core.js');
 const G = require('../restaurant-guide.js');
 const M = require('../menu-source.js');
-const richMenuFixture = require('./fixtures/welplan-20261019.json');
+const richMenuFixture = require('./fixtures/welstory-meal-20261019.json');
 
 const root = path.resolve(__dirname, '..');
 const monday = '2026-10-19';
@@ -267,7 +267,7 @@ async function boot(options = {}) {
         const value = (options.menus || menuData)[date];
         const response = Array.isArray(value) ? { dishes: value } : value || { dishes: [] };
         return C.clone({ ...response, ...(options.courseDetails?.[date] ? { courses: options.courseDetails[date] } : {}),
-          date, fetchedAt: fixedTime, source: 'https://welplan.pmh.codes/', ok: true });
+          date, fetchedAt: fixedTime, ok: true });
       }
     }
   });
@@ -836,7 +836,7 @@ test('공유 연결 전에도 메가존 주간 식단 다섯 날짜를 조회하
 });
 
 test('메가존 일반식 두 메뉴의 사진·반찬만 오늘과 주간에 표시하고 확대·사진 오류·참석 저장을 지원한다', async () => {
-  const rich = M.parseResponse(richMenuFixture, monday);
+  const rich = M.parseMealList(richMenuFixture, monday);
   const regularMeals = [rich.courses[0], rich.courses[1]], takeout = rich.courses[2];
   const ui = await boot({ menus: { ...menuData, [monday]: rich,
     '2026-10-20': ['[오늘의 데일리 팩] 샌드위치', '화요일 제육볶음', '화요일 우동', '추가 코스'],
@@ -861,7 +861,8 @@ test('메가존 일반식 두 메뉴의 사진·반찬만 오늘과 주간에 �
   assert.equal(ui.element('dialogTitle').textContent, rich.courses[0].name);
   assert.equal(ui.element('megaMealFull').getAttribute('src'), rich.courses[0].imageUrl);
   assert.match(visibleText(ui.element('dialogContent').innerHTML), /데리야끼고기경단조림.*흑미밥/);
-  assert.ok(ui.element('dialogContent').innerHTML.includes(C.menuUrl(monday)));
+  assert.match(visibleText(ui.element('dialogContent').innerHTML), /웰스토리플러스 식단 기준/);
+  assert.doesNotMatch(ui.element('dialogContent').innerHTML, /welplan/i);
   await ui.dispatch('error', ui.element('megaMealFull'));
   assert.equal(ui.element('megaMealFull').hidden, true);
   assert.equal(ui.element('megaMealFullError').hidden, false);

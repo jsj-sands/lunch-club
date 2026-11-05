@@ -28,9 +28,10 @@
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
     meetingTime: '12:00'
   };
-  const WELPLAN = 'https://welplan.pmh.codes/restaurants/welstory/REST007327/' + encodeURIComponent('메가존산학연센터');
+  // 메가존 식단은 공유 서버가 웰스토리플러스에서 가져옵니다(menu-source.js, backend/welstory.js).
+  const MEGAZONE_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
-    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: WELPLAN, type: 'cafeteria' },
+    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },
     { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' },
     { id: 'gangnambab', name: '강남밥상', subtitle: 'Threads 최신 게시물 · 메뉴 공지 화면 자동 보기', url: 'https://www.threads.com/@gangnambab', menuUrl: 'https://www.threads.com/@gangnambab', type: 'cafeteria' }
   ];
@@ -305,11 +306,5 @@
     }
     d.revision += 1; d.updatedAt = now || new Date().toISOString(); return d;
   }
-  function parseMenuMarkdown(text) {
-    const block = String(text || '').split(/^## 점심\s*$/m)[1];
-    if (!block) return [];
-    return block.split(/^## /m)[0].split('\n').filter(x => /^- /.test(x)).map(x => x.slice(2).trim()).filter(Boolean).slice(0, 12);
-  }
-  function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
-  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, MEGAZONE_MAP, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation };
 });

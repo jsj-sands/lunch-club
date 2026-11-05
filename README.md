@@ -1,3 +1,16 @@
+## 2026-11-05 업데이트 · 메가존 식단을 웰스토리플러스에서 가져오기
+
+메가존 식단을 제공하던 Welplan(welplan.pmh.codes)이 "권리자와 협의 미완료"로 서비스를 중단해 메가존 카드가 "식단 확인 중…"에서 멈춰 있었습니다. 이제 **팀 공유 서버(Apps Script)가 웰스토리플러스 앱 계정으로** 메가존산학연센터(`REST007327`) 점심을 직접 가져옵니다.
+
+- **흐름:** 점심판 → 팀 키로 Apps Script `action=menu` 요청 → `backend/welstory.js`가 Welstory+ API(`/login`, `/api/menu/getMealTimeList`, `/api/meal`)를 호출 → `menu-source.js`가 응답을 코스(메뉴 1·2)·반찬·사진으로 정리 → 점심판이 다시 검증해 표시.
+- **설정:** Apps Script 스크립트 속성에 `LUNCH_WELSTORY_USERNAME`, `LUNCH_WELSTORY_PASSWORD`를 저장하고 `testWelstoryConnection`을 실행해 확인한 뒤 새 버전으로 배포합니다. 자세한 순서는 `setup.html#update`에 있습니다. 계정 정보는 GitHub에 올리지 않습니다.
+- **요청 최소화:** 로그인 세션을 스크립트 속성에 저장해 재사용하고 만료 직전에는 `/session`으로 연장합니다. 식단은 날짜별로 30분(지난 날짜 6시간) 캐시합니다. 로그인이 거부되면 계정 잠김을 막기 위해 30분(서버 오류는 5분) 동안 다시 로그인하지 않습니다.
+- **표시 범위:** 팀 공유에 연결된 점심판에서만 메가존 식단이 보입니다. 테이크아웃 판매 코스는 숨기고 일반식 메뉴 1·메뉴 2만 표시합니다. 사진은 공개 HTTPS 주소(`img-welmenu.welstory.com`)만 사용합니다.
+- **한계:** 웰스토리가 공식으로 공개한 API가 아니어서 방식이 바뀌면 멈출 수 있습니다. 같은 계정의 휴대폰 앱이 로그아웃될 수 있고, Google 서버에서의 접속 가능 여부는 실제 실행으로만 확인할 수 있습니다.
+- **카드 링크:** 중단된 Welplan 원문 링크·"실시간 식단" 창을 없애고, 메가존 카드에는 다른 식당처럼 네이버 지도 링크를 둡니다.
+
+---
+
 ## 2026-10-20 추가 · 관리자 없이 Slackbot 알림 받기 (우선 추천)
 
 **관리자 권한 없이 가능한 더 간단한 방법**을 추가했습니다. 각 직원이 Slack 개인 설정에서 'Slack으로 이메일 가져오기 → 전달 주소 가져오기'로 고유 이메일 주소를 발급받고, 그 주소를 기존 Google Apps Script의 스크립트 속성에 저장합니다. 점심 초대/참여 요청 등 발생 시 `MailApp.sendEmail`이 해당 Slackbot 주소로 메일을 발송하므로, 수신자는 Slackbot 대화에서 확인할 수 있습니다. Gmail 공유 드라이브 알림보다 파일이 쌓이지 않고, Apps Script의 실행 계정 본인에게도 사용할 수 있습니다.
@@ -237,12 +250,11 @@
 
 ### 메가존
 
-- 출처: https://welplan.pmh.codes/restaurants/welstory/REST007327/메가존산학연센터
-- 공개 API: https://welplan.pmh.codes/docs/api
-- 인증 없는 공개 API로 선택한 날짜의 점심과 해당 주 월~금 식단을 조회합니다. 주간 날짜를 누르면 그날로 이동합니다.
+- 출처: 삼성웰스토리 웰스토리플러스(메가존산학연센터, 식당 코드 `REST007327`). 팀 공유 서버가 스크립트 속성의 계정으로 조회합니다.
+- 선택한 날짜의 점심과 해당 주 월~금 식단을 조회합니다. 주간 날짜를 누르면 그날로 이동합니다.
 - 날짜·식당·응답 형식을 확인하며, 미등록 메뉴와 통신 오류를 구분합니다. 이전 날짜 메뉴를 오늘 것으로 표시하지 않습니다.
-- 같은 날짜의 최근 결과를 캐시로 보관하고 화면이 열려 있으면 5분마다 갱신을 확인합니다. 직접 조회 실패 시 연결된 Google 공유 서버의 메뉴 조회를 보조 경로로 사용합니다.
-- 메인 메뉴와 전체 구성, 제공된 식단 사진을 카드와 확대 화면에서 볼 수 있습니다. 사진·구성이 없는 경우에는 있는 정보만 표시합니다. 공개 API 실패 시의 Google 보조 경로는 메인 메뉴 텍스트만 제공할 수 있습니다. Welplan은 식당 운영사와 별개의 서비스입니다.
+- 공유 서버가 날짜별로 30분 캐시하고, 화면이 열려 있으면 5분마다 갱신을 확인합니다. 팀 공유 연결 전에는 연결 안내를 표시합니다.
+- 메인 메뉴와 전체 구성, 제공된 식단 사진을 카드와 확대 화면에서 볼 수 있습니다. 사진·구성이 없는 경우에는 있는 정보만 표시합니다.
 
 ### 런치타임
 
@@ -270,10 +282,11 @@
 | app.js | 참석 선택·모임·맛집·공유 화면과 이벤트 |
 | core.js | 날짜·멤버·참석·초대·투표 규칙 |
 | restaurant-guide.js | 네이버에서 확인한 과천 음식점 33곳 |
-| menu-source.js | 공개 메가존 식단·전체 구성·사진 조회와 응답 검증 |
+| menu-source.js | 메가존 웰스토리 식단 정리(서버)·공유 서버 조회와 재검증(화면)·사진 주소 검증 |
 | lunchtime-source.js | 공개 카카오 프로필 응답과 사진 주소 검증 |
 | setup.html | 설치·업데이트 안내와 최신 서버 코드 복사 |
-| backend/Code.gs | core.js·lunchtime-source.js·서버 코드를 합친 Apps Script 원본 |
+| backend/welstory.js | 웰스토리플러스 로그인·세션 재사용·식단 캐시·`testWelstoryConnection` (Apps Script 전용) |
+| backend/Code.gs | setup.html에서 복사되는 서버 코드와 같은 파일(core.js·lunchtime-source.js·threads-menu-source.js·menu-source.js·backend/welstory.js·서버 코드) |
 | backend/server.js / setup.template.html | 서버·설정 안내 원본 |
 | tests/ / CHECKS.txt | 검증 코드, 결과와 범위 |
 
@@ -285,7 +298,7 @@
 - Google 기존 배포 업데이트: https://developers.google.com/apps-script/concepts/deployments
 - Google 웹 앱: https://developers.google.com/apps-script/guides/web?hl=ko
 - GitHub Pages: https://docs.github.com/ko/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
-- Welplan API: https://welplan.pmh.codes/docs/api
+- 웰스토리플러스 API 필드 참고(비공식 클라이언트): https://github.com/pmh-only/welplan2
 - 과천 음식점 원본: https://naver.me/xSBAzufn
 - 런치타임 공개 채널: https://pf.kakao.com/_xbbMPn
 - Google 외부 URL 조회: https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app

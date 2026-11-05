@@ -9,20 +9,21 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
 <header><a class="brand" href="./" aria-label="SANDS Lab Lunch Club 홈"><img class="brand-symbol" src="assets/sands-symbol.svg?v=20261020-join-alerts" width="30" height="30" alt=""><img class="brand-wordmark" src="assets/sands-wordmark.svg?v=20261020-join-alerts" width="126" height="28" alt="SANDS Lab"><span class="brand-divider" aria-hidden="true"></span><span class="brand-product">Lunch Club</span></a><a href="index.html">점심판 열기 ↗</a></header>
 <div class="intro"><p class="tag">ONE-TIME SETUP</p><h1>코딩은 끝났어요.<br>이제 우리 점심판을 열어볼까요?</h1><p>파일을 GitHub에 올리면 화면이 열립니다. 동료와 선택을 공유하려면 Google 연결을 한 번 더 진행해 주세요. 코드 작성 없이 복사·붙여넣기로 설정할 수 있습니다.</p></div>
 <section id="update">
-<h2>이번 수정 · 강남밥상 게시물 미표시 오류 수정</h2>
-<p><strong>수정 버전: 20261020-gas-url-fix</strong></p>
-<p>Google Apps Script에서 지원하지 않는 URL 객체로 정상 게시물을 거부하던 오류를 수정했습니다. 게시물 없음과 연결 실패를 구분하고 조회 진단을 추가했습니다.</p>
-<div class="note"><strong>이번 ZIP은 4개 파일만 교체합니다.</strong> index.html · app.js · threads-menu-source.js · setup.html. 기존 styles.css, core.js, assets와 다른 파일은 삭제하지 마세요.</div>
+<h2>이번 수정 · 메가존 식단을 웰스토리플러스에서 가져오기</h2>
+<p><strong>수정 버전: 20261105-welstory</strong></p>
+<p>메가존 식단을 보여주던 Welplan 서비스가 중단되어, 공유 서버(Apps Script)가 웰스토리플러스 앱 계정으로 메가존산학연센터 점심을 직접 가져오도록 바꿨습니다. 웰스토리플러스는 로그인이 필요하므로 계정은 Apps Script 스크립트 속성에만 보관하고, 식단은 팀 공유에 연결된 점심판에서만 보입니다.</p>
+<div class="note"><strong>GitHub에 올릴 파일:</strong> index.html · app.js · core.js · menu-source.js · setup.html · backend/welstory.js · backend/server.js · backend/Code.gs · README.md · tests 폴더. 기존 파일은 삭제하지 마세요.</div>
 <ol>
-<li>GitHub 저장소에 위 4개 파일을 같은 위치에 업로드하고 Commit changes를 누릅니다.</li>
-<li>기존 팀 공유를 설정했던 브라우저에서 이 페이지를 새로고침합니다. 위 수정 버전을 확인합니다.</li>
-<li>아래 <a href="#copyCode"><strong>공유 서버 코드 전체 복사</strong></a>를 누릅니다. 기존 팀 키가 삽입됩니다. 새 프로젝트나 새 팀 키를 만들지 마세요.</li>
-<li>기존 Google Apps Script 프로젝트의 Code.gs를 교체하고 저장합니다. <strong>배포 → 배포 관리 → 기존 웹 앱의 수정(연필) → 새 버전 → 배포</strong>를 누릅니다.</li>
-<li>점심판을 새로고침하고 강남밥상 카드의 <strong>Threads 새 게시물 확인</strong>을 누릅니다. 여전히 표시되지 않으면 <strong>조회 진단 보기</strong>를 펼쳐 확인합니다.</li>
+<li>GitHub 저장소에 위 파일을 같은 위치에 업로드하고 Commit changes를 누릅니다.</li>
+<li>기존 팀 공유를 설정했던 브라우저에서 이 페이지를 새로고침하고 위 수정 버전을 확인합니다.</li>
+<li>아래 <a href="#copyCode"><strong>공유 서버 코드 전체 복사</strong></a>를 누릅니다. 기존 팀 키가 삽입됩니다. 기존 Google Apps Script 프로젝트의 Code.gs 전체를 교체하고 저장합니다. 새 프로젝트나 새 팀 키를 만들지 마세요.</li>
+<li>Apps Script <strong>프로젝트 설정(톱니바퀴) → 스크립트 속성 → 스크립트 속성 추가</strong>에서 <code>LUNCH_WELSTORY_USERNAME</code>(웰스토리플러스 앱 아이디)과 <code>LUNCH_WELSTORY_PASSWORD</code>(비밀번호)를 저장합니다.</li>
+<li>편집기 상단 함수 목록에서 <code>testWelstoryConnection</code>을 선택해 <strong>실행</strong>합니다. 권한 요청이 뜨면 승인합니다. 실행 로그에 로그인 결과와 가까운 평일의 메가존 점심이 나오면 성공입니다.</li>
+<li><strong>배포 → 배포 관리 → 기존 웹 앱의 수정(연필) → 새 버전 → 배포</strong>를 누르고 점심판을 새로고침합니다.</li>
 </ol>
-<p>직원별 이메일·Slack·Google Drive 스크립트 속성, 팀 키, 기존 웹 앱 주소는 그대로 유지하세요. 이 수정은 공유 데이터를 초기화하지 않습니다.</p>
-<p><strong>선택 진단:</strong> Apps Script 편집기에서 <code>testGangnamThreadsConnection</code>을 실행하면 게시물 수·날짜·피드 응답 상태가 실행 로그에 나옵니다. 토큰이나 팀 키는 로그에 표시하지 않습니다.</p>
-<p><strong>검증 범위:</strong> 지원하지 않는 URL 기능이 없는 환경에서 코드 오류를 재현하고 수정했습니다. 실제 RSSHub의 현재 응답과 휴대폰의 영상 재생 성공은 별도 확인이 필요합니다. API 토큰이나 새로운 유료 서비스는 이 수정의 필수 조건이 아닙니다.</p>
+<p class="note warn"><strong>먼저 알아둘 점</strong><br>· 같은 계정으로 서버가 로그인하면 휴대폰의 웰스토리플러스 앱이 로그아웃될 수 있습니다. 서버는 로그인 세션을 저장해 재사용하고 만료될 때만 다시 로그인합니다. 테스트 후 휴대폰 앱이 로그아웃되는지 꼭 확인해 주세요.<br>· 스크립트 속성은 이 Apps Script 프로젝트의 편집자가 볼 수 있습니다. 다른 서비스와 같은 비밀번호를 쓰고 있다면 웰스토리플러스 비밀번호를 따로 바꿔 두는 것을 권장합니다. 계정 정보를 GitHub나 이 페이지에 넣지 마세요.<br>· 아이디·비밀번호가 틀리면 계정 잠김을 막기 위해 30분 동안 로그인을 다시 시도하지 않습니다. 고친 뒤 <code>testWelstoryConnection</code>을 실행하면 바로 다시 시도합니다.<br>· 웰스토리가 공식으로 공개한 API가 아니므로 웰스토리가 방식을 바꾸면 동작이 멈출 수 있습니다. Google 서버에서의 접속이 막혀 있는지는 실제 실행으로만 확인할 수 있습니다.</p>
+<p>메가존 식단은 날짜별로 30분(지난 날짜는 6시간) 보관해 웰스토리에 자주 요청하지 않습니다. 직원별 이메일·Slack·Google Drive 스크립트 속성, 팀 키, 기존 웹 앱 주소는 그대로 유지하세요. 이 수정은 공유 데이터를 초기화하지 않습니다.</p>
+<p><strong>검증 범위:</strong> 웰스토리 응답 형식을 흉내 낸 테스트 서버로 로그인·세션 재사용·재로그인·로그인 일시 중지·식단 표시를 확인했습니다. 실제 웰스토리 계정 로그인과 Google 서버에서의 접속 가능 여부는 위 5단계의 <code>testWelstoryConnection</code>으로 확인해야 합니다.</p>
 </section>
 <section><h2>1. GitHub에 점심판 올리기</h2>
 <div class="step"><span class="number">1</span><div class="step-body"><h3>압축을 풀어 주세요</h3><p><code>SANDS_Lunch_Club_Join_Notifications_20261020.zip</code>을 압축 해제합니다. <code>index.html</code>을 더블클릭하면 먼저 화면을 확인할 수 있습니다.</p></div></div>
@@ -68,10 +69,10 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
 <p class="note">신원 확인 주의: 이 앱은 이름 선택·팀 키 방식이며 Slack 계정 로그인과 묶여 있지 않습니다. 이름 변경으로 다른 직원 대신 버튼을 누를 수 있으므로 사내 구성원만 공유 링크를 사용해 주세요. Slack 전송 실패는 점심 기록을 취소하지 않으며 자동 재발송하지 않습니다.</p></section>
 <section><h2>매일은 이렇게 사용해요</h2><ol><li><strong>오늘 점심, 어떻게 할까요?</strong>에서 <strong>나는 → 내 이름</strong>을 선택합니다. 팀명과 이름은 가나다순으로 표시됩니다.</li><li>큰 버튼 <strong>함께 먹기 · 따로 먹기 · 안 먹기</strong> 중에서 선택합니다. 아무것도 선택하지 않으면 미선택입니다. 함께 먹기를 선택해야 초록색 그룹과 식당 투표 집계에 포함됩니다.</li><li>안 먹는 날에는 필요한 경우 사유를 선택합니다. <strong>연차·반차·외근·출장</strong>은 하나의 항목입니다.</li><li>자동으로 들어간 대표님 일정이 취소됐다면 <strong>내 대표님 점심 취소</strong>를 누르고 점심 여부를 다시 고릅니다. 그날 전체 일정이 취소됐을 때에는 <strong>대표님 점심 전체 취소</strong>를 체크합니다.</li><li>동료끼리 따로 먹는 날은 <strong>따로 먹기 → 동료 여러 명 체크 → 초대</strong>를 누릅니다. 초대받은 동료가 본인 이름을 선택하고 <strong>수락하고 따로 먹기</strong>를 누르면 같은 모임으로 표시됩니다. 다른 직원은 모임 카드의 <strong>이 모임에 참여 요청</strong>을 눌러 먼저 제안할 수 있고 생성자가 승인하면 합류합니다. 혼자 먹을 때는 <strong>동료 지정 없이 따로 먹기</strong>를 선택합니다.</li><li><strong>← / →</strong>로 내일·모레 현황과 선택을 확인하고 <strong>오늘</strong> 버튼으로 돌아옵니다. 선택과 초대는 화면에 표시된 날짜에만 저장됩니다.</li><li>메가존의 <strong>오늘 식단 / 이번 주 식단</strong>을 비교합니다. 런치타임은 자동으로 가져온 카카오 프로필 사진을 확인합니다. 사진에 적힌 식단 날짜를 확인해 주세요. 필요한 경우 <strong>식단 이미지 직접 올리기</strong>로 주간용·하루용 이미지를 따로 공유할 수 있습니다.</li><li><strong>일반 점심</strong>에 참여하면 응답 패널 또는 메가존/런치타임 식단 카드에서 <strong>둘 중 하나</strong>를 고릅니다. 바꾸고 싶으면 다른 한 곳을 누르면 됩니다. 각자의 선택이 집계됩니다.
 </li><li><strong>대표님과 점심</strong>인 사람은 아래 <strong>과천 맛집 골라보기</strong>에서 종류·이름으로 찾아 <strong>대표님 점심 장소</strong>를 누릅니다. 우측에 팀 전체가 보는 등록 장소가 표시됩니다. 변경하려면 다른 식당을 고르고 확인합니다.</li><li>대표님 점심의 기본 만남 시간은 설정에 있는 시간(<strong>기본 12:00</strong>)을 사용합니다. 일반 점심에는 따로 전체 장소 확정 단계가 없고 각자 선택으로 끝납니다.</li></ol><div class="note">대표님과 점심·안 먹음·미선택·따로 먹기는 함께 먹는 인원과 식당 투표 집계에서 빠집니다. 기존 식당 선택은 보관되며, 다시 함께 먹기를 선택하면 집계에 돌아옵니다. 초대나 참여 요청만 보냈을 때는 상대의 점심 상태가 바뀌지 않습니다. 수락 또는 승인 시에는 자동으로 일반 함께 점심 인원에서 빠집니다.</div></section>
-<section><h2>식단과 일정에 대해 알아둘 점</h2><ul><li><strong>메가존:</strong> 공유 연결 전에도 공개된 날짜별 점심 메뉴를 직접 조회합니다. 오늘과 이번 주 월~금 식단을 볼 수 있습니다. 날짜가 맞는 식단만 표시하며, 미등록과 조회 실패를 구분합니다. 메뉴 사진과 상세 내용은 Welplan 원문에서 확인합니다.</li><li><strong>런치타임 자동 조회:</strong> 공유 서버가 카카오 채널에 공개된 최신 프로필 사진 주소를 가져옵니다. 별도 카카오 로그인이나 친구 추가가 필요하지 않습니다. 점심판을 열 때와 화면이 열려 있는 동안 약 5분마다 확인합니다. 채널에 아직 전날 사진이 있으면 그 사진이 표시되므로 이미지 속 날짜를 확인해 주세요. 페이지를 닫은 상태의 오전 9시 예약 실행은 이번 버전에 포함하지 않습니다. 공개 화면의 데이터 형식이 바뀌면 자동 조회 코드 조정이 필요할 수 있습니다.</li><li><strong>직접 올린 식단 이미지 기간:</strong> 주간용은 월~일, 하루용은 지정한 날짜에 표시합니다. 같은 날짜에 하루용과 주간용이 모두 있으면 하루용을 우선 표시합니다. 다음 주에는 지난 주 이미지가 표시되지 않습니다.</li><li><strong>이미지 공유:</strong> 원본 선택은 15MB까지 가능하며 업로드 전 크기를 조정합니다. 이미지는 전용 비공개 Drive 폴더에 저장하고 팀 키로 조회합니다. 이미지 자체를 인터넷 공개 링크로 만들지 않습니다. 공유 연결 전 미리보기는 이 브라우저에만 보관하며 공유 연결 후 다시 올려야 합니다.</li><li><strong>대표님과 점심 기본 일정:</strong> 경영지원팀 김윤철·오성은·장윤석 수 / 디자인팀 서지우·천진기 화 / 연구기획팀 최민준 월·목 / 영업팀 조현주 월·금 / 전략사업팀 손주리·윤현수 월·화·금 / 커뮤니케이션팀 조성준 화·금. 연구기획팀은 연구소 팀장 일정을 따릅니다. 첨부 공지를 반영해 2026년 12월 31일까지 적용하며, 설정에서 기간과 요일을 바꿀 수 있습니다.</li><li><strong>주말·공휴일:</strong> 주말도 기본 미선택입니다. 공휴일은 자동 판정하지 않으므로 필요한 경우 대표님 일정을 취소하고 각자 점심 여부를 선택해 주세요.</li><li><strong>과천 맛집:</strong> <a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도</a>의 가게를 2026년 10월 19일 확인해 정리했습니다. 한식·중식·일식·양식·분식·아시안으로 나누고 스마트경양식·샤브올데이·상월은 요청에 맞게 분류를 보정했습니다. 원본 지도에 이후 추가한 장소는 이 파일에 자동 반영되지 않습니다. 맛집 목록은 대표님 점심 장소와 따로 먹는 모임별 식당 등록에 사용합니다. 일반 점심은 계속 메가존/런치타임 중 하나만 선택합니다.</li><li><strong>따로 먹는 모임:</strong> 동료 여러 명을 동시에 초대하여 모임을 만들고, 참여자는 모임 식당을 등록할 수 있습니다. 대기 중인 초대를 포함해 한 사람은 한 모임에만 들어갈 수 있습니다. 초대를 거절·취소하면 초대한 사람은 따로 먹기로 남고, 수락한 모임에서 나가면 본인만 미선택으로 바뀝니다.</li><li><strong>기록 보관:</strong> 공유 기록과 전용 식단 이미지는 최근 90일을 기준으로 정리합니다. 이 기기의 점심 기록은 최근 120일 보관합니다. 예전에 올린 이미지 데이터는 새 화면에서 표시하지 않습니다.</li></ul></section>
-<section><h2>잘 안 될 때</h2><table><tr><th>상황</th><th>확인할 것</th></tr><tr><td>GitHub 주소가 404예요</td><td>저장소 첫 화면에 index.html이 있는지, Pages가 main / (root)인지 확인합니다.</td></tr><tr><td>공유 서버 업데이트 안내가 떠요</td><td>맨 위 기존 서버 업데이트 순서대로 Code.gs를 교체하고 배포 관리에서 새 버전으로 갱신합니다. GitHub 파일 교체만으로는 이번 다인원 초대와 따로 먹기 식당을 팀에 저장할 수 없습니다.</td></tr><tr><td>동료와 선택이 달라요</td><td>양쪽 모두 ‘팀 공유 연결됨’인지 확인합니다. 일반 주소 대신 ‘동료 초대’로 복사한 링크를 전달하세요.</td></tr><tr><td>팀 키 오류예요</td><td>코드를 복사했던 브라우저에서 다시 연결합니다. 새 코드를 넣었다면 새 버전으로 재배포해야 합니다.</td></tr><tr><td>연결 응답이 없어요</td><td>웹 앱 실행 사용자 ‘나’, 접근 권한 ‘모든 사용자’, 주소 끝 /exec를 확인합니다. Workspace에서 익명 배포가 금지되어 있으면 관리자 확인이 필요합니다.</td></tr><tr><td>식단이 안 떠요</td><td>원문 서비스 또는 네트워크 문제일 수 있습니다. 메가존은 ‘식단 새로고침’과 Welplan 원문, 런치타임은 ‘사진 다시 불러오기’와 카카오 원문을 확인합니다. 런치타임 자동 조회의 서버 업데이트 안내가 있을 때만 기존 서버 버전을 확인합니다. 이전 사진은 마지막 확인 시각과 오류 안내를 함께 표시합니다.</td></tr><tr><td>강남밥상 게시물이 표시되지 않아요</td><td>RSSHub 공개 피드가 접속 가능한지 확인하세요. 기본 서버는 두 공개 피드를 순서대로 조회하며 실패할 수 있습니다. 영상을 확인할 수 있다면 재생·정지로 메뉴표 장면을 찾을 수 있습니다. 같은 날 영상이 여럿 올라와 자동 구분이 어렵다면 게시물들을 점심판 안에 나누어 표시합니다. 이미 Threads 공식 API 권한이 있는 경우 비공개 스크립트 속성 LUNCH_THREADS_ACCESS_TOKEN을 예비 수단으로 사용할 수 있습니다.</td></tr><tr><td>런치타임 식단 직접 올리기 버튼이 없어요</td><td>정상입니다. 이번 버전부터 직접 업로드·교체·삭제 UI를 제거하고 카카오 자동 식단만 사용합니다.</td></tr><tr><td>공유 서버 코드를 수정했어요</td><td>배포 → 배포 관리 → 수정(연필) → 버전 ‘새 버전’ → 배포. 기존 주소를 유지하면 팀 연결을 바꿀 필요가 없습니다.</td></tr></table></section>
-<footer>공식 설정 참고: <a href="https://docs.github.com/ko/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site" target="_blank" rel="noopener noreferrer">GitHub Pages</a> · <a href="https://developers.google.com/apps-script/guides/web?hl=ko" target="_blank" rel="noopener noreferrer">Google Apps Script</a> · <a href="https://welplan.pmh.codes/docs/api" target="_blank" rel="noopener noreferrer">Welplan 공개 API</a><br>이 패키지는 업로드용 소스입니다. GitHub 공개와 Google 계정 연결은 위 순서로 진행해야 완료됩니다.</footer>
-<script type="text/plain" id="codeTemplate">// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + threads-menu-source.js + backend/server.js.
+<section><h2>식단과 일정에 대해 알아둘 점</h2><ul><li><strong>메가존:</strong> 공유 서버가 Apps Script 스크립트 속성에 저장한 웰스토리플러스 계정으로 날짜별 점심 메뉴를 가져옵니다. 팀 공유에 연결된 점심판에서 오늘과 이번 주 월~금 식단, 메뉴 사진과 반찬을 볼 수 있습니다. 날짜가 맞는 식단만 표시하며, 미등록과 조회 실패를 구분합니다. 테이크아웃 코스는 표시하지 않습니다.</li><li><strong>런치타임 자동 조회:</strong> 공유 서버가 카카오 채널에 공개된 최신 프로필 사진 주소를 가져옵니다. 별도 카카오 로그인이나 친구 추가가 필요하지 않습니다. 점심판을 열 때와 화면이 열려 있는 동안 약 5분마다 확인합니다. 채널에 아직 전날 사진이 있으면 그 사진이 표시되므로 이미지 속 날짜를 확인해 주세요. 페이지를 닫은 상태의 오전 9시 예약 실행은 이번 버전에 포함하지 않습니다. 공개 화면의 데이터 형식이 바뀌면 자동 조회 코드 조정이 필요할 수 있습니다.</li><li><strong>직접 올린 식단 이미지 기간:</strong> 주간용은 월~일, 하루용은 지정한 날짜에 표시합니다. 같은 날짜에 하루용과 주간용이 모두 있으면 하루용을 우선 표시합니다. 다음 주에는 지난 주 이미지가 표시되지 않습니다.</li><li><strong>이미지 공유:</strong> 원본 선택은 15MB까지 가능하며 업로드 전 크기를 조정합니다. 이미지는 전용 비공개 Drive 폴더에 저장하고 팀 키로 조회합니다. 이미지 자체를 인터넷 공개 링크로 만들지 않습니다. 공유 연결 전 미리보기는 이 브라우저에만 보관하며 공유 연결 후 다시 올려야 합니다.</li><li><strong>대표님과 점심 기본 일정:</strong> 경영지원팀 김윤철·오성은·장윤석 수 / 디자인팀 서지우·천진기 화 / 연구기획팀 최민준 월·목 / 영업팀 조현주 월·금 / 전략사업팀 손주리·윤현수 월·화·금 / 커뮤니케이션팀 조성준 화·금. 연구기획팀은 연구소 팀장 일정을 따릅니다. 첨부 공지를 반영해 2026년 12월 31일까지 적용하며, 설정에서 기간과 요일을 바꿀 수 있습니다.</li><li><strong>주말·공휴일:</strong> 주말도 기본 미선택입니다. 공휴일은 자동 판정하지 않으므로 필요한 경우 대표님 일정을 취소하고 각자 점심 여부를 선택해 주세요.</li><li><strong>과천 맛집:</strong> <a href="https://naver.me/xSBAzufn" target="_blank" rel="noopener noreferrer">주변 식당 지도</a>의 가게를 2026년 10월 19일 확인해 정리했습니다. 한식·중식·일식·양식·분식·아시안으로 나누고 스마트경양식·샤브올데이·상월은 요청에 맞게 분류를 보정했습니다. 원본 지도에 이후 추가한 장소는 이 파일에 자동 반영되지 않습니다. 맛집 목록은 대표님 점심 장소와 따로 먹는 모임별 식당 등록에 사용합니다. 일반 점심은 계속 메가존/런치타임 중 하나만 선택합니다.</li><li><strong>따로 먹는 모임:</strong> 동료 여러 명을 동시에 초대하여 모임을 만들고, 참여자는 모임 식당을 등록할 수 있습니다. 대기 중인 초대를 포함해 한 사람은 한 모임에만 들어갈 수 있습니다. 초대를 거절·취소하면 초대한 사람은 따로 먹기로 남고, 수락한 모임에서 나가면 본인만 미선택으로 바뀝니다.</li><li><strong>기록 보관:</strong> 공유 기록과 전용 식단 이미지는 최근 90일을 기준으로 정리합니다. 이 기기의 점심 기록은 최근 120일 보관합니다. 예전에 올린 이미지 데이터는 새 화면에서 표시하지 않습니다.</li></ul></section>
+<section><h2>잘 안 될 때</h2><table><tr><th>상황</th><th>확인할 것</th></tr><tr><td>GitHub 주소가 404예요</td><td>저장소 첫 화면에 index.html이 있는지, Pages가 main / (root)인지 확인합니다.</td></tr><tr><td>공유 서버 업데이트 안내가 떠요</td><td>맨 위 기존 서버 업데이트 순서대로 Code.gs를 교체하고 배포 관리에서 새 버전으로 갱신합니다. GitHub 파일 교체만으로는 이번 다인원 초대와 따로 먹기 식당을 팀에 저장할 수 없습니다.</td></tr><tr><td>동료와 선택이 달라요</td><td>양쪽 모두 ‘팀 공유 연결됨’인지 확인합니다. 일반 주소 대신 ‘동료 초대’로 복사한 링크를 전달하세요.</td></tr><tr><td>팀 키 오류예요</td><td>코드를 복사했던 브라우저에서 다시 연결합니다. 새 코드를 넣었다면 새 버전으로 재배포해야 합니다.</td></tr><tr><td>연결 응답이 없어요</td><td>웹 앱 실행 사용자 ‘나’, 접근 권한 ‘모든 사용자’, 주소 끝 /exec를 확인합니다. Workspace에서 익명 배포가 금지되어 있으면 관리자 확인이 필요합니다.</td></tr><tr><td>메가존 식단이 안 떠요</td><td>카드에 표시된 안내를 먼저 확인합니다. 계정 등록 안내가 나오면 스크립트 속성 <code>LUNCH_WELSTORY_USERNAME</code>·<code>LUNCH_WELSTORY_PASSWORD</code>를 확인하고, 로그인 실패·일시 중지 안내가 나오면 Apps Script에서 <code>testWelstoryConnection</code>을 실행해 실행 로그를 확인합니다. 공유 서버 업데이트 안내가 나오면 위 순서대로 새 버전으로 배포합니다.</td></tr><tr><td>식단이 안 떠요</td><td>원문 서비스 또는 네트워크 문제일 수 있습니다. 메가존은 ‘식단 새로고침’과 웰스토리플러스 앱, 런치타임은 ‘사진 다시 불러오기’와 카카오 원문을 확인합니다. 런치타임 자동 조회의 서버 업데이트 안내가 있을 때만 기존 서버 버전을 확인합니다. 이전 사진은 마지막 확인 시각과 오류 안내를 함께 표시합니다.</td></tr><tr><td>강남밥상 게시물이 표시되지 않아요</td><td>RSSHub 공개 피드가 접속 가능한지 확인하세요. 기본 서버는 두 공개 피드를 순서대로 조회하며 실패할 수 있습니다. 영상을 확인할 수 있다면 재생·정지로 메뉴표 장면을 찾을 수 있습니다. 같은 날 영상이 여럿 올라와 자동 구분이 어렵다면 게시물들을 점심판 안에 나누어 표시합니다. 이미 Threads 공식 API 권한이 있는 경우 비공개 스크립트 속성 LUNCH_THREADS_ACCESS_TOKEN을 예비 수단으로 사용할 수 있습니다.</td></tr><tr><td>런치타임 식단 직접 올리기 버튼이 없어요</td><td>정상입니다. 이번 버전부터 직접 업로드·교체·삭제 UI를 제거하고 카카오 자동 식단만 사용합니다.</td></tr><tr><td>공유 서버 코드를 수정했어요</td><td>배포 → 배포 관리 → 수정(연필) → 버전 ‘새 버전’ → 배포. 기존 주소를 유지하면 팀 연결을 바꿀 필요가 없습니다.</td></tr></table></section>
+<footer>공식 설정 참고: <a href="https://docs.github.com/ko/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site" target="_blank" rel="noopener noreferrer">GitHub Pages</a> · <a href="https://developers.google.com/apps-script/guides/web?hl=ko" target="_blank" rel="noopener noreferrer">Google Apps Script</a><br>이 패키지는 업로드용 소스입니다. GitHub 공개와 Google 계정 연결은 위 순서로 진행해야 완료됩니다.</footer>
+<script type="text/plain" id="codeTemplate">// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + threads-menu-source.js + menu-source.js + backend/welstory.js + backend/server.js.
 /* Shared, dependency-free rules used by the page and the Apps Script server. */
 (function (root, factory) {
   const api = factory();
@@ -102,9 +103,10 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
     meetingTime: '12:00'
   };
-  const WELPLAN = 'https://welplan.pmh.codes/restaurants/welstory/REST007327/' + encodeURIComponent('메가존산학연센터');
+  // 메가존 식단은 공유 서버가 웰스토리플러스에서 가져옵니다(menu-source.js, backend/welstory.js).
+  const MEGAZONE_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
-    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: WELPLAN, type: 'cafeteria' },
+    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },
     { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' },
     { id: 'gangnambab', name: '강남밥상', subtitle: 'Threads 최신 게시물 · 메뉴 공지 화면 자동 보기', url: 'https://www.threads.com/@gangnambab', menuUrl: 'https://www.threads.com/@gangnambab', type: 'cafeteria' }
   ];
@@ -379,13 +381,7 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
     }
     d.revision += 1; d.updatedAt = now || new Date().toISOString(); return d;
   }
-  function parseMenuMarkdown(text) {
-    const block = String(text || '').split(/^## 점심\s*$/m)[1];
-    if (!block) return [];
-    return block.split(/^## /m)[0].split('\n').filter(x => /^- /.test(x)).map(x => x.slice(2).trim()).filter(Boolean).slice(0, 12);
-  }
-  function menuUrl(date) { return WELPLAN + '/' + date.replaceAll('-', ''); }
-  return { MEMBERS, PLACES, DEFAULT_SETTINGS, WELPLAN, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation, parseMenuMarkdown, menuUrl };
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, MEGAZONE_MAP, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation };
 });
 
 /* Public channel metadata only. No login, friend relationship, or menu date is inferred.
@@ -715,6 +711,455 @@ var LunchThreadsMenu = (function (root) {
   return api;
 })(typeof window !== 'undefined' ? window : null);
 
+/* 메가존산학연센터(삼성웰스토리) 점심 식단.
+ * Welstory+ API는 회원 로그인이 필요하므로 팀 공유 서버(Apps Script, backend/welstory.js)만 호출합니다.
+ * 이 파일은 브라우저와 Apps Script V8이 함께 사용합니다.
+ * - Apps Script: parseMealList / lunchMealType으로 웰스토리 응답을 점심판 형식으로 정리합니다.
+ * - 브라우저: fetchDay가 팀 키로 공유 서버에 요청하고, 돌아온 식단을 다시 검증합니다.
+ * 사진은 공개 HTTPS 웰스토리 레시피 이미지 주소만 사용합니다.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.LunchMenuSource = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const RESTAURANT_ID = 'REST007327';
+  const RESTAURANT_NAME = '메가존산학연센터';
+  // Welstory+ 식사 시간 코드: 1 아침, 2 점심, 3 저녁 (getMealTimeList로 다시 확인합니다).
+  const LUNCH_MEAL_TYPE = '2';
+  const IMAGE_HOST = 'img-welmenu.welstory.com';
+  const MAX_DISHES = 120;
+  const MAX_COURSES = 20;
+  const MAX_COMPONENTS = 30;
+
+  function failure(code, message) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+  }
+
+  function invalid() {
+    return failure('INVALID_RESPONSE', '식단 응답 형식이 바뀌어 확인하지 못했어요. 웰스토리플러스 앱에서 확인해 주세요.');
+  }
+
+  function object(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function text(value) {
+    return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+  }
+
+  function dateKey(value) {
+    if (typeof value !== 'string' || !/^(?:\d{8}|\d{4}-\d{2}-\d{2})$/.test(value)) {
+      throw failure('INVALID_DATE', '식단 날짜를 확인해 주세요.');
+    }
+    const compact = value.replace(/-/g, '');
+    const iso = compact.slice(0, 4) + '-' + compact.slice(4, 6) + '-' + compact.slice(6, 8);
+    const parsed = new Date(iso + 'T00:00:00.000Z');
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso) {
+      throw failure('INVALID_DATE', '식단 날짜를 확인해 주세요.');
+    }
+    return iso;
+  }
+
+  function validImageURL(value) {
+    if (typeof value !== 'string' || !value || value.length > 2048 || /[\s\\<>"']/.test(value)) return false;
+    const match = /^https:\/\/([^/?#]+)(\/[^?#]*)(?:\?([^#]*))?$/i.exec(value);
+    if (!match || match[1].toLowerCase() !== IMAGE_HOST) return false;
+    // Verified Welstory recipe-photo host and path; no credentials, ports or traversal.
+    if (!/^\/data\/manager\/recipe\/(?:[a-z0-9_-]+\/)+[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(match[2])) return false;
+    return match[3] === undefined || /^[a-z0-9._~!$&()*+,;=:@%/?-]*$/i.test(match[3]);
+  }
+
+  // Welstory gives a folder (photoUrl) and a file name (photoCd). Older responses use
+  // http://samsungwelstory.com/...; the same recipe path is served over HTTPS by IMAGE_HOST.
+  function imageURL(folder, file) {
+    const base = text(folder), name = text(file);
+    if (!base || !name) return '';
+    const match = /^(?:https?:)?\/\/(?:www\.)?(?:samsungwelstory\.com|img-welmenu\.welstory\.com)(\/data\/manager\/recipe\/[^?#]*)$/i.exec(base);
+    if (!match) return '';
+    const url = 'https://' + IMAGE_HOST + match[1].replace(/\/?$/, '/') + name;
+    return validImageURL(url) ? url : '';
+  }
+
+  // GET /api/menu/getMealTimeList -> { data: [{ code: '2', codeNm: '점심' }, ...] }
+  function lunchMealType(raw) {
+    const list = object(raw) && Array.isArray(raw.data) ? raw.data : raw;
+    if (!Array.isArray(list)) return LUNCH_MEAL_TYPE;
+    const lunch = list.find(function (item) {
+      return object(item) && /^\d{1,2}$/.test(String(item.code)) && /점심|중식|lunch/i.test(text(item.codeNm));
+    });
+    return lunch ? String(lunch.code) : LUNCH_MEAL_TYPE;
+  }
+
+  function mealList(raw) {
+    let payload = raw;
+    if (typeof payload === 'string') {
+      try { payload = JSON.parse(payload); } catch (_) { throw invalid(); }
+    }
+    if (!object(payload)) throw invalid();
+    // Welstory wraps responses as { code, message, data: { mealList: [...] } }.
+    const data = Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
+    if (!object(data) || !Array.isArray(data.mealList) || data.mealList.length > MAX_DISHES) throw invalid();
+    return data.mealList;
+  }
+
+  function unique(values) {
+    const seen = Object.create(null);
+    return values.filter(function (value) {
+      if (!value || seen[value]) return false;
+      seen[value] = true;
+      return true;
+    });
+  }
+
+  // GET /api/meal?menuDt=YYYYMMDD&menuMealType=2&restaurantCode=REST007327
+  // Each row is one dish; rows sharing hallNo + menuCourseType form one course.
+  // An empty mealList for the requested date means no lunch is published yet.
+  function parseMealList(raw, requestedDate, mealType) {
+    const date = dateKey(requestedDate), compact = date.replace(/-/g, '');
+    const wantedType = String(mealType || LUNCH_MEAL_TYPE);
+    const groups = [], byKey = Object.create(null);
+    mealList(raw).forEach(function (dish) {
+      if (!object(dish) || !text(dish.menuName)) throw invalid();
+      if (dish.restaurantCode !== undefined && dish.restaurantCode !== null &&
+          String(dish.restaurantCode).toUpperCase() !== RESTAURANT_ID) {
+        throw failure('LOCATION_MISMATCH', '다른 식당의 응답이어서 식단을 표시하지 않았어요.');
+      }
+      if (dish.menuDt !== undefined && dish.menuDt !== null && String(dish.menuDt).replace(/-/g, '') !== compact) {
+        throw failure('DATE_MISMATCH', '요청한 날짜와 응답 날짜가 달라 식단을 표시하지 않았어요.');
+      }
+      if (dish.menuMealType !== undefined && dish.menuMealType !== null && String(dish.menuMealType) !== wantedType) return;
+      const key = String(dish.hallNo || '') + '|' + String(dish.menuCourseType || '');
+      if (!byKey[key]) { byKey[key] = []; groups.push(byKey[key]); }
+      byKey[key].push(dish);
+    });
+    const courses = groups.slice(0, MAX_COURSES).map(function (dishes) {
+      const main = dishes.find(function (dish) { return dish.typicalMenu === 'Y'; }) || dishes[0];
+      const photo = [main].concat(dishes).map(function (dish) { return imageURL(dish.photoUrl, dish.photoCd); })
+        .find(Boolean);
+      const course = {
+        name: text(main.menuName),
+        components: unique([main].concat(dishes).map(function (dish) { return text(dish.menuName); })).slice(0, MAX_COMPONENTS)
+      };
+      if (photo) course.imageUrl = photo;
+      if (dishes.some(function (dish) { return /^T/i.test(text(dish.salesType)); })) course.takeout = true;
+      return course;
+    });
+    return {
+      ok: true,
+      date: date,
+      dishes: unique(courses.map(function (course) { return course.name; })),
+      courses: courses,
+      fetchedAt: new Date().toISOString()
+    };
+  }
+
+  // Re-validates a menu that came back from the team server before the page renders it.
+  function cleanMenu(value, requestedDate) {
+    const date = dateKey(requestedDate);
+    if (!object(value) || value.date !== date || !Array.isArray(value.courses)) throw invalid();
+    const courses = value.courses.slice(0, MAX_COURSES).map(function (course) {
+      if (!object(course) || !text(course.name)) throw invalid();
+      const result = {
+        name: text(course.name),
+        components: Array.isArray(course.components) ? unique(course.components.map(text)).slice(0, MAX_COMPONENTS) : []
+      };
+      if (validImageURL(course.imageUrl)) result.imageUrl = course.imageUrl;
+      if (course.takeout === true) result.takeout = true;
+      return result;
+    });
+    const fetched = Date.parse(value.fetchedAt);
+    return {
+      ok: true,
+      date: date,
+      dishes: unique(courses.map(function (course) { return course.name; })),
+      courses: courses,
+      fetchedAt: Number.isFinite(fetched) ? new Date(fetched).toISOString() : new Date().toISOString()
+    };
+  }
+
+  // options.request(params) sends { action: 'menu', date } to the team server (JSONP in the page).
+  async function fetchDay(requestedDate, options) {
+    const date = dateKey(requestedDate);
+    const request = (options || {}).request;
+    if (typeof request !== 'function') {
+      throw failure('NOT_CONNECTED', '메가존 식단은 팀 공유 연결 후 볼 수 있어요.');
+    }
+    let response;
+    try {
+      response = await request({ action: 'menu', date: date });
+    } catch (error) {
+      throw failure('NETWORK_ERROR', (error && error.message) || '공유 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    }
+    if (!object(response)) throw invalid();
+    if (response.ok !== true) {
+      const message = typeof response.error === 'string' && response.error.trim()
+        ? response.error.trim().slice(0, 240) : '메가존 식단을 불러오지 못했어요.';
+      throw failure(response.reason === 'setup' ? 'SETUP_REQUIRED' : 'PROVIDER_ERROR', message);
+    }
+    return cleanMenu(response.menu, date);
+  }
+
+  return Object.freeze({
+    RESTAURANT_ID: RESTAURANT_ID,
+    RESTAURANT_NAME: RESTAURANT_NAME,
+    LUNCH_MEAL_TYPE: LUNCH_MEAL_TYPE,
+    dateKey: dateKey,
+    validImageURL: validImageURL,
+    imageURL: imageURL,
+    lunchMealType: lunchMealType,
+    parseMealList: parseMealList,
+    cleanMenu: cleanMenu,
+    fetchDay: fetchDay
+  });
+});
+
+/* 메가존 점심 식단: Welstory+ 회원 API를 Apps Script 서버에서만 호출합니다.
+ * menu-source.js(LunchMenuSource) 다음, backend/server.js 앞에 붙여 Code.gs를 만듭니다.
+ * 웰스토리 계정은 Apps Script > 프로젝트 설정 > 스크립트 속성에만 저장하고 GitHub 파일에는 넣지 않습니다.
+ *   LUNCH_WELSTORY_USERNAME  웰스토리플러스 앱 로그인 아이디
+ *   LUNCH_WELSTORY_PASSWORD  웰스토리플러스 앱 비밀번호
+ * 나머지 LUNCH_WELSTORY_* 속성(기기 ID, 세션, 점심 코드, 로그인 일시 중지)은 서버가 자동으로 관리합니다.
+ * 로그인은 세션이 없거나 만료될 때만 하고, 식단은 날짜별로 캐시해 웰스토리 요청을 최소화합니다.
+ */
+const WELSTORY_BASE = 'https://welplus.welstory.com';
+const WELSTORY_USERNAME_PROPERTY = 'LUNCH_WELSTORY_USERNAME';
+const WELSTORY_PASSWORD_PROPERTY = 'LUNCH_WELSTORY_PASSWORD';
+const WELSTORY_DEVICE_PROPERTY = 'LUNCH_WELSTORY_DEVICE_ID';
+const WELSTORY_SESSION_PROPERTY = 'LUNCH_WELSTORY_SESSION';
+const WELSTORY_MEAL_TYPE_PROPERTY = 'LUNCH_WELSTORY_MEAL_TYPE';
+const WELSTORY_PAUSE_PROPERTY = 'LUNCH_WELSTORY_LOGIN_PAUSE';
+const WELSTORY_MENU_CACHE_PREFIX = 'lunch_welstory_menu_v1_';
+const WELSTORY_MENU_TTL_SECONDS = 30 * 60;
+const WELSTORY_PAST_MENU_TTL_SECONDS = 6 * 60 * 60;
+const WELSTORY_ERROR_TTL_SECONDS = 2 * 60;
+const WELSTORY_SESSION_MARGIN_MS = 5 * 60000;
+const WELSTORY_DEFAULT_SESSION_MS = 50 * 60000;
+// A rejected login is not retried for a while so a wrong password cannot lock the account.
+const WELSTORY_LOGIN_PAUSE_MS = 30 * 60000;
+const WELSTORY_SERVER_PAUSE_MS = 5 * 60000;
+const WELSTORY_DEVICE_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const WELSTORY_SETUP_ERROR = '메가존 식단을 보려면 Apps Script 스크립트 속성에 LUNCH_WELSTORY_USERNAME과 LUNCH_WELSTORY_PASSWORD를 등록해 주세요.';
+const WELSTORY_NETWORK_ERROR = '웰스토리 식단 서버에 연결하지 못했어요. 잠시 후 다시 확인해 주세요.';
+
+function welstoryError_(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+function welstoryHeader_(response, name) {
+  const headers = response.getAllHeaders ? response.getAllHeaders() : {};
+  const key = Object.keys(headers || {}).find(k => k.toLowerCase() === name);
+  const value = key ? headers[key] : '';
+  return String(Array.isArray(value) ? value[0] : value || '');
+}
+function welstoryCredentials_(properties) {
+  const username = String(properties.getProperty(WELSTORY_USERNAME_PROPERTY) || '').trim();
+  const password = String(properties.getProperty(WELSTORY_PASSWORD_PROPERTY) || '');
+  if (!username || !password) throw welstoryError_('SETUP', WELSTORY_SETUP_ERROR);
+  return { username: username, password: password };
+}
+function welstoryDeviceId_(properties) {
+  let id = String(properties.getProperty(WELSTORY_DEVICE_PROPERTY) || '');
+  if (!WELSTORY_DEVICE_ID.test(id)) {
+    id = String(Utilities.getUuid()).toLowerCase();
+    properties.setProperty(WELSTORY_DEVICE_PROPERTY, id);
+  }
+  return id;
+}
+function welstoryHeaders_(deviceId, token, extra) {
+  const headers = { 'User-Agent': 'Welplus', 'X-Device-Id': deviceId, Accept: 'application/json' };
+  if (token) headers.Authorization = token;
+  Object.keys(extra || {}).forEach(k => { headers[k] = extra[k]; });
+  return headers;
+}
+function welstoryTokenExpiry_(token) {
+  try {
+    const part = String(token).replace(/^Bearer\s+/i, '').split('.')[1] || '';
+    const padded = part + '='.repeat((4 - part.length % 4) % 4);
+    const exp = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(padded)).getDataAsString()).exp;
+    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0;
+  } catch (_) { return 0; }
+}
+function welstorySessionRecord_(token, via) {
+  const exp = welstoryTokenExpiry_(token);
+  return { token: token, exp: exp > Date.now() ? exp : Date.now() + WELSTORY_DEFAULT_SESSION_MS, via: via, at: new Date().toISOString() };
+}
+function welstorySession_(properties) {
+  let value = null;
+  try { value = JSON.parse(properties.getProperty(WELSTORY_SESSION_PROPERTY) || 'null'); } catch (_) {}
+  return value && typeof value.token === 'string' && value.token && Number.isFinite(value.exp) ? value : null;
+}
+// { until, reason: 'credentials' | 'server' }
+function welstoryPauseState_(properties) {
+  let value = null;
+  try { value = JSON.parse(properties.getProperty(WELSTORY_PAUSE_PROPERTY) || 'null'); } catch (_) {}
+  return value && Number.isFinite(value.until) && value.until > Date.now() ? value : null;
+}
+function welstoryPause_(properties, ms, reason) {
+  properties.setProperty(WELSTORY_PAUSE_PROPERTY, JSON.stringify({ until: Date.now() + ms, reason: reason }));
+}
+function welstoryPausedError_(pause) {
+  const time = Utilities.formatDate(new Date(pause.until), 'Asia/Seoul', 'HH:mm');
+  if (pause.reason === 'server') return welstoryError_('LOGIN_PAUSED', '웰스토리 로그인 서버가 응답하지 않아 ' + time + ' 이후에 다시 시도해요.');
+  return welstoryError_('LOGIN_PAUSED', '웰스토리 로그인이 거부되어 ' + time + '까지 다시 시도하지 않아요. 스크립트 속성의 아이디·비밀번호를 확인한 뒤 Apps Script에서 testWelstoryConnection을 실행해 주세요.');
+}
+function welstoryLogin_(properties, deviceId) {
+  const pause = welstoryPauseState_(properties);
+  if (pause) throw welstoryPausedError_(pause);
+  const account = welstoryCredentials_(properties);
+  let response;
+  try {
+    response = UrlFetchApp.fetch(WELSTORY_BASE + '/login', {
+      method: 'post',
+      contentType: 'application/x-www-form-urlencoded',
+      payload: 'username=' + encodeURIComponent(account.username) + '&password=' + encodeURIComponent(account.password) + '&remember-me=false',
+      headers: welstoryHeaders_(deviceId, '', { 'X-Autologin': 'N' }),
+      muteHttpExceptions: true,
+      followRedirects: false
+    });
+  } catch (_) { throw welstoryError_('NETWORK', WELSTORY_NETWORK_ERROR); }
+  const status = response.getResponseCode(), token = welstoryHeader_(response, 'authorization').trim();
+  if (status >= 200 && status < 300 && token) return welstorySessionRecord_(token, 'login');
+  if (status >= 500 || status === 429) {
+    welstoryPause_(properties, WELSTORY_SERVER_PAUSE_MS, 'server');
+    throw welstoryError_('LOGIN_UNAVAILABLE', '웰스토리 로그인 서버가 응답하지 않았어요 (' + status + '). 5분 뒤 다시 시도해요.');
+  }
+  welstoryPause_(properties, WELSTORY_LOGIN_PAUSE_MS, 'credentials');
+  throw welstoryError_('LOGIN_REJECTED', '웰스토리 로그인에 실패했어요 (' + status + '). 스크립트 속성의 아이디·비밀번호를 확인한 뒤 testWelstoryConnection을 실행해 주세요.');
+}
+function welstoryRefresh_(session, deviceId) {
+  try {
+    const response = UrlFetchApp.fetch(WELSTORY_BASE + '/session', { headers: welstoryHeaders_(deviceId, session.token), muteHttpExceptions: true, followRedirects: false });
+    if (response.getResponseCode() !== 200) return null;
+    const body = JSON.parse(response.getContentText() || 'null');
+    return body && typeof body.data === 'string' && body.data.trim() ? welstorySessionRecord_(body.data.trim(), 'refresh') : null;
+  } catch (_) { return null; }
+}
+// Returns a usable token. Logging in again can sign the same account out of the phone app,
+// so an unexpired session is reused and renewed through /session before a full login.
+function welstoryToken_(properties, deviceId, rejectedToken) {
+  const usable = s => s && s.token !== rejectedToken && s.exp - Date.now() > WELSTORY_SESSION_MARGIN_MS;
+  const current = welstorySession_(properties);
+  if (usable(current)) return { token: current.token, fresh: false };
+  // A user lock serializes logins (the web app always runs as its owner) without holding
+  // the script lock that attendance writes wait on.
+  const lock = LockService.getUserLock();
+  if (!lock.tryLock(15000)) throw welstoryError_('BUSY', '다른 요청이 웰스토리에 로그인하는 중이에요. 잠시 후 다시 확인해 주세요.');
+  try {
+    const latest = welstorySession_(properties);
+    if (usable(latest)) return { token: latest.token, fresh: false };
+    let next = latest && latest.token !== rejectedToken && latest.exp > Date.now() ? welstoryRefresh_(latest, deviceId) : null;
+    if (!next || next.token === rejectedToken) next = welstoryLogin_(properties, deviceId);
+    properties.setProperty(WELSTORY_SESSION_PROPERTY, JSON.stringify(next));
+    return { token: next.token, fresh: next.via === 'login' };
+  } finally { lock.releaseLock(); }
+}
+function welstoryGet_(properties, deviceId, path, extraHeaders) {
+  let rejected = '', emptyReplies = 0;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const session = welstoryToken_(properties, deviceId, rejected);
+    let response;
+    try {
+      response = UrlFetchApp.fetch(WELSTORY_BASE + path, { headers: welstoryHeaders_(deviceId, session.token, extraHeaders), muteHttpExceptions: true, followRedirects: false });
+    } catch (_) { throw welstoryError_('NETWORK', WELSTORY_NETWORK_ERROR); }
+    const status = response.getResponseCode(), body = response.getContentText() || '';
+    const html = /text\/html/i.test(welstoryHeader_(response, 'content-type')) || /^\s*<(?:!doctype html|html[\s>])/i.test(body);
+    if (status === 401 || status === 403 || (status >= 300 && status < 400) || (status === 200 && html)) {
+      properties.deleteProperty(WELSTORY_SESSION_PROPERTY);
+      if (session.fresh) {
+        // A token from a brand-new login was refused: stop instead of logging in again and again.
+        welstoryPause_(properties, WELSTORY_LOGIN_PAUSE_MS, 'credentials');
+        throw welstoryError_('AUTH_REJECTED', '웰스토리가 새 로그인 세션을 받지 않았어요. Apps Script에서 testWelstoryConnection을 실행해 원인을 확인해 주세요.');
+      }
+      rejected = session.token;
+      continue;
+    }
+    if (status !== 200) throw welstoryError_('HTTP_' + status, '웰스토리 식단 서버가 요청을 처리하지 못했어요 (' + status + '). 잠시 후 다시 확인해 주세요.');
+    if (!body.trim()) {
+      // Welstory sometimes answers concurrent requests with an empty body.
+      if (++emptyReplies >= 3) break;
+      Utilities.sleep(300 * emptyReplies);
+      continue;
+    }
+    try { return JSON.parse(body); } catch (_) { throw welstoryError_('INVALID_RESPONSE', '웰스토리 식단 응답 형식을 확인하지 못했어요.'); }
+  }
+  throw welstoryError_('EMPTY_RESPONSE', '웰스토리 식단 서버의 응답이 비어 있어요. 잠시 후 다시 확인해 주세요.');
+}
+function welstoryMealType_(properties, deviceId) {
+  let saved = null;
+  try { saved = JSON.parse(properties.getProperty(WELSTORY_MEAL_TYPE_PROPERTY) || 'null'); } catch (_) {}
+  if (saved && /^\d{1,2}$/.test(saved.code) && Date.now() - Date.parse(saved.checkedAt) < 7 * 86400000) return saved.code;
+  let raw;
+  try {
+    raw = welstoryGet_(properties, deviceId, '/api/menu/getMealTimeList', { Cookie: 'cafeteriaActiveId=' + LunchMenuSource.RESTAURANT_ID });
+  } catch (error) {
+    // Only a bad meal-time list falls back to the default lunch code; login and network problems surface as-is.
+    if (!/^(?:HTTP_\d+|INVALID_RESPONSE|EMPTY_RESPONSE)$/.test(String(error && error.code || ''))) throw error;
+    return LunchMenuSource.LUNCH_MEAL_TYPE;
+  }
+  const code = LunchMenuSource.lunchMealType(raw);
+  properties.setProperty(WELSTORY_MEAL_TYPE_PROPERTY, JSON.stringify({ code: code, checkedAt: new Date().toISOString() }));
+  return code;
+}
+function welstoryMenu_(date) {
+  if (typeof LunchMenuSource === 'undefined') throw welstoryError_('SETUP', '공유 서버 코드에 menu-source.js가 빠졌어요. setup.html에서 코드를 다시 복사해 주세요.');
+  const properties = PropertiesService.getScriptProperties();
+  welstoryCredentials_(properties);
+  const deviceId = welstoryDeviceId_(properties), mealType = welstoryMealType_(properties, deviceId);
+  const raw = welstoryGet_(properties, deviceId, '/api/meal?menuDt=' + date.replace(/-/g, '') + '&menuMealType=' + encodeURIComponent(mealType) + '&restaurantCode=' + LunchMenuSource.RESTAURANT_ID);
+  return LunchMenuSource.parseMealList(raw, date, mealType);
+}
+function welstoryMenuResponse_(date) {
+  const cache = CacheService.getScriptCache(), cacheKey = WELSTORY_MENU_CACHE_PREFIX + date;
+  try {
+    const cached = JSON.parse(cache.get(cacheKey) || 'null');
+    if (cached && cached.ok === true && cached.menu && cached.menu.date === date) return cached;
+    if (cached && cached.ok === false && typeof cached.error === 'string') return cached;
+  } catch (_) {}
+  let result;
+  try {
+    result = { ok: true, menu: welstoryMenu_(date) };
+  } catch (error) {
+    const known = error && typeof error.code === 'string' && typeof error.message === 'string';
+    result = { ok: false, reason: known && error.code === 'SETUP' ? 'setup' : 'provider', error: known ? error.message : WELSTORY_NETWORK_ERROR };
+    if (!known) console.log('Lunch Club Welstory menu failed: ' + String(error && error.message || error).slice(0, 120));
+  }
+  // Setup errors are not cached, so the menu appears as soon as the account is registered.
+  const ttl = result.ok ? (date < LunchCore.today() ? WELSTORY_PAST_MENU_TTL_SECONDS : WELSTORY_MENU_TTL_SECONDS) : WELSTORY_ERROR_TTL_SECONDS;
+  if (result.ok || result.reason !== 'setup') {
+    try { cache.put(cacheKey, JSON.stringify(result), ttl); } catch (_) {}
+  }
+  return result;
+}
+// Apps Script 편집기에서 직접 실행하는 연결 진단입니다. 비밀번호와 토큰은 로그에 쓰지 않습니다.
+function testWelstoryConnection() {
+  const properties = PropertiesService.getScriptProperties();
+  properties.deleteProperty(WELSTORY_PAUSE_PROPERTY);
+  properties.deleteProperty(WELSTORY_MEAL_TYPE_PROPERTY);
+  welstoryCredentials_(properties);
+  console.log('1) 웰스토리 계정 스크립트 속성: 확인됨');
+  const deviceId = welstoryDeviceId_(properties);
+  const before = welstorySession_(properties), session = welstoryToken_(properties, deviceId, '');
+  const saved = welstorySession_(properties);
+  console.log('2) 로그인 세션: ' + (session.fresh ? '새로 로그인' : before && before.token === session.token ? '기존 세션 재사용' : '세션 연장') +
+    ' · 만료 예상 ' + Utilities.formatDate(new Date(saved ? saved.exp : Date.now()), 'Asia/Seoul', 'MM-dd HH:mm'));
+  const mealType = welstoryMealType_(properties, deviceId);
+  console.log('3) 점심 식사 코드: ' + mealType);
+  let date = LunchCore.today();
+  while (LunchCore.weekday(date) === 0 || LunchCore.weekday(date) === 6) date = LunchCore.shiftDate(date, 1);
+  const menu = welstoryMenu_(date);
+  CacheService.getScriptCache().remove(WELSTORY_MENU_CACHE_PREFIX + date);
+  console.log('4) ' + date + ' ' + LunchMenuSource.RESTAURANT_NAME + ' 점심: ' + (menu.courses.length
+    ? menu.courses.map(c => c.name + (c.takeout ? ' [테이크아웃]' : '') + (c.imageUrl ? ' (사진 있음)' : '')).join(' / ')
+    : '아직 등록된 메뉴가 없어요.'));
+  console.log('완료. 배포 > 배포 관리 > 새 버전으로 배포한 뒤 점심판을 새로고침하세요.');
+}
+
 /* Append this file after core.js and lunchtime-source.js to create the copy/paste Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
 const DATA_PREFIX = 'LUNCH_DAY_';
@@ -769,8 +1214,10 @@ function initializeLunchClub() {
     menuImageFolder_(properties, properties.getProperties(), true);
     properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
   } finally { lock.releaseLock(); }
-  UrlFetchApp.fetch('https://welplan.pmh.codes/api/health', { muteHttpExceptions: true });
+  // Authorizes outbound requests (Welstory+, Kakao, Threads) while running this in the editor.
+  UrlFetchApp.fetch('https://welplus.welstory.com/', { muteHttpExceptions: true, followRedirects: false });
   console.log('점심판 준비 완료. 배포 > 새 배포 > 웹 앱에서 실행 사용자: 나 / 액세스: 모든 사용자로 배포하세요.');
+  console.log('메가존 식단: 스크립트 속성에 LUNCH_WELSTORY_USERNAME과 LUNCH_WELSTORY_PASSWORD를 등록하고 testWelstoryConnection을 실행하세요.');
 }
 
 function output_(body, callback) {
@@ -1400,20 +1847,12 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, gangnamMenu: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, gangnamMenu: true, separateGroups: true, separateVenues: true, joinRequests: true, welstoryMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
-  const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;
-  const previous = cache.get(cacheKey); if (previous) return { ok: true, menu: JSON.parse(previous) };
-  const url = LunchCore.menuUrl(date);
-  const response = UrlFetchApp.fetch(url, { headers: { Accept: 'text/markdown' }, muteHttpExceptions: true, followRedirects: true });
-  if (response.getResponseCode() !== 200) throw new Error('식단 원본에 연결하지 못했어요. 원문 식단에서 확인해 주세요.');
-  const text = response.getContentText();
-  const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)), d = Number(date.slice(8, 10));
-  if (!text.includes(y + '년 ' + m + '월 ' + d + '일') || !text.includes('메가존산학연센터') || !text.includes('- Vendor:')) throw new Error('선택한 날짜의 식단 원문을 확인하지 못했어요.');
-  const menu = { date: date, dishes: LunchCore.parseMenuMarkdown(text), fetchedAt: new Date().toISOString(), source: url };
-  cache.put(cacheKey, JSON.stringify(menu), 600);
-  return { ok: true, menu: menu };
+  // 메가존 식단은 backend/welstory.js가 Welstory+ 회원 API에서 가져옵니다.
+  if (typeof welstoryMenuResponse_ !== 'function') return { ok: false, reason: 'setup', error: '공유 서버 코드에 웰스토리 연동이 빠졌어요. setup.html에서 코드를 다시 복사해 주세요.' };
+  return welstoryMenuResponse_(date);
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';

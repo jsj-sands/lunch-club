@@ -145,7 +145,7 @@
     if (!menu) return [];
     const courses = Array.isArray(menu.courses) ? menu.courses : (Array.isArray(menu.dishes) ? menu.dishes.map(name => ({ name })) : []);
     // Every date and data source uses the same two regular meals; takeout courses stay hidden.
-    return courses.filter(course => course && typeof course.name === 'string' && course.name.trim()
+    return courses.filter(course => course && typeof course.name === 'string' && course.name.trim() && course.takeout !== true
       && !/간편\s*식|데일리\s*팩|take[\s-]*out|테이크\s*아웃/i.test(course.name.normalize('NFKC'))).slice(0, 2).map(course => ({
       name: course.name.trim(), components: Array.isArray(course.components) ? course.components.filter(name => typeof name === 'string' && name.trim()) : [],
       imageUrl: typeof window.LunchMenuSource?.validImageURL === 'function' && window.LunchMenuSource.validImageURL(course.imageUrl) ? course.imageUrl : ''
@@ -170,17 +170,27 @@
   function viewMegaMeal(index, targetDate) {
     if (!C.validDate(targetDate) || !/^\d+$/.test(index || '')) return;
     const course = menuCourses(menus[targetDate])[Number(index)]; if (!course) return;
-    openDialog(course.name, `<p class="dialog-copy">${esc(dateText(targetDate))} · 메가존 점심</p>${course.imageUrl ? `<div class="full-menu-image"><img id="megaMealFull" src="${esc(course.imageUrl)}" alt="${esc(course.name)} 식단 사진" referrerpolicy="no-referrer"></div><p id="megaMealFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 아래 원문에서 확인해 주세요.</p>` : ''}<h3 class="mega-detail-heading">함께 나오는 메뉴</h3>${mealComponentsHTML(course)}<p class="dialog-copy"><a href="${C.menuUrl(targetDate)}" target="_blank" rel="noopener noreferrer">선택한 날 원문 보기 ↗</a></p>`, true);
+    openDialog(course.name, `<p class="dialog-copy">${esc(dateText(targetDate))} · 메가존 점심</p>${course.imageUrl ? `<div class="full-menu-image"><img id="megaMealFull" src="${esc(course.imageUrl)}" alt="${esc(course.name)} 식단 사진" referrerpolicy="no-referrer"></div><p id="megaMealFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 웰스토리플러스 앱에서 확인해 주세요.</p>` : ''}<h3 class="mega-detail-heading">함께 나오는 메뉴</h3>${mealComponentsHTML(course)}<p class="dialog-copy">웰스토리플러스 식단 기준이에요.</p>`, true);
+  }
+  // 메가존 식단은 팀 공유 서버가 웰스토리플러스 계정으로 대신 조회합니다(backend/welstory.js).
+  function megaMenuProblem(menu) {
+    if (!connection) return { title: '메가존 식단은 팀 공유 연결 후 볼 수 있어요', detail: '공유 서버가 웰스토리플러스에서 점심 메뉴를 대신 가져와요.', link: '<a class="menu-source-link" href="setup.html">팀 공유 연결 안내 ↗</a>', short: '공유 연결 후 확인할 수 있어요' };
+    if (!connectedReady) return { title: '공유 연결을 확인하고 있어요…', detail: '연결되면 메가존 식단을 바로 불러와요.', link: '', short: '공유 연결 확인 중…' };
+    if (!shared.features.welstoryMenu) return { title: '공유 서버 업데이트가 필요해요', detail: '메가존 식단을 웰스토리플러스에서 가져오도록 공유 서버 코드를 새 버전으로 배포해 주세요.', link: '<a class="menu-source-link" href="setup.html#update">업데이트 안내 ↗</a>', short: '공유 서버 업데이트 필요' };
+    return { title: '식단을 불러오지 못했어요', detail: menu?.errorMessage || '잠시 후 새로고침하거나 웰스토리플러스 앱에서 확인해 주세요.', link: '', short: '조회 실패 · 잠시 후 다시 확인해 주세요' };
   }
   function renderMegaDay() {
-    const menu = menus[date], source = C.menuUrl(date), loading = menuLoadingDates.has(date);
+    const menu = menus[date], loading = menuLoadingDates.has(date);
     let content = `<p class="menu-date-label">${esc(dateText(date))} · 점심</p>`;
     if (menuCourses(menu).length) {
-      content += menuDishesHTML(menu) + `<div class="menu-meta"><span>${menu.initial ? '미리 확인한 식단' : menu.error ? '최근 확인한 식단 · 재조회 실패' : '자동 조회'} · ${esc(timeText(menu.fetchedAt))}</span><a href="${source}" target="_blank" rel="noopener noreferrer">Welplan 원문 ↗</a></div>`;
+      content += menuDishesHTML(menu) + `<div class="menu-meta"><span>${menu.initial ? '미리 확인한 식단' : menu.error ? '최근 확인한 식단 · 재조회 실패' : '자동 조회'} · ${esc(timeText(menu.fetchedAt))}</span><span>웰스토리플러스 기준</span></div>`;
     } else if (menu && !menu.error && (menu.ok || Array.isArray(menu.dishes))) {
       content += `<div class="empty-menu"><strong>아직 공개된 일반식 메뉴가 없어요</strong><p>선택한 날짜의 메뉴가 올라오면 여기서 확인할 수 있어요.</p></div>`;
+    } else if (loading) {
+      content += `<div class="empty-menu"><strong>선택한 날짜의 식단을 확인하고 있어요</strong><p>웰스토리플러스에서 점심 메뉴를 가져오는 중이에요.</p></div>`;
     } else {
-      content += `<div class="empty-menu"><strong>${loading ? '선택한 날짜의 식단을 확인하고 있어요' : '식단을 불러오지 못했어요'}</strong><p>${loading ? '공개된 점심 메뉴를 가져오는 중이에요.' : '잠시 후 새로고침하거나 원문에서 확인해 주세요.'}</p><a class="menu-source-link" href="${source}" target="_blank" rel="noopener noreferrer">선택한 날 원문 보기 ↗</a></div>`;
+      const problem = megaMenuProblem(menu);
+      content += `<div class="empty-menu"><strong>${esc(problem.title)}</strong><p>${esc(problem.detail)}</p>${problem.link}</div>`;
     }
     return content;
   }
@@ -190,9 +200,9 @@
       const menu = menus[d], loading = menuLoadingDates.has(d), courses = menuCourses(menu);
       let content;
       if (courses.length) content = `<ul>${courses.map(course => `<li>${esc(course.name)}</li>`).join('')}</ul><details class="week-menu-details" data-meal-details-date="${d}" ${expandedMenuDates.has(d) ? 'open' : ''}><summary>사진·반찬 보기</summary>${menuDishesHTML(menu, d, true)}</details>${menu.error ? '<p class="week-menu-status">최근 확인한 식단 · 재조회 실패</p>' : ''}`;
-      else content = `<p class="week-menu-status">${loading ? '식단 확인 중…' : menu?.error ? '조회 실패 · 원문에서 확인해 주세요' : menu?.ok || Array.isArray(menu?.dishes) ? '아직 공개된 일반식 메뉴가 없어요' : '식단을 확인하고 있어요…'}</p>`;
-      return `<article class="week-menu-day${d === date ? ' selected-day' : ''}"><div class="week-menu-date"><button data-action="menuDate" data-id="${d}" aria-label="${esc(dateText(d))} 선택">${'일월화수목금토'[C.weekday(d)]}<strong>${Number(d.slice(5, 7))}.${Number(d.slice(8))}</strong>${d === today ? '<small>오늘</small>' : ''}</button></div><div class="week-menu-content">${content}<a href="${C.menuUrl(d)}" target="_blank" rel="noopener noreferrer">원문 ↗</a></div></article>`;
-    }).join('')}</div><p class="tiny-note">공개된 일반식 메뉴만 표시해요. 날짜를 누르면 그날의 점심을 선택할 수 있어요.</p>`;
+      else content = `<p class="week-menu-status">${loading ? '식단 확인 중…' : menu?.error ? esc(megaMenuProblem(menu).short) : menu?.ok || Array.isArray(menu?.dishes) ? '아직 공개된 일반식 메뉴가 없어요' : '식단을 확인하고 있어요…'}</p>`;
+      return `<article class="week-menu-day${d === date ? ' selected-day' : ''}"><div class="week-menu-date"><button data-action="menuDate" data-id="${d}" aria-label="${esc(dateText(d))} 선택">${'일월화수목금토'[C.weekday(d)]}<strong>${Number(d.slice(5, 7))}.${Number(d.slice(8))}</strong>${d === today ? '<small>오늘</small>' : ''}</button></div><div class="week-menu-content">${content}</div></article>`;
+    }).join('')}</div><p class="tiny-note">웰스토리플러스에 등록된 일반식 메뉴만 표시해요. 날짜를 누르면 그날의 점심을 선택할 수 있어요.</p>`;
   }
   function cleanKakaoProfile(value) {
     if (!value || value.sourceUrl !== KAKAO_CHANNEL || typeof window.LunchKakaoSource?.validImageURL !== 'function' || !window.LunchKakaoSource.validImageURL(value.imageUrl)) return null;
@@ -315,7 +325,7 @@
         content = renderGangnamMenu();
       } else content = `<p class="channel-info">${esc(p.subtitle || '동료가 제안한 오늘의 다른 식당이에요.')}</p>`;
       if (note) content += `<div class="menu-note"><strong>${esc(dateText(date))} · 함께 적은 메뉴 메모</strong>${esc(note)}</div>`;
-      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.id === 'megazone' ? `<button data-action="source">실시간 식단 ↗</button>` : p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
+      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
     }).join('');
   }
   function renderDecision() {
@@ -478,10 +488,12 @@
     if (!connection || syncing || busy || document.hidden) return;
     const target = connection, requestDate = date; syncing = true; renderConnection();
     try {
-      const before = JSON.stringify(shared);
+      const before = JSON.stringify(shared), menuReadyBefore = connectedReady && !!shared.features.welstoryMenu;
       const res = await jsonp({ action: 'state', date: requestDate }, target); if (target !== connection) return;
       mergeResponse(res); if (before !== JSON.stringify(shared)) render(); else renderConnection();
       loadKakaoProfile(!lastKakaoAttempt); loadGangnamMenu(requestDate);
+      // The Megazone menu is only available through the team server: load it once the server is ready.
+      if (!menuReadyBefore && shared.features.welstoryMenu) loadMenu();
     }
     catch (e) { if (target === connection) { syncError = e.message; renderConnection(); } }
     finally { syncing = false; renderConnection(); if (requestDate !== date && target === connection) sync(); }
@@ -494,23 +506,17 @@
     menuLoadingDates.add(currentDate); renderMenuCards();
     const task = Promise.resolve().then(async () => {
       try {
-        let menu;
-        try {
-          if (!window.LunchMenuSource) throw new Error('식단 연결 기능을 불러오지 못했어요.');
-          menu = await window.LunchMenuSource.fetchDay(currentDate);
-        } catch (publicError) {
-          const target = connection;
-          if (!target || !connectedReady) throw publicError;
-          const res = await jsonp({ action: 'menu', date: currentDate }, target);
-          if (!res.ok) throw new Error(res.error || '식단 원본을 불러오지 못했어요.');
-          menu = res.menu;
-        }
+        if (!window.LunchMenuSource) throw new Error('식단 연결 기능을 불러오지 못했어요.');
+        // Welstory+ needs a member login, so only the team server (Apps Script) can fetch the menu.
+        const target = connection, ready = !!target && connectedReady && !!shared.features.welstoryMenu;
+        const menu = await window.LunchMenuSource.fetchDay(currentDate, ready ? { request: params => jsonp(params, target) } : {});
         if (!menu || menu.date !== currentDate || !Array.isArray(menu.dishes) || menu.dishes.some(x => typeof x !== 'string')) throw new Error('날짜가 맞는 식단을 확인하지 못했어요.');
         menus[currentDate] = { ...menu, ok: true, initial: false, error: false };
         const kept = Object.fromEntries(Object.entries(menus).filter(([d]) => C.validDate(d)).sort(([a], [b]) => b.localeCompare(a)).slice(0, 35));
         try { write(KEYS.cache, kept); } catch (_) { /* Menu remains visible if storage is unavailable. */ }
       } catch (e) {
-        menus[currentDate] = { ...(menus[currentDate] || {}), date: currentDate, error: true };
+        const { errorMessage: _previousError, ...previous } = menus[currentDate] || {};
+        menus[currentDate] = { ...previous, date: currentDate, error: true, ...(e?.code === 'NOT_CONNECTED' ? {} : { errorMessage: String(e?.message || '').slice(0, 240) }) };
       } finally { menuLoadingDates.delete(currentDate); menuRequests.delete(currentDate); renderMenuCards(); }
     });
     menuRequests.set(currentDate, task);
@@ -647,10 +653,6 @@
     const options = ['', '연차·반차·외근·출장', '속이 안 좋아요', '선약이 있어요', '병원에 가요', '개인 사정'];
     const custom = current && !options.includes(current);
     openDialog(dateText(targetDate) + ' · 점심 불참', `<p class="dialog-copy">${esc(dateText(targetDate))}의 참석 인원과 투표 집계에서 빠져요. 사유는 남기지 않아도 됩니다. 적은 사유는 점심판 멤버에게 보여요.</p><form id="absenceForm" class="dialog-form" data-date="${targetDate}" data-member="${identity}"><label>사유 · 선택<select name="reason" id="absenceReason">${options.map(x => `<option value="${esc(x)}" ${current === x ? 'selected' : ''}>${x || '사유는 남기지 않을게요'}</option>`).join('')}<option value="custom" ${custom ? 'selected' : ''}>직접 입력</option></select></label><label id="customReasonLabel" ${custom ? '' : 'hidden'}>한 줄 메모<input name="customReason" maxlength="60" value="${custom ? esc(current) : ''}" placeholder="필요한 내용만 간단히 남겨 주세요"></label><button class="primary-button">이날 불참으로 저장</button></form>`);
-  }
-  function showSource() {
-    const url = C.menuUrl(date);
-    openDialog('메가존 · ' + dateText(date), `<p class="dialog-copy">Welplan의 실시간 원문입니다. 원문 서비스가 열리지 않으면 <a href="${url}" target="_blank" rel="noopener noreferrer"><u>새 창에서 확인하세요 ↗</u></a></p><iframe class="menu-frame" style="height:60vh" title="메가존 원문 식단" src="${url}" referrerpolicy="no-referrer"></iframe>`, true);
   }
   function showNote(id) {
     if (!identity) return showIdentity(); const p = C.places(day()).find(p => p.id === id); if (!p) return;
@@ -798,7 +800,6 @@
     else if (action === 'settings') showSettings();
     else if (action === 'retry') { syncError = ''; sync(); loadMenu(true); }
     else if (action === 'invite') shareLink();
-    else if (action === 'source') showSource();
     else if (action === 'date') changeDate(id);
     else if (action === 'dailyMember') showDailyMember(id, b.dataset.date);
     else if (action === 'ceoUnconfirm') {

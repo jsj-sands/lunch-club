@@ -7,10 +7,10 @@ const crypto=require('node:crypto');
 const KEY='a'.repeat(48),DATE='2026-10-19';
 function server(){
  const store={},cache=new Map();let locked=false,fetches=0;
- const properties={getProperties:()=>({...store}),setProperty(k,v){if(Buffer.byteLength(v)>9000)throw Error('property quota');store[k]=v;return this;},setProperties(v){Object.entries(v).forEach(([k,x])=>this.setProperty(k,x));return this;},deleteProperty(k){delete store[k];return this;}};
+ const properties={getProperties:()=>({...store}),getProperty:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setProperty(k,v){if(Buffer.byteLength(v)>9000)throw Error('property quota');store[k]=v;return this;},setProperties(v){Object.entries(v).forEach(([k,x])=>this.setProperty(k,x));return this;},deleteProperty(k){delete store[k];return this;}};
  const context={console,Date,Intl,URL,Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)}),getUuid:()=>crypto.randomUUID(),formatDate:()=>DATE},PropertiesService:{getScriptProperties:()=>properties},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},hasLock:()=>locked,releaseLock(){locked=false;}})},ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput:s=>({text:s,setMimeType(t){this.mime=t;return this;}})},UrlFetchApp:{fetch(){fetches++;return {getResponseCode:()=>200,getContentText:()=>'- Vendor: 삼성웰스토리\n- Date: 2026년 10월 19일 (월)\n# 메가존산학연센터\n## 점심\n- 나주곰탕\n- 김치볶음밥\n## Discovery\n- RSS: test'};}}};
  vm.createContext(context);
- vm.runInContext((fs.readFileSync(path.join(__dirname,'../core.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'../backend/server.js'),'utf8')).replace("'__TEAM_KEY__'",`'${KEY}'`),context);
+ vm.runInContext(['core.js','menu-source.js','backend/welstory.js','backend/server.js'].map(f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8')).join('\n').replace("'__TEAM_KEY__'",`'${KEY}'`),context);
  let seq=0;
  const post=(type,actor,payload,extra={})=>{const id=(++seq).toString(16).padStart(24,'0');const body={key:KEY,date:DATE,op:{type,actor,payload,id},...extra};return {body,response:JSON.parse(context.doPost({postData:{contents:JSON.stringify(body)}}).text)};};
  const get=(extra={})=>JSON.parse(context.doGet({parameter:{key:KEY,date:DATE,action:'state',...extra}}).text);
@@ -24,7 +24,7 @@ test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요
 });
 test('버전 5 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,6);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true});
+ assert.equal(state.serverVersion,6);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,welstoryMenu:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
@@ -54,10 +54,13 @@ test('기본 일정 동시 수정은 버전 충돌을 안내하고 이전 설정
  cfg.scheduleEnd='2026-11-30';const result=s.post('settings','juri',cfg,{configRevision:0});
  const current=s.get({receipt:result.body.op.id});assert.equal(current.receipt.ok,false);assert.equal(current.settings.scheduleEnd,'2027-12-31');
 });
-test('메뉴 날짜와 본문을 검증하고 10분 캐시를 사용한다',()=>{
- const s=server();const result=s.get({action:'menu'});assert.equal(result.ok,true);assert.deepEqual(result.menu.dishes,['나주곰탕','김치볶음밥']);
- s.get({action:'menu'});assert.equal(s.fetches(),1);
- const wrong=s.get({action:'menu',date:'2026-10-20'});assert.equal(wrong.ok,false);assert.match(wrong.error,/날짜/);
+test('웰스토리 계정이 없으면 외부 요청 없이 설정 안내를 돌려주고 안내를 캐시하지 않는다',()=>{
+ const s=server();const result=s.get({action:'menu'});
+ assert.equal(result.ok,false);assert.equal(result.reason,'setup');assert.match(result.error,/LUNCH_WELSTORY_USERNAME/);
+ assert.equal(s.fetches(),0);
+ s.store.LUNCH_WELSTORY_USERNAME='member';
+ assert.equal(s.get({action:'menu'}).reason,'setup');assert.equal(s.fetches(),0);
+ assert.equal(s.get({action:'menu',date:'2026-13-01'}).ok,false);
 });
 test('긴 한국어 메뉴와 다수 식당을 저장해도 9KB 속성 한도를 넘지 않는다',()=>{
  const s=server();

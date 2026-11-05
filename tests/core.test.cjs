@@ -365,10 +365,13 @@ test('저장된 쌍은 유효한 두 멤버·동의 상태·개인 선택이 맞
   const detached = C.pairFor('seongjun',restored); detached.status = 'pending';
   assert.equal(restored.pairs[0].status,'accepted');
 });
-test('메가존 Markdown에서 점심 주메뉴만 추출한다', () => {
-  const input='# 메뉴\n## 아침\n- 토스트\n## 점심\n\n- 나주곰탕\n  - Nutrition: 817 kcal\n  - Components: 나주곰탕\n- 치즈볶음밥\n## 저녁\n- 카레\n';
-  assert.deepEqual(C.parseMenuMarkdown(input),['나주곰탕','치즈볶음밥']);
-  assert.deepEqual(C.parseMenuMarkdown('# 메뉴\n## 아침\n- 토스트'),[]);
+test('메가존 카드는 중단된 Welplan 대신 지도 링크를 쓰고 식단 원문 주소를 만들지 않는다', () => {
+  const megazone = C.PLACES.find(p => p.id === 'megazone');
+  assert.equal(megazone.url, C.MEGAZONE_MAP);
+  assert.equal(new URL(megazone.url).hostname, 'map.naver.com');
+  assert.equal(C.safeUrl(megazone.url), megazone.url);
+  assert.equal(C.menuUrl, undefined);
+  assert.equal(C.parseMenuMarkdown, undefined);
 });
 
 // 2026-10-20: CEO venue is date-wide while regular cafeteria choices stay person-wide.

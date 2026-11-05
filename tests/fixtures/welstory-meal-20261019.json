@@ -1,0 +1,21 @@
+{
+  "code": 200,
+  "message": null,
+  "data": {
+    "mealList": [
+      { "menuName": "나주곰탕*당면사리", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "BB", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 BB", "typicalMenu": "Y", "salesType": "L1", "menuMealSeq": 1, "photoUrl": "https://img-welmenu.welstory.com/data/manager/recipe/E5Z5/20261019/", "photoCd": "s20261019103924.jpg" },
+      { "menuName": "데리야끼고기경단조림", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "BB", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 BB", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 2, "photoUrl": "", "photoCd": "" },
+      { "menuName": "건파래볶음", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "BB", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 BB", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 3, "photoUrl": "", "photoCd": "" },
+      { "menuName": "오복지무침", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "BB", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 BB", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 4, "photoUrl": "", "photoCd": "" },
+      { "menuName": "깍두기", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "BB", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 BB", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 5, "photoUrl": "", "photoCd": "" },
+      { "menuName": "흑미밥", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "BB", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 BB", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 6, "photoUrl": "", "photoCd": "" },
+      { "menuName": "눈꽃치즈김치볶음밥", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "CC", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 CC", "typicalMenu": "Y", "salesType": "L1", "menuMealSeq": 7, "photoUrl": "http://samsungwelstory.com/data/manager/recipe/E5Z5/20261019/", "photoCd": "s20261019104145.jpg" },
+      { "menuName": "돼지고기육전*부추무침", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "CC", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 CC", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 8, "photoUrl": "", "photoCd": "" },
+      { "menuName": "오복지무침", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "CC", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 CC", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 9, "photoUrl": "", "photoCd": "" },
+      { "menuName": "깍두기", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "CC", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 CC", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 10, "photoUrl": "", "photoCd": "" },
+      { "menuName": "온육수", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "CC", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 CC", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 11, "photoUrl": "", "photoCd": "" },
+      { "menuName": "[오늘의데일리팩] 치킨텐더포케", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "DD", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 DD", "typicalMenu": "Y", "salesType": "L1", "menuMealSeq": 12, "photoUrl": "https://img-welmenu.welstory.com/data/manager/recipe/E5Z5/20261019/", "photoCd": "s20261019103631.jpg" },
+      { "menuName": "[오늘의샐러드] New 차돌유자포테이토샐러드)", "hallNo": "E5Z5", "menuDt": "20261019", "menuCourseType": "DD", "menuMealType": "2", "restaurantCode": "REST007327", "restaurantName": "메가존산학연센터", "courseTxt": "코스 DD", "typicalMenu": "N", "salesType": "L1", "menuMealSeq": 13, "photoUrl": "", "photoCd": "" }
+    ]
+  }
+}

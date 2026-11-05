@@ -44,8 +44,10 @@ function initializeLunchClub() {
     menuImageFolder_(properties, properties.getProperties(), true);
     properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
   } finally { lock.releaseLock(); }
-  UrlFetchApp.fetch('https://welplan.pmh.codes/api/health', { muteHttpExceptions: true });
+  // Authorizes outbound requests (Welstory+, Kakao, Threads) while running this in the editor.
+  UrlFetchApp.fetch('https://welplus.welstory.com/', { muteHttpExceptions: true, followRedirects: false });
   console.log('점심판 준비 완료. 배포 > 새 배포 > 웹 앱에서 실행 사용자: 나 / 액세스: 모든 사용자로 배포하세요.');
+  console.log('메가존 식단: 스크립트 속성에 LUNCH_WELSTORY_USERNAME과 LUNCH_WELSTORY_PASSWORD를 등록하고 testWelstoryConnection을 실행하세요.');
 }
 
 function output_(body, callback) {
@@ -558,20 +560,12 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, welstoryMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function menuResponse_(date) {
-  const cache = CacheService.getScriptCache(), cacheKey = 'menu_' + date;
-  const previous = cache.get(cacheKey); if (previous) return { ok: true, menu: JSON.parse(previous) };
-  const url = LunchCore.menuUrl(date);
-  const response = UrlFetchApp.fetch(url, { headers: { Accept: 'text/markdown' }, muteHttpExceptions: true, followRedirects: true });
-  if (response.getResponseCode() !== 200) throw new Error('식단 원본에 연결하지 못했어요. 원문 식단에서 확인해 주세요.');
-  const text = response.getContentText();
-  const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)), d = Number(date.slice(8, 10));
-  if (!text.includes(y + '년 ' + m + '월 ' + d + '일') || !text.includes('메가존산학연센터') || !text.includes('- Vendor:')) throw new Error('선택한 날짜의 식단 원문을 확인하지 못했어요.');
-  const menu = { date: date, dishes: LunchCore.parseMenuMarkdown(text), fetchedAt: new Date().toISOString(), source: url };
-  cache.put(cacheKey, JSON.stringify(menu), 600);
-  return { ok: true, menu: menu };
+  // 메가존 식단은 backend/welstory.js가 Welstory+ 회원 API에서 가져옵니다.
+  if (typeof welstoryMenuResponse_ !== 'function') return { ok: false, reason: 'setup', error: '공유 서버 코드에 웰스토리 연동이 빠졌어요. setup.html에서 코드를 다시 복사해 주세요.' };
+  return welstoryMenuResponse_(date);
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';

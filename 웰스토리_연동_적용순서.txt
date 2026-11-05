@@ -1,0 +1,54 @@
+SANDS Lab Lunch Club - 2026-11-05 메가존 식단 웰스토리플러스 연동
+
+[왜 바꿨나요]
+메가존 식단을 가져오던 Welplan(welplan.pmh.codes)이 서비스를 중단해
+메가존 카드가 "식단 확인 중…"에서 멈춰 있었습니다.
+이제 팀 공유 서버(Google Apps Script)가 웰스토리플러스 앱 계정으로
+메가존산학연센터 점심을 직접 가져옵니다.
+
+[1. GitHub에 파일 올리기]
+https://github.com/jsj-sands/lunch-club → Add file → Upload files
+이 ZIP을 압축 푼 폴더 "안의" 파일과 폴더를 모두 끌어 놓고 Commit changes.
+(index.html이 저장소 최상위에 있어야 합니다. 기존 파일은 삭제하지 마세요.)
+바뀐 파일: index.html, app.js, core.js, menu-source.js, setup.html, README.md,
+          backend/welstory.js(새 파일), backend/server.js, backend/Code.gs, tests/ 일부
+
+[2. 공유 서버(Apps Script) 업데이트]
+① 평소 팀 공유를 설정했던 브라우저에서
+   https://jsj-sands.github.io/lunch-club/setup.html#update 열기
+   → "수정 버전: 20261105-welstory"가 보이는지 확인 (안 보이면 Ctrl+Shift+R)
+② "공유 서버 코드 전체 복사" → 기존 Apps Script 프로젝트의 Code.gs 전체 교체 → 저장
+③ 프로젝트 설정(톱니바퀴) → 스크립트 속성 → 스크립트 속성 추가
+     LUNCH_WELSTORY_USERNAME = 웰스토리플러스 앱 아이디
+     LUNCH_WELSTORY_PASSWORD = 웰스토리플러스 앱 비밀번호
+④ 편집기 함수 목록에서 testWelstoryConnection 선택 → 실행 (권한 요청 시 승인)
+   실행 로그 예:
+     1) 웰스토리 계정 스크립트 속성: 확인됨
+     2) 로그인 세션: 새로 로그인 · 만료 예상 ...
+     3) 점심 식사 코드: 2
+     4) 2026-11-05 메가존산학연센터 점심: ○○○ (사진 있음) / ...
+⑤ 배포 → 배포 관리 → 기존 웹 앱 수정(연필) → 새 버전 → 배포
+⑥ 점심판 새로고침 → 메가존 카드에 메뉴 1·메뉴 2와 사진이 나오면 완료
+
+[꼭 확인할 것]
+- 테스트 후 휴대폰 웰스토리플러스 앱이 로그아웃되는지 확인하세요.
+  같은 계정으로 서버가 로그인하면 앱이 로그아웃될 수 있습니다.
+  서버는 세션을 저장해 재사용하고 만료될 때만 다시 로그인합니다.
+- 아이디·비밀번호는 Apps Script 스크립트 속성에만 넣고 GitHub에는 넣지 마세요.
+  스크립트 속성은 Apps Script 프로젝트 편집자가 볼 수 있습니다.
+- 로그인이 거부되면 계정 잠김을 막기 위해 30분간 다시 로그인하지 않습니다.
+  비밀번호를 고친 뒤 testWelstoryConnection을 실행하면 바로 다시 시도합니다.
+
+[testWelstoryConnection 결과별 조치]
+- "스크립트 속성에 ... 등록해 주세요"  → ③의 속성 이름·값 확인
+- "로그인에 실패했어요 (401/403 등)"   → 아이디·비밀번호 확인
+- "새 로그인 세션을 받지 않았어요"      → 웰스토리가 Google 서버 접속을 거부했을 수 있음.
+                                        로그 내용을 그대로 전달해 주세요.
+- "식단 서버에 연결하지 못했어요"       → 웰스토리가 Google 서버 IP를 막았을 수 있음.
+                                        잠시 후 재시도, 계속되면 로그를 전달해 주세요.
+
+[검증 범위]
+- 웰스토리 응답 형식을 흉내 낸 테스트 서버로 로그인·세션 재사용·재로그인·
+  로그인 일시 중지·식단 표시를 자동 테스트했습니다(tests/welstory-server.test.cjs).
+- 실제 웰스토리 계정 로그인, Google 서버에서의 접속 허용 여부,
+  휴대폰 앱 로그아웃 여부는 ④ 실행으로만 확인할 수 있습니다.
