@@ -21,7 +21,6 @@
   let date = C.validDate(deepLinkDate) ? deepLinkDate : C.today(), followsToday = date === C.today(), lastToday = C.today();
   let shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} };
   let syncing = false, busy = false, syncError = '', lastSync = null, toastTimer;
-  let menuView = 'day';
   let guideCategory = '전체', guideQuery = '', guideLimit = 6;
   const GUIDE_CATEGORIES = ['한식', '중식', '일식', '양식', '분식', '아시안'];
   const megaPhotos = new Map(), megaLoads = new Map(), megaErrors = new Set();
@@ -140,9 +139,9 @@
     renderMyResponse(); renderPairBoard();
   }
   // The Megazone card shows manually uploaded screenshots only, never vendor credentials.
-  const megaSlot=(d,scope)=>scope+':'+(scope==='megaWeek'?C.weekDates(d)[0]:d);
-  const megaDayMeta=(d=date)=>shared.menuImages[megaSlot(d,'megaDay')]||shared.menuImages[megaSlot(d,'megaWeek')]||null;
-  const megaShownMeta=()=>menuView==='week'?(shared.menuImages[megaSlot(date,'megaWeek')]||null):megaDayMeta();
+  const megaSlot=d=>'megaDay:'+d;
+  const megaDayMeta=(d=date)=>shared.menuImages[megaSlot(d)]||null;
+  const megaShownMeta=()=>megaDayMeta();
   const megaReady=()=>!!(connection&&connectedReady&&shared.features.megaPhotos&&shared.features.menuImages);
   function megaPlaceholder(){
     if(!connection)return '<div class="image-empty"><strong>팀 공유에 연결해 주세요</strong><p>동료 초대 링크로 연결하면 식단 사진을 공유할 수 있어요.</p><a href="setup.html" class="menu-source-link">공유 연결 안내 ↗</a></div>';
@@ -155,25 +154,16 @@
     if(megaErrors.has(meta.id))return '<div class="image-empty"><strong>사진을 불러오지 못했어요</strong><p>연결을 확인하고 다시 불러와 주세요.</p></div><button class="secondary-button" data-action="megaReload">사진 다시 불러오기 ↻</button>';
     const data=megaPhotos.get(meta.id);
     if(!data)return '<div class="image-empty"><strong>사진을 불러오고 있어요…</strong></div>';
-    const scope=meta.scope==='megaWeek'?'이번 주 전체':'해당 날짜';
+    const scope='선택한 날짜';
     return '<button class="menu-photo-button mega-uploaded-photo" data-action="megaZoom" aria-label="메가존 식단 사진 확대"><img class="menu-photo" src="'+esc(data)+'" alt="메가존 식단 캡처" loading="lazy"><span>사진 크게 보기 ↗</span></button><p class="image-caption"><strong>'+scope+' · '+esc(nameOf(meta.uploadedBy)||'직원')+'님 공유</strong><span>'+esc(timeText(meta.uploadedAt))+' 업로드 · 사진에 적힌 날짜를 확인해 주세요.</span></p>';
   }
-  function megaActions(scope,meta){
+  function megaActions(meta){
     if(!megaReady())return '';
-    return '<div class="image-share-row mega-image-actions"><button class="primary-button" data-action="megaUpload" data-scope="'+scope+'">'+(meta?'↻ 사진 교체':'＋ 식단 사진 올리기')+'</button>'+(meta?'<button class="danger-button" data-action="megaDelete" data-scope="'+esc(meta.scope)+'" data-id="'+esc(meta.id)+'">사진 삭제</button>':'')+'</div><p class="upload-hint">앱에서 캡처한 JPG·PNG·WEBP 사진을 선택하면 자동으로 압축해 공유합니다.</p>';
+    return '<div class="image-share-row mega-image-actions"><button class="primary-button" data-action="megaUpload">'+(meta?'↻ 사진 교체':'＋ 식단 사진 올리기')+'</button>'+(meta?'<button class="danger-button" data-action="megaDelete" data-id="'+esc(meta.id)+'">사진 삭제</button>':'')+'</div><p class="upload-hint">선택한 날짜의 메뉴 사진만 공유해요. JPG·PNG·WEBP 파일을 자동으로 압축합니다.</p>';
   }
   function renderMegaDay(){
     const meta=megaReady()?megaDayMeta():null;
-    return '<p class="menu-date-label">'+esc(dateText(date))+' · 메가존 점심</p>'+megaPhotoHTML(meta)+megaActions('megaDay',meta);
-  }
-  function renderMegaWeek(){
-    const days=C.weekDates(date), week=days[0], meta=megaReady()?shared.menuImages[megaSlot(date,'megaWeek')]:null;
-    const title='<div class="week-menu-heading"><strong>'+(week===C.weekDates(C.today())[0]?'이번 주':'선택한 주')+' 식단 사진</strong><span>'+week.slice(5).replace('-','.')+' – '+days[4].slice(5).replace('-','.')+'</span></div>';
-    const rows=days.map(d=>{
-      const text=shared.menuImages[megaSlot(d,'megaDay')]?'하루 사진 있음 · 날짜를 눌러 확인':shared.menuImages[megaSlot(d,'megaWeek')]?'주간 사진 있음 · 날짜를 눌러 확인':'사진 미등록';
-      return '<article class="week-menu-day'+(d===date?' selected-day':'')+'"><div class="week-menu-date"><button data-action="menuDate" data-id="'+d+'" aria-label="'+esc(dateText(d))+' 식단 보기">'+('일월화수목금토'[C.weekday(d)])+'<strong>'+Number(d.slice(5,7))+'.'+Number(d.slice(8))+'</strong></button></div><div class="week-menu-content"><p class="week-menu-status">'+text+'</p></div></article>';
-    }).join('');
-    return title+megaPhotoHTML(meta)+megaActions('megaWeek',meta)+'<div class="week-menu-list">'+rows+'</div><p class="tiny-note">이번 주 전체 사진을 올릴 수 있으며, 날짜별 사진이 있으면 해당 날에 우선 표시해요.</p>';
+    return '<p class="menu-date-label">'+esc(dateText(date))+' · 메가존 점심</p>'+megaPhotoHTML(meta)+megaActions(meta);
   }
   function loadMegaPhoto(force=false){
     if(!megaReady())return Promise.resolve();
@@ -196,11 +186,11 @@
     if(!photo){loadMegaPhoto(true);return toast('사진을 불러오는 중이에요. 다시 눌러 주세요.');}
     openDialog('메가존 · '+dateText(date)+' 식단 사진','<p class="dialog-copy">직원이 공유한 앱 캡처입니다. 사진 속 메뉴 날짜를 확인해 주세요.</p><div class="full-menu-image"><img id="megaPhotoFull" src="'+esc(photo)+'" alt="메가존 식단 확대"></div><p id="megaPhotoError" class="inline-warning" hidden>사진을 표시하지 못했어요.</p>',true);
   }
-  function openMegaUpload(scope){
+  function openMegaUpload(){
     if(!megaReady())return toast('팀 공유 서버를 사진 업로드 버전으로 갱신한 뒤 사용해 주세요.');
     if(!identity)return showIdentity();
-    megaDraft=null;const weekly=scope==='megaWeek';
-    openDialog('메가존 식단 사진 올리기','<p class="dialog-copy">웰스토리플러스 앱에서 메뉴만 캡처해 주세요. 계정정보·바코드·QR코드가 포함되지 않게 확인하세요.</p><form id="megaUploadForm" data-date="'+date+'"><label for="megaScope">적용 날짜</label><select id="megaScope" name="scope"><option value="megaDay"'+(!weekly?' selected':'')+'>선택한 날만 · '+esc(dateText(date))+'</option><option value="megaWeek"'+(weekly?' selected':'')+'>선택한 주 전체 · 월~일</option></select><label for="megaFile">사진 선택 (원본 15MB 이하)</label><input id="megaFile" type="file" accept="image/png,image/jpeg,image/webp" required><div id="megaPreview" class="upload-preview" hidden></div><p id="megaStatus" class="upload-status" role="status">파일을 고르면 미리 보여 드려요.</p><button class="primary-button" type="submit" id="megaSave" disabled>팀원에게 사진 공유하기</button></form>');
+    megaDraft=null;
+    openDialog('메가존 식단 사진 올리기','<p class="dialog-copy">웰스토리플러스 앱에서 메뉴만 캡처해 주세요. 계정정보·바코드·QR코드가 포함되지 않게 확인하세요.</p><form id="megaUploadForm" data-date="'+date+'"><p class="dialog-copy">등록 날짜: <strong>'+esc(dateText(date))+'</strong> · 이 날짜에만 사진이 보여요.</p><label for="megaFile">사진 선택 (원본 15MB 이하)</label><input id="megaFile" type="file" accept="image/png,image/jpeg,image/webp" required><div id="megaPreview" class="upload-preview" hidden></div><p id="megaStatus" class="upload-status" role="status">파일을 고르면 미리 보여 드려요.</p><button class="primary-button" type="submit" id="megaSave" disabled>팀원에게 사진 공유하기</button></form>');
   }
   async function prepareMega(file){
     megaDraft=null;const status=$('megaStatus'),button=$('megaSave'),preview=$('megaPreview');
@@ -229,21 +219,21 @@
   }
   async function saveMega(form){
     if(!megaDraft)return toast('먼저 사진을 선택해 주세요.');
-    const when=form.dataset.date,scope=$('megaScope').value;
-    if(!C.validDate(when)||!['megaDay','megaWeek'].includes(scope))return toast('날짜를 확인해 주세요.');
-    const original=megaDraft,old=shared.menuImages[megaSlot(when,scope)];
+    const when=form.dataset.date,scope='megaDay';
+    if(!C.validDate(when))return toast('날짜를 확인해 주세요.');
+    const original=megaDraft,old=shared.menuImages[megaSlot(when)];
     $('megaSave').disabled=true;$('megaStatus').textContent='팀 공유에 저장 중…';
     const ok=await mutate('menuImageUpload',{scope,dataUrl:original.dataUrl,name:original.name,expectedImageId:old?.id||''},when);
     if(ok){
-      const saved=shared.menuImages[megaSlot(when,scope)];if(saved)megaPhotos.set(saved.id,original.dataUrl);
+      const saved=shared.menuImages[megaSlot(when)];if(saved)megaPhotos.set(saved.id,original.dataUrl);
       megaDraft=null;closeDialog();renderMenuCards();loadMegaPhoto();toast('메가존 사진을 팀원에게 공유했어요.');
     }else{if($('megaStatus'))$('megaStatus').textContent='저장에 실패했어요. 연결 상태를 확인해 주세요.';if($('megaSave'))$('megaSave').disabled=false;}
   }
-  async function deleteMega(id,scope){
-    const meta=megaShownMeta();if(!meta||meta.id!==id||meta.scope!==scope)return toast('사진이 바뀌었어요. 새로고침해 주세요.');
+  async function deleteMega(id){
+    const meta=megaShownMeta();if(!meta||meta.id!==id||meta.scope!=='megaDay')return toast('사진이 바뀌었어요. 새로고침해 주세요.');
     if(!identity)return showIdentity();
-    if(!confirm((scope==='megaWeek'?'이번 주':'이날')+' 식단 사진을 삭제할까요? 팀원 화면에서도 사라집니다.'))return;
-    if(await mutate('menuImageDelete',{scope,expectedImageId:id},date)){megaPhotos.delete(id);megaErrors.delete(id);renderMenuCards();loadMegaPhoto();toast('식단 사진을 삭제했어요.');}
+    if(!confirm('이날 식단 사진을 삭제할까요? 팀원 화면에서도 사라집니다.'))return;
+    if(await mutate('menuImageDelete',{scope:'megaDay',expectedImageId:id},date)){megaPhotos.delete(id);megaErrors.delete(id);renderMenuCards();loadMegaPhoto();toast('식단 사진을 삭제했어요.');}
   }
   function cleanKakaoProfile(value) {
     if (!value || value.sourceUrl !== KAKAO_CHANNEL || typeof window.LunchKakaoSource?.validImageURL !== 'function' || !window.LunchKakaoSource.validImageURL(value.imageUrl)) return null;
@@ -357,14 +347,14 @@
     $('restaurantCards').innerHTML = C.PLACES.map((p, i) => {
       const chosen = d.votes[identity] === p.id, note = d.notes[p.id]; let content = '';
       if (p.id === 'megazone') {
-        content = `<div class="menu-tabs" role="group" aria-label="메가존 식단 보기"><button data-action="menuView" data-id="day" aria-pressed="${menuView === 'day'}">${date === C.today() ? '오늘 식단' : '선택한 날 식단'}</button><button data-action="menuView" data-id="week" aria-pressed="${menuView === 'week'}">${C.weekDates(date)[0] === C.weekDates(C.today())[0] ? '이번 주' : '선택한 주'} 식단</button></div>${menuView === 'week' ? renderMegaWeek() : renderMegaDay()}`;
+        content = renderMegaDay();
       } else if (p.id === 'lunchtime') {
         content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>런치타임 카카오 채널</strong><p>점심판을 열 때 자동 조회 · 열어 두면 5분마다 확인</p></div><span class="arrow">↗</span></a>${renderLunchImage()}`;
       } else if (p.id === 'gangnambab') {
         content = renderGangnamMenu();
       } else content = `<p class="channel-info">${esc(p.subtitle || '동료가 제안한 오늘의 다른 식당이에요.')}</p>`;
       if (note) content += `<div class="menu-note"><strong>${esc(dateText(date))} · 함께 적은 메뉴 메모</strong>${esc(note)}</div>`;
-      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'megazone' ? '우리의 기본 픽' : p.id === 'lunchtime' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
+      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'lunchtime' ? '우리의 기본 픽' : p.id === 'megazone' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
     }).join('');
   }
   function renderDecision() {
@@ -798,12 +788,10 @@
       if (day().votes[identity] === id) return toast('이미 이 장소를 선택했어요. 다른 식당을 누르면 변경돼요.');
       if (await mutate('vote', { placeId: id })) toast(dateText(date) + ' 일반 점심 장소를 ' + (C.PLACES.find(p => p.id === id)?.name || '') + '(으)로 저장했어요.');
     }
-    else if (action === 'menuView') { menuView = id === 'week' ? 'week' : 'day'; renderMenuCards(); loadMegaPhoto(); }
-    else if (action === 'menuDate') { menuView = 'day'; changeDate(id); }
-    else if (action === 'megaUpload') openMegaUpload(b.dataset.scope);
+    else if (action === 'megaUpload') openMegaUpload();
     else if (action === 'megaZoom') zoomMega();
     else if (action === 'megaReload') loadMegaPhoto(true);
-    else if (action === 'megaDelete') deleteMega(id,b.dataset.scope);
+    else if (action === 'megaDelete') deleteMega(id);
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
     else if (action === 'refreshGangnamMenu') loadGangnamMenu(date, true);

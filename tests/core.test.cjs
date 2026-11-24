@@ -179,9 +179,9 @@ test('일정 적용기한 이후에는 종료된 대표님과 점심 반복 규�
 test('일반 점심은 메가존·런치타임·강남밥상을 선택할 수 있고 재선택은 한 사람 한 표로 변경된다', () => {
   let d=choose(C.emptyDay(),'seongjun','in');
   d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'megazone'}));
-  assert.deepEqual(C.tally(monday,d,settings),{megazone:['seongjun'],lunchtime:[],gangnambab:[]});
+  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:[],megazone:['seongjun'],gangnambab:[]});
   d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'lunchtime'}));
-  assert.deepEqual(C.tally(monday,d,settings),{megazone:[],lunchtime:['seongjun'],gangnambab:[]});
+  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:['seongjun'],megazone:[],gangnambab:[]});
   assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:null})),/메가존·런치타임·강남밥상/);
   assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'})),/메가존·런치타임·강남밥상/);
 });
@@ -224,7 +224,7 @@ test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 �
   assert.deepEqual(restored,{...legacy,ceoDecision:null,separateVenues:{},pairs:[],joinRequests:[]});
   assert.equal(JSON.stringify(legacy),before);
   assert.deepEqual(C.participants(monday,restored,settings).map(m => m.id),['seongjun']);
-  assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[],gangnambab:[]});
+  assert.deepEqual(C.tally(monday,restored,settings),{lunchtime:[],megazone:[],gangnambab:[]});
   const returned = choose(restored,'yunchul','in');
   assert.deepEqual(C.tally(monday,returned,settings).megazone,['yunchul']);
   assert.deepEqual(returned.decision,legacy.decision);

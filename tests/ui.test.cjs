@@ -1713,6 +1713,9 @@ test('메가존은 웰스토리 API를 전혀 호출하지 않고 사진 업로�
  assert.equal(connected.requests.some(r=>r.action==='menu'),false);
  await connected.action('megaUpload',undefined,{'data-scope':'megaDay'});
  assert.equal(connected.element('megaUploadForm').dataset.date,monday);
+ assert.equal(connected.element('megaScope'),undefined);
+ assert.doesNotMatch(connected.element('restaurantCards').innerHTML,/data-action="menuView"|이번 주 식단/);
+ assert.doesNotMatch(connected.element('dialogContent').innerHTML,/megaWeek|주 전체|사진 적용 기간/);
  assert.match(connected.element('dialogContent').innerHTML,/웰스토리플러스 앱에서 메뉴만 캡처/);
 });
 test('메가존 캡처는 하루별 Drive 슬롯에 압축 업로드하고 팀원의 화면에 같은 이미지를 표시한다',async()=>{
@@ -1735,7 +1738,6 @@ test('메가존 캡처는 하루별 Drive 슬롯에 압축 업로드하고 팀�
  };
  const uploader=await boot({connected:true,server,post,identity:'seongjun'});
  await uploader.action('megaUpload',undefined,{'data-scope':'megaDay'});
- uploader.element('megaScope').value='megaDay';
  uploader.element('megaFile').files=[imageFile];await uploader.dispatch('change',uploader.element('megaFile'));
  assert.equal(uploader.element('megaSave').disabled,false);
  await uploader.dispatch('submit',uploader.element('megaUploadForm'));
@@ -1748,4 +1750,14 @@ test('메가존 캡처는 하루별 Drive 슬롯에 압축 업로드하고 팀�
  assert.match(teammate.element('restaurantCards').innerHTML,/mega-uploaded-photo/);
  assert.match(teammate.element('restaurantCards').innerHTML,/조성준/);
  assert.equal(teammate.requests.some(x=>x.action==='menu'),false);
+});
+
+test('런치타임을 첫 번째 기본 픽으로 표시하고 메가존은 두 번째 대안으로 표시한다',async()=>{
+ const ui=await boot({identity:'seongjun'});
+ const html=ui.element('restaurantCards').innerHTML;
+ const first=html.indexOf('<h3>런치타임</h3>'),second=html.indexOf('<h3>메가존</h3>');
+ assert.ok(first>=0&&second>first,'런치타임이 메가존보다 앞에 표시돼야 합니다.');
+ assert.match(html.slice(first,second),/우리의 기본 픽/);
+ assert.match(html.slice(second),/기분 좋은 대안/);
+ assert.deepEqual(C.PLACES.map(p=>p.id),['lunchtime','megazone','gangnambab']);
 });

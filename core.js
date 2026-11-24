@@ -32,8 +32,8 @@
   // 메가존 메뉴 사진은 직원이 앱 화면을 캡처해 팀 공유 Drive 폴더에 직접 올립니다.
   const MEGAZONE_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
-    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },
     { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' },
+    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },
     { id: 'gangnambab', name: '강남밥상', subtitle: 'Threads 최신 게시물 · 메뉴 공지 화면 자동 보기', url: 'https://www.threads.com/@gangnambab', menuUrl: 'https://www.threads.com/@gangnambab', type: 'cafeteria' }
   ];
   function clone(v) { return JSON.parse(JSON.stringify(v)); }

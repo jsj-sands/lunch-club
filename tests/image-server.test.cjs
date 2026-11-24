@@ -227,18 +227,19 @@ test('이미지 삭제 후 영수증 저장 실패를 재시도해도 새 이미
  }
 });
 
-test('메가존 전용 하루·주간 사진은 기존 런치타임 이미지와 서로 다른 비공개 슬롯에 보관된다',()=>{
+test('메가존 전용 하루 사진은 런치타임 기존 사진과 분리하며 주간 업로드를 거절한다',()=>{
  const c=client();
  const old=c.post({scope:'day'});
  const day=c.post({scope:'megaDay'});
  const week=c.post({scope:'megaWeek'});
  assert.equal(receipt(c,old).ok,true);
  assert.equal(receipt(c,day).ok,true);
- assert.equal(receipt(c,week).ok,true);
+ assert.equal(receipt(c,week).ok,false);
+ assert.match(receipt(c,week).error,/적용 범위/);
  const images=c.get().menuImages;
  assert.ok(images['day:2026-10-19']);
  assert.equal(images['megaDay:2026-10-19'].scope,'megaDay');
- assert.equal(images['megaWeek:2026-10-19'].endDate,'2026-10-25');
+ assert.equal(images['megaWeek:2026-10-19'],undefined);
  const meta=images['megaDay:2026-10-19'];
  assert.equal(meta.dataUrl,undefined);
  assert.equal(c.get({action:'menuImage',scope:'megaDay',imageId:meta.id}).image.dataUrl,DATA);
@@ -247,6 +248,5 @@ test('메가존 전용 하루·주간 사진은 기존 런치타임 이미지와
  assert.equal(receipt(c,remove).ok,true);
  const remaining=c.get().menuImages;
  assert.equal(remaining['megaDay:2026-10-19'],undefined);
- assert.ok(remaining['megaWeek:2026-10-19']);
  assert.ok(remaining['day:2026-10-19']);
 });

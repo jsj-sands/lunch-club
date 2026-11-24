@@ -133,8 +133,8 @@ function kakaoProfileResponse_(force) {
   }
 }
 function menuImageSlot_(date, scope) {
-  if (!LunchCore.validDate(date) || !['day', 'week', 'megaDay', 'megaWeek'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
-  const weekly = scope === 'week' || scope === 'megaWeek';
+  if (!LunchCore.validDate(date) || !['day', 'week', 'megaDay'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
+  const weekly = scope === 'week';
   const start = weekly ? LunchCore.weekDates(date)[0] : date;
   return { key: scope + ':' + start, property: MENU_IMAGE_PREFIX + scope + '_' + start, scope: scope, date: start, startDate: start, endDate: weekly ? LunchCore.shiftDate(start, 6) : start };
 }
@@ -151,8 +151,8 @@ function publicMenuImage_(entry) {
   return value;
 }
 function menuImageState_(all, date, dates) {
-  // Keep the legacy day/week slots separate from the new Megazone screenshot slots.
-  const slots = [menuImageSlot_(date, 'week'), menuImageSlot_(date, 'megaWeek')].concat(dates.flatMap(d => [menuImageSlot_(d, 'day'), menuImageSlot_(d, 'megaDay')])), images = {};
+  // Legacy day/week slots remain untouched; Megazone uses one megaDay slot per date.
+  const slots = [menuImageSlot_(date, 'week')].concat(dates.flatMap(d => [menuImageSlot_(d, 'day'), menuImageSlot_(d, 'megaDay')])), images = {};
   slots.forEach(slot => { const entry = menuImageEntry_(all, slot); if (entry) images[slot.key] = publicMenuImage_(entry); });
   return images;
 }
@@ -284,9 +284,9 @@ function menuImageResponse_(date, scope, imageId) {
 }
 function pruneMenuImages_(properties, all, keepDate) {
   const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'), cutoff = LunchCore.shiftDate(today, -KEEP_DAYS);
-  const keep = ['day', 'week', 'megaDay', 'megaWeek'].map(scope => menuImageSlot_(keepDate, scope).key);
+  const keep = ['day', 'week', 'megaDay'].map(scope => menuImageSlot_(keepDate, scope).key);
   Object.keys(all).forEach(key => {
-    const match = /^LUNCH_MENU_IMAGE_(day|week|megaDay|megaWeek)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
+    const match = /^LUNCH_MENU_IMAGE_(day|week|megaDay)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
     if (!match || !LunchCore.validDate(match[2])) return;
     const slot = menuImageSlot_(match[2], match[1]);
     if (key !== slot.property || keep.includes(slot.key) || slot.endDate >= cutoff) return;
@@ -301,7 +301,7 @@ function pruneMenuImages_(properties, all, keepDate) {
       const file = files.next(), description = file.getDescription();
       if (!description.startsWith(MENU_IMAGE_FILE_MARKER)) continue;
       let tag; try { tag = JSON.parse(description.slice(MENU_IMAGE_FILE_MARKER.length)); } catch (_) { continue; }
-      const match = /^(day|week|megaDay|megaWeek):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
+      const match = /^(day|week|megaDay):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
       if (!match || !MENU_IMAGE_UUID.test(tag.id || '') || !LunchCore.validDate(match[2]) || tag.folderId !== folder.getId()) continue;
       const slot = menuImageSlot_(match[2], match[1]);
       if (slot.key !== tag.slot || tag.endDate !== slot.endDate || slot.endDate >= cutoff || keep.includes(slot.key)) continue;
