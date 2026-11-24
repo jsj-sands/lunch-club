@@ -1,0 +1,22 @@
+name: Verify Lunch Club
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check core.js
+          node --check backend/server.js
+          node --check lunchtime-source.js
+          node --check threads-menu-source.js
+      - name: Regression tests
+        run: node --test tests/*.test.cjs

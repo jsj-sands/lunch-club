@@ -4,7 +4,7 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', cache: 'sandsLunch.menus.v2', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v3' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v3' };
   const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
   const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
@@ -20,14 +20,12 @@
   const deepLinkDate = new URLSearchParams(location.search || '').get('date');
   let date = C.validDate(deepLinkDate) ? deepLinkDate : C.today(), followsToday = date === C.today(), lastToday = C.today();
   let shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} };
-  let menus = read(KEYS.cache, {});
-  if (!menus || typeof menus !== 'object') menus = {};
-  if (!menus['2026-10-19']) menus['2026-10-19'] = { date: '2026-10-19', dishes: ['나주곰탕*당면사리', '눈꽃치즈김치볶음밥', '[오늘의데일리팩] 치킨텐더포케'], fetchedAt: '2026-10-19T02:51:00.000Z', initial: true };
-  let syncing = false, busy = false, syncError = '', lastSync = null, menuLoading = false, toastTimer;
+  let syncing = false, busy = false, syncError = '', lastSync = null, toastTimer;
   let menuView = 'day';
   let guideCategory = '전체', guideQuery = '', guideLimit = 6;
   const GUIDE_CATEGORIES = ['한식', '중식', '일식', '양식', '분식', '아시안'];
-  const menuRequests = new Map(), menuLoadingDates = new Set(), mealImageErrors = new Set(), expandedMenuDates = new Set();
+  const megaPhotos = new Map(), megaLoads = new Map(), megaErrors = new Set();
+  let megaDraft = null;
   let kakaoProfile = cleanKakaoProfile(read(KEYS.kakao, null));
   let kakaoLoading = false, kakaoWaiting = false, kakaoError = '', kakaoPhotoError = '', kakaoRequest = null, lastKakaoAttempt = 0;
   let gangnamMenus = read(KEYS.gangnam, {});
@@ -141,68 +139,111 @@
     }).join('');
     renderMyResponse(); renderPairBoard();
   }
-  function menuCourses(menu) {
-    if (!menu) return [];
-    const courses = Array.isArray(menu.courses) ? menu.courses : (Array.isArray(menu.dishes) ? menu.dishes.map(name => ({ name })) : []);
-    // Every date and data source uses the same two regular meals; takeout courses stay hidden.
-    return courses.filter(course => course && typeof course.name === 'string' && course.name.trim() && course.takeout !== true
-      && !/간편\s*식|데일리\s*팩|take[\s-]*out|테이크\s*아웃/i.test(course.name.normalize('NFKC'))).slice(0, 2).map(course => ({
-      name: course.name.trim(), components: Array.isArray(course.components) ? course.components.filter(name => typeof name === 'string' && name.trim()) : [],
-      imageUrl: typeof window.LunchMenuSource?.validImageURL === 'function' && window.LunchMenuSource.validImageURL(course.imageUrl) ? course.imageUrl : ''
-    }));
+  // The Megazone card shows manually uploaded screenshots only, never vendor credentials.
+  const megaSlot=(d,scope)=>scope+':'+(scope==='megaWeek'?C.weekDates(d)[0]:d);
+  const megaDayMeta=(d=date)=>shared.menuImages[megaSlot(d,'megaDay')]||shared.menuImages[megaSlot(d,'megaWeek')]||null;
+  const megaShownMeta=()=>menuView==='week'?(shared.menuImages[megaSlot(date,'megaWeek')]||null):megaDayMeta();
+  const megaReady=()=>!!(connection&&connectedReady&&shared.features.megaPhotos&&shared.features.menuImages);
+  function megaPlaceholder(){
+    if(!connection)return '<div class="image-empty"><strong>팀 공유에 연결해 주세요</strong><p>동료 초대 링크로 연결하면 식단 사진을 공유할 수 있어요.</p><a href="setup.html" class="menu-source-link">공유 연결 안내 ↗</a></div>';
+    if(!connectedReady)return '<div class="image-empty"><strong>팀 공유 연결을 확인 중이에요…</strong></div>';
+    if(!megaReady())return '<div class="image-empty"><strong>사진 업로드 서버 업데이트가 필요해요</strong><p>기존 Google Apps Script 코드를 교체하고 새 버전으로 배포해 주세요. 웰스토리 로그인은 사용하지 않아요.</p><a href="setup.html#update" class="menu-source-link">업데이트 방법 ↗</a></div>';
+    return '<div class="image-empty"><span aria-hidden="true">📷</span><strong>등록된 식단 사진이 없어요</strong><p>웰스토리플러스 앱에서 메뉴 부분을 캡처해 올려 주세요.</p></div>';
   }
-  function menuSides(course) {
-    const clean = name => name.trim().replace(/\s+/g, ' ').normalize('NFC'), seen = new Set([clean(course.name)]);
-    return course.components.map(name => name.trim()).filter(name => { const key = clean(name); if (seen.has(key)) return false; seen.add(key); return true; });
+  function megaPhotoHTML(meta){
+    if(!meta)return megaPlaceholder();
+    if(megaErrors.has(meta.id))return '<div class="image-empty"><strong>사진을 불러오지 못했어요</strong><p>연결을 확인하고 다시 불러와 주세요.</p></div><button class="secondary-button" data-action="megaReload">사진 다시 불러오기 ↻</button>';
+    const data=megaPhotos.get(meta.id);
+    if(!data)return '<div class="image-empty"><strong>사진을 불러오고 있어요…</strong></div>';
+    const scope=meta.scope==='megaWeek'?'이번 주 전체':'해당 날짜';
+    return '<button class="menu-photo-button mega-uploaded-photo" data-action="megaZoom" aria-label="메가존 식단 사진 확대"><img class="menu-photo" src="'+esc(data)+'" alt="메가존 식단 캡처" loading="lazy"><span>사진 크게 보기 ↗</span></button><p class="image-caption"><strong>'+scope+' · '+esc(nameOf(meta.uploadedBy)||'직원')+'님 공유</strong><span>'+esc(timeText(meta.uploadedAt))+' 업로드 · 사진에 적힌 날짜를 확인해 주세요.</span></p>';
   }
-  function mealComponentsHTML(course) {
-    const sides = menuSides(course);
-    return sides.length ? `<ul class="mega-meal-components" aria-label="함께 나오는 메뉴">${sides.map(name => `<li>${esc(name)}</li>`).join('')}</ul>` : '<p class="mega-meal-components is-empty">추가 구성 정보가 없어요.</p>';
+  function megaActions(scope,meta){
+    if(!megaReady())return '';
+    return '<div class="image-share-row mega-image-actions"><button class="primary-button" data-action="megaUpload" data-scope="'+scope+'">'+(meta?'↻ 사진 교체':'＋ 식단 사진 올리기')+'</button>'+(meta?'<button class="danger-button" data-action="megaDelete" data-scope="'+esc(meta.scope)+'" data-id="'+esc(meta.id)+'">사진 삭제</button>':'')+'</div><p class="upload-hint">앱에서 캡처한 JPG·PNG·WEBP 사진을 선택하면 자동으로 압축해 공유합니다.</p>';
   }
-  function menuDishesHTML(menu, currentDate = date, compact = false) {
-    return `<div class="mega-meals${compact ? ' is-week' : ''}">${menuCourses(menu).map((course, ix) => {
-      const kind = `메뉴 ${ix + 1}`;
-      const available = course.imageUrl && !mealImageErrors.has(course.imageUrl);
-      const photo = available ? `<button class="mega-meal-photo" data-action="viewMegaMeal" data-date="${currentDate}" data-id="${ix}" aria-label="${esc(course.name)} 사진 크게 보기"><img src="${esc(course.imageUrl)}" alt="${esc(course.name)} 식단 사진" data-mega-photo="true" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span class="mega-meal-zoom">확대 ↗</span></button>` : `<div class="mega-meal-photo is-empty"><span>${course.imageUrl ? '사진을 불러오지 못했어요' : '사진 미등록'}</span></div>`;
-      return `<article class="mega-meal-card">${photo}<div class="mega-meal-heading"><span class="mega-meal-kind">${kind}</span><h4>${esc(course.name)}</h4></div>${mealComponentsHTML(course)}</article>`;
-    }).join('')}</div>`;
+  function renderMegaDay(){
+    const meta=megaReady()?megaDayMeta():null;
+    return '<p class="menu-date-label">'+esc(dateText(date))+' · 메가존 점심</p>'+megaPhotoHTML(meta)+megaActions('megaDay',meta);
   }
-  function viewMegaMeal(index, targetDate) {
-    if (!C.validDate(targetDate) || !/^\d+$/.test(index || '')) return;
-    const course = menuCourses(menus[targetDate])[Number(index)]; if (!course) return;
-    openDialog(course.name, `<p class="dialog-copy">${esc(dateText(targetDate))} · 메가존 점심</p>${course.imageUrl ? `<div class="full-menu-image"><img id="megaMealFull" src="${esc(course.imageUrl)}" alt="${esc(course.name)} 식단 사진" referrerpolicy="no-referrer"></div><p id="megaMealFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 웰스토리플러스 앱에서 확인해 주세요.</p>` : ''}<h3 class="mega-detail-heading">함께 나오는 메뉴</h3>${mealComponentsHTML(course)}<p class="dialog-copy">웰스토리플러스 식단 기준이에요.</p>`, true);
+  function renderMegaWeek(){
+    const days=C.weekDates(date), week=days[0], meta=megaReady()?shared.menuImages[megaSlot(date,'megaWeek')]:null;
+    const title='<div class="week-menu-heading"><strong>'+(week===C.weekDates(C.today())[0]?'이번 주':'선택한 주')+' 식단 사진</strong><span>'+week.slice(5).replace('-','.')+' – '+days[4].slice(5).replace('-','.')+'</span></div>';
+    const rows=days.map(d=>{
+      const text=shared.menuImages[megaSlot(d,'megaDay')]?'하루 사진 있음 · 날짜를 눌러 확인':shared.menuImages[megaSlot(d,'megaWeek')]?'주간 사진 있음 · 날짜를 눌러 확인':'사진 미등록';
+      return '<article class="week-menu-day'+(d===date?' selected-day':'')+'"><div class="week-menu-date"><button data-action="menuDate" data-id="'+d+'" aria-label="'+esc(dateText(d))+' 식단 보기">'+('일월화수목금토'[C.weekday(d)])+'<strong>'+Number(d.slice(5,7))+'.'+Number(d.slice(8))+'</strong></button></div><div class="week-menu-content"><p class="week-menu-status">'+text+'</p></div></article>';
+    }).join('');
+    return title+megaPhotoHTML(meta)+megaActions('megaWeek',meta)+'<div class="week-menu-list">'+rows+'</div><p class="tiny-note">이번 주 전체 사진을 올릴 수 있으며, 날짜별 사진이 있으면 해당 날에 우선 표시해요.</p>';
   }
-  // 메가존 식단은 팀 공유 서버가 웰스토리플러스 계정으로 대신 조회합니다(backend/welstory.js).
-  function megaMenuProblem(menu) {
-    if (!connection) return { title: '메가존 식단은 팀 공유 연결 후 볼 수 있어요', detail: '공유 서버가 웰스토리플러스에서 점심 메뉴를 대신 가져와요.', link: '<a class="menu-source-link" href="setup.html">팀 공유 연결 안내 ↗</a>', short: '공유 연결 후 확인할 수 있어요' };
-    if (!connectedReady) return { title: '공유 연결을 확인하고 있어요…', detail: '연결되면 메가존 식단을 바로 불러와요.', link: '', short: '공유 연결 확인 중…' };
-    if (!shared.features.welstoryMenu) return { title: '공유 서버 업데이트가 필요해요', detail: '메가존 식단을 웰스토리플러스에서 가져오도록 공유 서버 코드를 새 버전으로 배포해 주세요.', link: '<a class="menu-source-link" href="setup.html#update">업데이트 안내 ↗</a>', short: '공유 서버 업데이트 필요' };
-    return { title: '식단을 불러오지 못했어요', detail: menu?.errorMessage || '잠시 후 새로고침하거나 웰스토리플러스 앱에서 확인해 주세요.', link: '', short: '조회 실패 · 잠시 후 다시 확인해 주세요' };
+  function loadMegaPhoto(force=false){
+    if(!megaReady())return Promise.resolve();
+    const meta=megaShownMeta();if(!meta)return Promise.resolve();
+    if(force){megaPhotos.delete(meta.id);megaErrors.delete(meta.id);}
+    if(!force&&(megaPhotos.has(meta.id)||megaErrors.has(meta.id)))return Promise.resolve();
+    if(megaLoads.has(meta.id))return megaLoads.get(meta.id);
+    const target=connection,id=meta.id;
+    const task=jsonp({action:'menuImage',date:meta.date,scope:meta.scope,imageId:id},target).then(result=>{
+      if(target!==connection||megaShownMeta()?.id!==id)return;
+      const data=result?.image?.dataUrl;
+      if(!result?.ok||result.image.id!==id||typeof data!=='string'||!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(data))throw new Error('잘못된 사진 응답');
+      megaPhotos.set(id,data);megaErrors.delete(id);
+    }).catch(()=>{if(target===connection&&megaShownMeta()?.id===id)megaErrors.add(id);})
+      .finally(()=>{megaLoads.delete(id);if(target===connection&&megaShownMeta()?.id===id)renderMenuCards();});
+    megaLoads.set(id,task);return task;
   }
-  function renderMegaDay() {
-    const menu = menus[date], loading = menuLoadingDates.has(date);
-    let content = `<p class="menu-date-label">${esc(dateText(date))} · 점심</p>`;
-    if (menuCourses(menu).length) {
-      content += menuDishesHTML(menu) + `<div class="menu-meta"><span>${menu.initial ? '미리 확인한 식단' : menu.error ? '최근 확인한 식단 · 재조회 실패' : '자동 조회'} · ${esc(timeText(menu.fetchedAt))}</span><span>웰스토리플러스 기준</span></div>`;
-    } else if (menu && !menu.error && (menu.ok || Array.isArray(menu.dishes))) {
-      content += `<div class="empty-menu"><strong>아직 공개된 일반식 메뉴가 없어요</strong><p>선택한 날짜의 메뉴가 올라오면 여기서 확인할 수 있어요.</p></div>`;
-    } else if (loading) {
-      content += `<div class="empty-menu"><strong>선택한 날짜의 식단을 확인하고 있어요</strong><p>웰스토리플러스에서 점심 메뉴를 가져오는 중이에요.</p></div>`;
-    } else {
-      const problem = megaMenuProblem(menu);
-      content += `<div class="empty-menu"><strong>${esc(problem.title)}</strong><p>${esc(problem.detail)}</p>${problem.link}</div>`;
-    }
-    return content;
+  function zoomMega(){
+    const meta=megaShownMeta(),photo=meta&&megaPhotos.get(meta.id);
+    if(!photo){loadMegaPhoto(true);return toast('사진을 불러오는 중이에요. 다시 눌러 주세요.');}
+    openDialog('메가존 · '+dateText(date)+' 식단 사진','<p class="dialog-copy">직원이 공유한 앱 캡처입니다. 사진 속 메뉴 날짜를 확인해 주세요.</p><div class="full-menu-image"><img id="megaPhotoFull" src="'+esc(photo)+'" alt="메가존 식단 확대"></div><p id="megaPhotoError" class="inline-warning" hidden>사진을 표시하지 못했어요.</p>',true);
   }
-  function renderMegaWeek() {
-    const dates = C.weekDates(date), today = C.today(), thisWeek = dates[0] === C.weekDates(today)[0];
-    return `<div class="week-menu-heading"><strong>${thisWeek ? '이번 주' : '선택한 주'} 식단 미리보기</strong><span>${dates[0].slice(5).replace('-', '.')} – ${dates[4].slice(5).replace('-', '.')}</span></div><div class="week-menu-list">${dates.map(d => {
-      const menu = menus[d], loading = menuLoadingDates.has(d), courses = menuCourses(menu);
-      let content;
-      if (courses.length) content = `<ul>${courses.map(course => `<li>${esc(course.name)}</li>`).join('')}</ul><details class="week-menu-details" data-meal-details-date="${d}" ${expandedMenuDates.has(d) ? 'open' : ''}><summary>사진·반찬 보기</summary>${menuDishesHTML(menu, d, true)}</details>${menu.error ? '<p class="week-menu-status">최근 확인한 식단 · 재조회 실패</p>' : ''}`;
-      else content = `<p class="week-menu-status">${loading ? '식단 확인 중…' : menu?.error ? esc(megaMenuProblem(menu).short) : menu?.ok || Array.isArray(menu?.dishes) ? '아직 공개된 일반식 메뉴가 없어요' : '식단을 확인하고 있어요…'}</p>`;
-      return `<article class="week-menu-day${d === date ? ' selected-day' : ''}"><div class="week-menu-date"><button data-action="menuDate" data-id="${d}" aria-label="${esc(dateText(d))} 선택">${'일월화수목금토'[C.weekday(d)]}<strong>${Number(d.slice(5, 7))}.${Number(d.slice(8))}</strong>${d === today ? '<small>오늘</small>' : ''}</button></div><div class="week-menu-content">${content}</div></article>`;
-    }).join('')}</div><p class="tiny-note">웰스토리플러스에 등록된 일반식 메뉴만 표시해요. 날짜를 누르면 그날의 점심을 선택할 수 있어요.</p>`;
+  function openMegaUpload(scope){
+    if(!megaReady())return toast('팀 공유 서버를 사진 업로드 버전으로 갱신한 뒤 사용해 주세요.');
+    if(!identity)return showIdentity();
+    megaDraft=null;const weekly=scope==='megaWeek';
+    openDialog('메가존 식단 사진 올리기','<p class="dialog-copy">웰스토리플러스 앱에서 메뉴만 캡처해 주세요. 계정정보·바코드·QR코드가 포함되지 않게 확인하세요.</p><form id="megaUploadForm" data-date="'+date+'"><label for="megaScope">적용 날짜</label><select id="megaScope" name="scope"><option value="megaDay"'+(!weekly?' selected':'')+'>선택한 날만 · '+esc(dateText(date))+'</option><option value="megaWeek"'+(weekly?' selected':'')+'>선택한 주 전체 · 월~일</option></select><label for="megaFile">사진 선택 (원본 15MB 이하)</label><input id="megaFile" type="file" accept="image/png,image/jpeg,image/webp" required><div id="megaPreview" class="upload-preview" hidden></div><p id="megaStatus" class="upload-status" role="status">파일을 고르면 미리 보여 드려요.</p><button class="primary-button" type="submit" id="megaSave" disabled>팀원에게 사진 공유하기</button></form>');
+  }
+  async function prepareMega(file){
+    megaDraft=null;const status=$('megaStatus'),button=$('megaSave'),preview=$('megaPreview');
+    if(!status||!button||!preview)return;button.disabled=true;preview.hidden=true;
+    if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>15*1024*1024){status.textContent='JPG·PNG·WEBP 15MB 이하 파일을 골라 주세요.';return;}
+    status.textContent='이미지를 압축하고 있어요…';let url;
+    try{
+      url=URL.createObjectURL(file);const img=new Image();
+      await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});
+      if(!img.naturalWidth||!img.naturalHeight)throw Error('사진 크기를 확인하지 못했어요.');
+      let scale=Math.min(1,2200/Math.max(img.naturalWidth,img.naturalHeight)),quality=.88,data='';
+      for(let i=0;i<7;i++){
+        const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+        const ctx=canvas.getContext('2d');if(!ctx)throw Error('이미지 처리 기능을 사용할 수 없어요.');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        data=canvas.toDataURL('image/jpeg',quality);
+        if(data.startsWith('data:image/jpeg;base64,')&&(data.length-23)*3/4<=1024*1024)break;
+        scale*=.82;quality=Math.max(.55,quality-.06);
+      }
+      if(!data.startsWith('data:image/jpeg;base64,')||(data.length-23)*3/4>1024*1024)throw Error('압축에 실패했어요. 메뉴 부분만 잘라 다시 시도해 주세요.');
+      megaDraft={dataUrl:data,name:file.name.slice(0,100)};
+      preview.innerHTML='<img src="'+esc(data)+'" alt="업로드 사진 미리보기">';preview.hidden=false;
+      button.disabled=false;status.textContent='사진 준비 완료 · 같은 기간의 기존 사진은 교체됩니다.';
+    }catch(e){status.textContent=e?.message||'사진을 열지 못했어요. 다른 사진을 골라 주세요.';}
+    finally{if(url)URL.revokeObjectURL(url);}
+  }
+  async function saveMega(form){
+    if(!megaDraft)return toast('먼저 사진을 선택해 주세요.');
+    const when=form.dataset.date,scope=$('megaScope').value;
+    if(!C.validDate(when)||!['megaDay','megaWeek'].includes(scope))return toast('날짜를 확인해 주세요.');
+    const original=megaDraft,old=shared.menuImages[megaSlot(when,scope)];
+    $('megaSave').disabled=true;$('megaStatus').textContent='팀 공유에 저장 중…';
+    const ok=await mutate('menuImageUpload',{scope,dataUrl:original.dataUrl,name:original.name,expectedImageId:old?.id||''},when);
+    if(ok){
+      const saved=shared.menuImages[megaSlot(when,scope)];if(saved)megaPhotos.set(saved.id,original.dataUrl);
+      megaDraft=null;closeDialog();renderMenuCards();loadMegaPhoto();toast('메가존 사진을 팀원에게 공유했어요.');
+    }else{if($('megaStatus'))$('megaStatus').textContent='저장에 실패했어요. 연결 상태를 확인해 주세요.';if($('megaSave'))$('megaSave').disabled=false;}
+  }
+  async function deleteMega(id,scope){
+    const meta=megaShownMeta();if(!meta||meta.id!==id||meta.scope!==scope)return toast('사진이 바뀌었어요. 새로고침해 주세요.');
+    if(!identity)return showIdentity();
+    if(!confirm((scope==='megaWeek'?'이번 주':'이날')+' 식단 사진을 삭제할까요? 팀원 화면에서도 사라집니다.'))return;
+    if(await mutate('menuImageDelete',{scope,expectedImageId:id},date)){megaPhotos.delete(id);megaErrors.delete(id);renderMenuCards();loadMegaPhoto();toast('식단 사진을 삭제했어요.');}
   }
   function cleanKakaoProfile(value) {
     if (!value || value.sourceUrl !== KAKAO_CHANNEL || typeof window.LunchKakaoSource?.validImageURL !== 'function' || !window.LunchKakaoSource.validImageURL(value.imageUrl)) return null;
@@ -312,9 +353,7 @@
   function renderMenuCards() {
     const d = day(), meStatus = identity && C.memberStatus(identity, date, d, config());
     $('menuTitle').textContent = date === C.today() ? '오늘 구내식당 식단' : '선택한 날의 구내식당 식단';
-    const activeDates = menuView === 'week' ? C.weekDates(date) : [date];
-    menuLoading = activeDates.some(d => menuLoadingDates.has(d));
-    $('refreshMenu').disabled = menuLoading || kakaoLoading || gangnamLoading; $('refreshMenu').textContent = menuLoading || kakaoLoading || gangnamLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
+    $('refreshMenu').disabled = kakaoLoading || gangnamLoading; $('refreshMenu').textContent = kakaoLoading || gangnamLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
     $('restaurantCards').innerHTML = C.PLACES.map((p, i) => {
       const chosen = d.votes[identity] === p.id, note = d.notes[p.id]; let content = '';
       if (p.id === 'megazone') {
@@ -468,6 +507,7 @@
       if (C.validDate(d) && (!shared.days[d] || value.revision >= shared.days[d].revision)) shared.days[d] = C.cleanDay(value);
     });
     if (result.settings && (result.configRevision || 0) >= shared.configRevision) { shared.settings = C.settings(result.settings); shared.configRevision = result.configRevision || 0; }
+    if (result.menuImages) shared.menuImages = result.menuImages;
     shared.features = result.features || {};
     connectedReady = true; lastSync = new Date(); syncError = '';
   }
@@ -488,45 +528,14 @@
     if (!connection || syncing || busy || document.hidden) return;
     const target = connection, requestDate = date; syncing = true; renderConnection();
     try {
-      const before = JSON.stringify(shared), menuReadyBefore = connectedReady && !!shared.features.welstoryMenu;
+      const before = JSON.stringify(shared);
       const res = await jsonp({ action: 'state', date: requestDate }, target); if (target !== connection) return;
       mergeResponse(res); if (before !== JSON.stringify(shared)) render(); else renderConnection();
       loadKakaoProfile(!lastKakaoAttempt); loadGangnamMenu(requestDate);
-      // The Megazone menu is only available through the team server: load it once the server is ready.
-      if (!menuReadyBefore && shared.features.welstoryMenu) loadMenu();
+      loadMegaPhoto();
     }
     catch (e) { if (target === connection) { syncError = e.message; renderConnection(); } }
     finally { syncing = false; renderConnection(); if (requestDate !== date && target === connection) sync(); }
-  }
-  async function fetchMenuDate(currentDate, force) {
-    if (menuRequests.has(currentDate)) return menuRequests.get(currentDate);
-    const previous = menus[currentDate];
-    if (force) menuCourses(previous).forEach(course => mealImageErrors.delete(course.imageUrl));
-    if (!force && previous && !previous.initial && !previous.error && Date.now() - Date.parse(previous.fetchedAt) < 5 * 60000) return;
-    menuLoadingDates.add(currentDate); renderMenuCards();
-    const task = Promise.resolve().then(async () => {
-      try {
-        if (!window.LunchMenuSource) throw new Error('식단 연결 기능을 불러오지 못했어요.');
-        // Welstory+ needs a member login, so only the team server (Apps Script) can fetch the menu.
-        const target = connection, ready = !!target && connectedReady && !!shared.features.welstoryMenu;
-        const menu = await window.LunchMenuSource.fetchDay(currentDate, ready ? { request: params => jsonp(params, target) } : {});
-        if (!menu || menu.date !== currentDate || !Array.isArray(menu.dishes) || menu.dishes.some(x => typeof x !== 'string')) throw new Error('날짜가 맞는 식단을 확인하지 못했어요.');
-        menus[currentDate] = { ...menu, ok: true, initial: false, error: false };
-        const kept = Object.fromEntries(Object.entries(menus).filter(([d]) => C.validDate(d)).sort(([a], [b]) => b.localeCompare(a)).slice(0, 35));
-        try { write(KEYS.cache, kept); } catch (_) { /* Menu remains visible if storage is unavailable. */ }
-      } catch (e) {
-        const { errorMessage: _previousError, ...previous } = menus[currentDate] || {};
-        menus[currentDate] = { ...previous, date: currentDate, error: true, ...(e?.code === 'NOT_CONNECTED' ? {} : { errorMessage: String(e?.message || '').slice(0, 240) }) };
-      } finally { menuLoadingDates.delete(currentDate); menuRequests.delete(currentDate); renderMenuCards(); }
-    });
-    menuRequests.set(currentDate, task);
-    return task;
-  }
-  async function loadMenu(force = false) {
-    const dates = menuView === 'week' ? C.weekDates(date) : [date];
-    let index = 0;
-    const worker = async () => { while (index < dates.length) { const d = dates[index++]; await fetchMenuDate(d, force); } };
-    await Promise.all([worker(), worker()]);
   }
   function loadKakaoProfile(force = false) {
     const target = connection;
@@ -604,10 +613,11 @@
     if (needsServerUpdate()) { toast('모임 참여 요청·알림 기능을 위해 공유 서버를 업데이트해야 합니다. 설정 안내를 확인해 주세요.'); return false; }
     const opDate = requestedDate, actor = identity, op = { type, payload, actor, id: uid() }, target = connection;
     let next;
-    try { if (type !== 'settings') next = C.applyOperation(day(opDate), opDate, config(), op); }
+    try { if (!['settings','menuImageUpload','menuImageDelete'].includes(type)) next = C.applyOperation(day(opDate), opDate, config(), op); }
     
     catch (e) { toast(e.message); return false; }
     if (!target) {
+      if (type === 'menuImageUpload' || type === 'menuImageDelete') { toast('팀 공유 연결 후 이용해 주세요.'); return false; }
       const prev = C.clone(local);
       try { if (type === 'settings') local.settings = C.settings(payload); else local.days[opDate] = next; persistLocal(); render(); return true; }
       catch (_) { local = prev; toast('기기에 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.'); return false; }
@@ -622,7 +632,7 @@
         const res = await jsonp({ action: 'state', date: opDate, receipt: op.id }, target);
         if (target !== connection) throw new Error('공유 공간이 변경됐어요. 이전 공간에서 저장 결과를 확인해 주세요.');
         mergeResponse(res);
-        if (res.receipt) { if (!res.receipt.ok) throw new Error(res.receipt.error || '저장되지 않았어요.'); return true; }
+        if (res.receipt) { if (!res.receipt.ok) throw new Error(res.receipt.error || '저장되지 않았어요.'); loadMegaPhoto(); return true; }
         await new Promise(resolve => setTimeout(resolve, 700 + n * 600));
       }
       throw new Error('저장 완료 응답을 받지 못했어요. 새로고침 후 결과를 확인해 주세요.');
@@ -631,7 +641,7 @@
   }
   function changeDate(next) {
     if (!C.validDate(next)) { toast('올바른 날짜를 선택해 주세요.'); return; }
-    date = next; followsToday = date === C.today(); selectedDecision = ''; draftTime = ''; render(); sync(); loadMenu(); loadGangnamMenu(date);
+    date = next; followsToday = date === C.today(); selectedDecision = ''; draftTime = ''; render(); sync(); loadMegaPhoto(); loadGangnamMenu(date);
   }
   function setIdentity(id) {
     if (!MEMBERS.some(m => m.id === id)) return;
@@ -671,8 +681,8 @@
     try {
       toast('공유 서버와 연결하고 있어요…'); const result = await jsonp({ action: 'state', date }, next);
       if (!result.ok) throw new Error(result.error || '팀 키를 확인해 주세요.');
-      write(KEYS.connection, next); connection = next; shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} }; mergeResponse(result);
-      lastKakaoAttempt = 0; kakaoWaiting = false; render(); loadMenu(true); loadKakaoProfile(true); return true;
+      write(KEYS.connection, next); connection = next; shared = { days: {}, settings: C.settings(), configRevision: -1, menuImages: {}, features: {} }; megaPhotos.clear(); megaErrors.clear(); mergeResponse(result);
+      lastKakaoAttempt = 0; kakaoWaiting = false; render(); loadMegaPhoto(); loadKakaoProfile(true); return true;
     } catch (e) { toast(e.message); return false; }
   }
   function shareEncode(value) { const bytes = new TextEncoder().encode(JSON.stringify(value)); let str = ''; bytes.forEach(b => { str += String.fromCharCode(b); }); return btoa(str).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, ''); }
@@ -788,9 +798,12 @@
       if (day().votes[identity] === id) return toast('이미 이 장소를 선택했어요. 다른 식당을 누르면 변경돼요.');
       if (await mutate('vote', { placeId: id })) toast(dateText(date) + ' 일반 점심 장소를 ' + (C.PLACES.find(p => p.id === id)?.name || '') + '(으)로 저장했어요.');
     }
-    else if (action === 'menuView') { menuView = id === 'week' ? 'week' : 'day'; renderMenuCards(); loadMenu(); }
+    else if (action === 'menuView') { menuView = id === 'week' ? 'week' : 'day'; renderMenuCards(); loadMegaPhoto(); }
     else if (action === 'menuDate') { menuView = 'day'; changeDate(id); }
-    else if (action === 'viewMegaMeal') viewMegaMeal(id, b.dataset.date);
+    else if (action === 'megaUpload') openMegaUpload(b.dataset.scope);
+    else if (action === 'megaZoom') zoomMega();
+    else if (action === 'megaReload') loadMegaPhoto(true);
+    else if (action === 'megaDelete') deleteMega(id,b.dataset.scope);
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
     else if (action === 'refreshGangnamMenu') loadGangnamMenu(date, true);
@@ -798,7 +811,7 @@
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }
     else if (action === 'settings') showSettings();
-    else if (action === 'retry') { syncError = ''; sync(); loadMenu(true); }
+    else if (action === 'retry') { syncError = ''; sync(); loadMegaPhoto(true); }
     else if (action === 'invite') shareLink();
     else if (action === 'date') changeDate(id);
     else if (action === 'dailyMember') showDailyMember(id, b.dataset.date);
@@ -818,8 +831,9 @@
     }
   });
   document.addEventListener('submit', async e => {
-    const form = e.target; if (!['decisionForm','addForm','noteForm','connectionForm','scheduleForm','absenceForm','pairInviteForm'].includes(form.id)) return;
-    e.preventDefault(); const f = new FormData(form);
+    const form = e.target; if (!['decisionForm','addForm','noteForm','connectionForm','scheduleForm','absenceForm','pairInviteForm','megaUploadForm'].includes(form.id)) return;
+    e.preventDefault(); if (form.id === 'megaUploadForm') return saveMega(form);
+    const f = new FormData(form);
     if (form.id === 'pairInviteForm') {
       if (form.dataset.member !== identity) return toast('내 이름을 다시 선택해 주세요.');
       const members = [...new Set(f.getAll('to').map(String))];
@@ -861,7 +875,7 @@
   $('guideSearch').addEventListener('input', e => { guideQuery = e.target.value; guideLimit = 6; renderGuide(); });
   $('dateInput').addEventListener('change', e => changeDate(e.target.value));
   $('prevDate').onclick = () => changeDate(C.shiftDate(date, -1)); $('nextDate').onclick = () => changeDate(C.shiftDate(date, 1)); $('todayBtn').onclick = () => changeDate(C.today());
-  $('settingsBtn').onclick = showSettings; $('refreshMenu').onclick = () => { loadMenu(true); loadKakaoProfile(true); loadGangnamMenu(date, true); };
+  $('settingsBtn').onclick = showSettings; $('refreshMenu').onclick = () => { sync(); loadMegaPhoto(true); loadKakaoProfile(true); loadGangnamMenu(date, true); };
   $('ceoCancelled').onchange = async e => {
     const checked = e.target.checked, targetDate = date;
     if (e.target.disabled) return;
@@ -872,15 +886,9 @@
   $('copySummary').onclick = () => copy(summary(), '점심 공지를 복사했어요. 메신저에 붙여넣어 주세요.'); $('shareLink').onclick = shareLink;
   $('closeDialog').onclick = closeDialog;
   $('appDialog').addEventListener('click', e => { if (e.target === $('appDialog')) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeDialog(); } });
-  document.addEventListener('toggle', e => {
-    const d = e.target.dataset?.mealDetailsDate;
-    if (C.validDate(d)) { if (e.target.open) expandedMenuDates.add(d); else expandedMenuDates.delete(d); }
-  }, true);
+  document.addEventListener('change', e => { if(e.target.id==='megaFile') prepareMega(e.target.files?.[0]); });
   document.addEventListener('error', e => {
-    if (e.target.dataset?.megaPhoto === 'true') {
-      const url = e.target.getAttribute('src');
-      if (window.LunchMenuSource?.validImageURL?.(url)) { mealImageErrors.add(url); renderMenuCards(); }
-    } else if (e.target.id === 'megaMealFull') { e.target.hidden = true; if ($('megaMealFullError')) $('megaMealFullError').hidden = false; }
+    if(e.target.id==='megaPhotoFull'){e.target.hidden=true;if($('megaPhotoError'))$('megaPhotoError').hidden=false;}
     else if (e.target.id === 'kakaoProfilePhoto' && kakaoProfile && e.target.getAttribute('src') === kakaoProfile.imageUrl) {
       kakaoPhotoError = kakaoProfile.imageUrl; renderMenuCards();
     } else if (e.target.id === 'kakaoProfileFull') { e.target.hidden = true; if ($('kakaoFullError')) $('kakaoFullError').hidden = false; }
@@ -915,9 +923,9 @@
     }
     try { video.currentTime = Math.min(Math.max(0.8, video.duration * .10), Math.max(0, video.duration - .2)); video.pause(); } catch (_) {}
   }, true);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMenu(); loadKakaoProfile(); loadGangnamMenu(date); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMegaPhoto(); loadKakaoProfile(); loadGangnamMenu(date); } });
   function checkMidnight() { const now = C.today(); if (now !== lastToday) { lastToday = now; if (followsToday) changeDate(now); else renderMembers(); } }
   setInterval(() => { checkMidnight(); sync(); }, 30000);
-  setInterval(() => { if (!document.hidden) { loadMenu(); loadKakaoProfile(); loadGangnamMenu(date); } }, 5 * 60000);
-  render(); handleFragment(); sync(); loadMenu();
+  setInterval(() => { if (!document.hidden) { loadMegaPhoto(); loadKakaoProfile(); loadGangnamMenu(date); } }, 5 * 60000);
+  render(); handleFragment(); sync();
 })();

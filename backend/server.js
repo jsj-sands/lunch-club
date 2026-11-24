@@ -1,4 +1,4 @@
-/* Append this file after core.js and lunchtime-source.js to create the copy/paste Code.gs. */
+/* Append after core.js, lunchtime-source.js and threads-menu-source.js to build Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
 const DATA_PREFIX = 'LUNCH_DAY_';
 const KEEP_DAYS = 90;
@@ -44,10 +44,7 @@ function initializeLunchClub() {
     menuImageFolder_(properties, properties.getProperties(), true);
     properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
   } finally { lock.releaseLock(); }
-  // Authorizes outbound requests (Welstory+, Kakao, Threads) while running this in the editor.
-  UrlFetchApp.fetch('https://welplus.welstory.com/', { muteHttpExceptions: true, followRedirects: false });
-  console.log('점심판 준비 완료. 배포 > 새 배포 > 웹 앱에서 실행 사용자: 나 / 액세스: 모든 사용자로 배포하세요.');
-  console.log('메가존 식단: 스크립트 속성에 LUNCH_WELSTORY_USERNAME과 LUNCH_WELSTORY_PASSWORD를 등록하고 testWelstoryConnection을 실행하세요.');
+  console.log('점심판 준비 완료. 메가존 식단은 웰스토리 로그인 없이 팀 공유 Drive 사진으로 운영합니다.');
 }
 
 function output_(body, callback) {
@@ -136,9 +133,10 @@ function kakaoProfileResponse_(force) {
   }
 }
 function menuImageSlot_(date, scope) {
-  if (!LunchCore.validDate(date) || !['day', 'week'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
-  const start = scope === 'week' ? LunchCore.weekDates(date)[0] : date;
-  return { key: scope + ':' + start, property: MENU_IMAGE_PREFIX + scope + '_' + start, scope: scope, date: start, startDate: start, endDate: scope === 'week' ? LunchCore.shiftDate(start, 6) : start };
+  if (!LunchCore.validDate(date) || !['day', 'week', 'megaDay', 'megaWeek'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
+  const weekly = scope === 'week' || scope === 'megaWeek';
+  const start = weekly ? LunchCore.weekDates(date)[0] : date;
+  return { key: scope + ':' + start, property: MENU_IMAGE_PREFIX + scope + '_' + start, scope: scope, date: start, startDate: start, endDate: weekly ? LunchCore.shiftDate(start, 6) : start };
 }
 function menuImageEntry_(all, slot) {
   if (!all[slot.property]) return null;
@@ -153,7 +151,8 @@ function publicMenuImage_(entry) {
   return value;
 }
 function menuImageState_(all, date, dates) {
-  const slots = [menuImageSlot_(date, 'week')].concat(dates.map(d => menuImageSlot_(d, 'day'))), images = {};
+  // Keep the legacy day/week slots separate from the new Megazone screenshot slots.
+  const slots = [menuImageSlot_(date, 'week'), menuImageSlot_(date, 'megaWeek')].concat(dates.flatMap(d => [menuImageSlot_(d, 'day'), menuImageSlot_(d, 'megaDay')])), images = {};
   slots.forEach(slot => { const entry = menuImageEntry_(all, slot); if (entry) images[slot.key] = publicMenuImage_(entry); });
   return images;
 }
@@ -169,7 +168,7 @@ function menuImageFolder_(properties, all, create) {
       return folder;
     }
     if (!create) throw new Error('folder not initialized');
-    folder = DriveApp.createFolder('SANDS Lunch Club · 런치타임 식단');
+    folder = DriveApp.createFolder('SANDS Lunch Club · 공유 식단 사진');
     folder.setDescription(MENU_IMAGE_FOLDER_MARKER);
     // PRIVATE + VIEW is valid; PRIVATE + NONE is not supported by DriveApp.
     folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
@@ -224,7 +223,7 @@ function uploadMenuImage_(properties, all, date, op) {
   if (p.expectedImageId !== (previous ? previous.id : '')) throw new Error('다른 멤버가 식단 이미지를 먼저 바꿨어요. 새로고침 후 새 이미지를 확인하고 다시 올려 주세요.');
   const decoded = decodeMenuImage_(p.dataUrl), folder = menuImageFolder_(properties, all, true);
   const name = typeof p.name === 'string' ? p.name.replace(/[\u0000-\u001f\u007f/\\]/g, '').trim().slice(0, 100) : '';
-  const entry = { id: Utilities.getUuid(), scope: slot.scope, date: slot.date, startDate: slot.startDate, endDate: slot.endDate, name: name || '런치타임 식단', mimeType: decoded.mimeType, size: decoded.bytes.length, uploadedBy: op.actor, uploadedAt: new Date().toISOString(), operationId: op.id, operationDate: date, folderId: folder.getId() };
+  const entry = { id: Utilities.getUuid(), scope: slot.scope, date: slot.date, startDate: slot.startDate, endDate: slot.endDate, name: name || (slot.scope.startsWith('mega') ? '메가존 식단' : '런치타임 식단'), mimeType: decoded.mimeType, size: decoded.bytes.length, uploadedBy: op.actor, uploadedAt: new Date().toISOString(), operationId: op.id, operationDate: date, folderId: folder.getId() };
   const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[entry.mimeType];
   let file;
   try {
@@ -285,9 +284,9 @@ function menuImageResponse_(date, scope, imageId) {
 }
 function pruneMenuImages_(properties, all, keepDate) {
   const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'), cutoff = LunchCore.shiftDate(today, -KEEP_DAYS);
-  const keep = [menuImageSlot_(keepDate, 'day').key, menuImageSlot_(keepDate, 'week').key];
+  const keep = ['day', 'week', 'megaDay', 'megaWeek'].map(scope => menuImageSlot_(keepDate, scope).key);
   Object.keys(all).forEach(key => {
-    const match = /^LUNCH_MENU_IMAGE_(day|week)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
+    const match = /^LUNCH_MENU_IMAGE_(day|week|megaDay|megaWeek)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
     if (!match || !LunchCore.validDate(match[2])) return;
     const slot = menuImageSlot_(match[2], match[1]);
     if (key !== slot.property || keep.includes(slot.key) || slot.endDate >= cutoff) return;
@@ -302,7 +301,7 @@ function pruneMenuImages_(properties, all, keepDate) {
       const file = files.next(), description = file.getDescription();
       if (!description.startsWith(MENU_IMAGE_FILE_MARKER)) continue;
       let tag; try { tag = JSON.parse(description.slice(MENU_IMAGE_FILE_MARKER.length)); } catch (_) { continue; }
-      const match = /^(day|week):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
+      const match = /^(day|week|megaDay|megaWeek):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
       if (!match || !MENU_IMAGE_UUID.test(tag.id || '') || !LunchCore.validDate(match[2]) || tag.folderId !== folder.getId()) continue;
       const slot = menuImageSlot_(match[2], match[1]);
       if (slot.key !== tag.slot || tag.endDate !== slot.endDate || slot.endDate >= cutoff || keep.includes(slot.key)) continue;
@@ -560,12 +559,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, welstoryMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
-}
-function menuResponse_(date) {
-  // 메가존 식단은 backend/welstory.js가 Welstory+ 회원 API에서 가져옵니다.
-  if (typeof welstoryMenuResponse_ !== 'function') return { ok: false, reason: 'setup', error: '공유 서버 코드에 웰스토리 연동이 빠졌어요. setup.html에서 코드를 다시 복사해 주세요.' };
-  return welstoryMenuResponse_(date);
+  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
@@ -574,7 +568,6 @@ function doGet(e) {
     if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
     if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
-    if (p.action === 'menu') return output_(menuResponse_(p.date), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);
     if (p.action === 'state') return output_(stateResponse_(p.date, p.receipt), callback);
     return output_({ ok: false, error: '지원하지 않는 조회입니다.' }, callback);

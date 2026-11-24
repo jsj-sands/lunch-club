@@ -1,4 +1,4 @@
-// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + threads-menu-source.js + menu-source.js + backend/welstory.js + backend/server.js.
+// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + threads-menu-source.js + backend/server.js.
 /* Shared, dependency-free rules used by the page and the Apps Script server. */
 (function (root, factory) {
   const api = factory();
@@ -30,7 +30,7 @@
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
     meetingTime: '12:00'
   };
-  // 메가존 식단은 공유 서버가 웰스토리플러스에서 가져옵니다(menu-source.js, backend/welstory.js).
+  // 메가존 메뉴 사진은 직원이 앱 화면을 캡처해 팀 공유 Drive 폴더에 직접 올립니다.
   const MEGAZONE_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
     { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },
@@ -638,456 +638,7 @@ var LunchThreadsMenu = (function (root) {
   return api;
 })(typeof window !== 'undefined' ? window : null);
 
-/* 메가존산학연센터(삼성웰스토리) 점심 식단.
- * Welstory+ API는 회원 로그인이 필요하므로 팀 공유 서버(Apps Script, backend/welstory.js)만 호출합니다.
- * 이 파일은 브라우저와 Apps Script V8이 함께 사용합니다.
- * - Apps Script: parseMealList / lunchMealType으로 웰스토리 응답을 점심판 형식으로 정리합니다.
- * - 브라우저: fetchDay가 팀 키로 공유 서버에 요청하고, 돌아온 식단을 다시 검증합니다.
- * 사진은 공개 HTTPS 웰스토리 레시피 이미지 주소만 사용합니다.
- */
-(function (root, factory) {
-  const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.LunchMenuSource = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  'use strict';
-
-  const RESTAURANT_ID = 'REST007327';
-  const RESTAURANT_NAME = '메가존산학연센터';
-  // Welstory+ 식사 시간 코드: 1 아침, 2 점심, 3 저녁 (getMealTimeList로 다시 확인합니다).
-  const LUNCH_MEAL_TYPE = '2';
-  const IMAGE_HOST = 'img-welmenu.welstory.com';
-  const MAX_DISHES = 120;
-  const MAX_COURSES = 20;
-  const MAX_COMPONENTS = 30;
-
-  function failure(code, message) {
-    const error = new Error(message);
-    error.code = code;
-    return error;
-  }
-
-  function invalid() {
-    return failure('INVALID_RESPONSE', '식단 응답 형식이 바뀌어 확인하지 못했어요. 웰스토리플러스 앱에서 확인해 주세요.');
-  }
-
-  function object(value) {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-  }
-
-  function text(value) {
-    return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
-  }
-
-  function dateKey(value) {
-    if (typeof value !== 'string' || !/^(?:\d{8}|\d{4}-\d{2}-\d{2})$/.test(value)) {
-      throw failure('INVALID_DATE', '식단 날짜를 확인해 주세요.');
-    }
-    const compact = value.replace(/-/g, '');
-    const iso = compact.slice(0, 4) + '-' + compact.slice(4, 6) + '-' + compact.slice(6, 8);
-    const parsed = new Date(iso + 'T00:00:00.000Z');
-    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso) {
-      throw failure('INVALID_DATE', '식단 날짜를 확인해 주세요.');
-    }
-    return iso;
-  }
-
-  function validImageURL(value) {
-    if (typeof value !== 'string' || !value || value.length > 2048 || /[\s\\<>"']/.test(value)) return false;
-    const match = /^https:\/\/([^/?#]+)(\/[^?#]*)(?:\?([^#]*))?$/i.exec(value);
-    if (!match || match[1].toLowerCase() !== IMAGE_HOST) return false;
-    // Verified Welstory recipe-photo host and path; no credentials, ports or traversal.
-    if (!/^\/data\/manager\/recipe\/(?:[a-z0-9_-]+\/)+[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(match[2])) return false;
-    return match[3] === undefined || /^[a-z0-9._~!$&()*+,;=:@%/?-]*$/i.test(match[3]);
-  }
-
-  // Welstory gives a folder (photoUrl) and a file name (photoCd). Older responses use
-  // http://samsungwelstory.com/...; the same recipe path is served over HTTPS by IMAGE_HOST.
-  function imageURL(folder, file) {
-    const base = text(folder), name = text(file);
-    if (!base || !name) return '';
-    const match = /^(?:https?:)?\/\/(?:www\.)?(?:samsungwelstory\.com|img-welmenu\.welstory\.com)(\/data\/manager\/recipe\/[^?#]*)$/i.exec(base);
-    if (!match) return '';
-    const url = 'https://' + IMAGE_HOST + match[1].replace(/\/?$/, '/') + name;
-    return validImageURL(url) ? url : '';
-  }
-
-  // GET /api/menu/getMealTimeList -> { data: [{ code: '2', codeNm: '점심' }, ...] }
-  function lunchMealType(raw) {
-    const list = object(raw) && Array.isArray(raw.data) ? raw.data : raw;
-    if (!Array.isArray(list)) return LUNCH_MEAL_TYPE;
-    const lunch = list.find(function (item) {
-      return object(item) && /^\d{1,2}$/.test(String(item.code)) && /점심|중식|lunch/i.test(text(item.codeNm));
-    });
-    return lunch ? String(lunch.code) : LUNCH_MEAL_TYPE;
-  }
-
-  function mealList(raw) {
-    let payload = raw;
-    if (typeof payload === 'string') {
-      try { payload = JSON.parse(payload); } catch (_) { throw invalid(); }
-    }
-    if (!object(payload)) throw invalid();
-    // Welstory wraps responses as { code, message, data: { mealList: [...] } }.
-    const data = Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
-    if (!object(data) || !Array.isArray(data.mealList) || data.mealList.length > MAX_DISHES) throw invalid();
-    return data.mealList;
-  }
-
-  function unique(values) {
-    const seen = Object.create(null);
-    return values.filter(function (value) {
-      if (!value || seen[value]) return false;
-      seen[value] = true;
-      return true;
-    });
-  }
-
-  // GET /api/meal?menuDt=YYYYMMDD&menuMealType=2&restaurantCode=REST007327
-  // Each row is one dish; rows sharing hallNo + menuCourseType form one course.
-  // An empty mealList for the requested date means no lunch is published yet.
-  function parseMealList(raw, requestedDate, mealType) {
-    const date = dateKey(requestedDate), compact = date.replace(/-/g, '');
-    const wantedType = String(mealType || LUNCH_MEAL_TYPE);
-    const groups = [], byKey = Object.create(null);
-    mealList(raw).forEach(function (dish) {
-      if (!object(dish) || !text(dish.menuName)) throw invalid();
-      if (dish.restaurantCode !== undefined && dish.restaurantCode !== null &&
-          String(dish.restaurantCode).toUpperCase() !== RESTAURANT_ID) {
-        throw failure('LOCATION_MISMATCH', '다른 식당의 응답이어서 식단을 표시하지 않았어요.');
-      }
-      if (dish.menuDt !== undefined && dish.menuDt !== null && String(dish.menuDt).replace(/-/g, '') !== compact) {
-        throw failure('DATE_MISMATCH', '요청한 날짜와 응답 날짜가 달라 식단을 표시하지 않았어요.');
-      }
-      if (dish.menuMealType !== undefined && dish.menuMealType !== null && String(dish.menuMealType) !== wantedType) return;
-      const key = String(dish.hallNo || '') + '|' + String(dish.menuCourseType || '');
-      if (!byKey[key]) { byKey[key] = []; groups.push(byKey[key]); }
-      byKey[key].push(dish);
-    });
-    const courses = groups.slice(0, MAX_COURSES).map(function (dishes) {
-      const main = dishes.find(function (dish) { return dish.typicalMenu === 'Y'; }) || dishes[0];
-      const photo = [main].concat(dishes).map(function (dish) { return imageURL(dish.photoUrl, dish.photoCd); })
-        .find(Boolean);
-      const course = {
-        name: text(main.menuName),
-        components: unique([main].concat(dishes).map(function (dish) { return text(dish.menuName); })).slice(0, MAX_COMPONENTS)
-      };
-      if (photo) course.imageUrl = photo;
-      if (dishes.some(function (dish) { return /^T/i.test(text(dish.salesType)); })) course.takeout = true;
-      return course;
-    });
-    return {
-      ok: true,
-      date: date,
-      dishes: unique(courses.map(function (course) { return course.name; })),
-      courses: courses,
-      fetchedAt: new Date().toISOString()
-    };
-  }
-
-  // Re-validates a menu that came back from the team server before the page renders it.
-  function cleanMenu(value, requestedDate) {
-    const date = dateKey(requestedDate);
-    if (!object(value) || value.date !== date || !Array.isArray(value.courses)) throw invalid();
-    const courses = value.courses.slice(0, MAX_COURSES).map(function (course) {
-      if (!object(course) || !text(course.name)) throw invalid();
-      const result = {
-        name: text(course.name),
-        components: Array.isArray(course.components) ? unique(course.components.map(text)).slice(0, MAX_COMPONENTS) : []
-      };
-      if (validImageURL(course.imageUrl)) result.imageUrl = course.imageUrl;
-      if (course.takeout === true) result.takeout = true;
-      return result;
-    });
-    const fetched = Date.parse(value.fetchedAt);
-    return {
-      ok: true,
-      date: date,
-      dishes: unique(courses.map(function (course) { return course.name; })),
-      courses: courses,
-      fetchedAt: Number.isFinite(fetched) ? new Date(fetched).toISOString() : new Date().toISOString()
-    };
-  }
-
-  // options.request(params) sends { action: 'menu', date } to the team server (JSONP in the page).
-  async function fetchDay(requestedDate, options) {
-    const date = dateKey(requestedDate);
-    const request = (options || {}).request;
-    if (typeof request !== 'function') {
-      throw failure('NOT_CONNECTED', '메가존 식단은 팀 공유 연결 후 볼 수 있어요.');
-    }
-    let response;
-    try {
-      response = await request({ action: 'menu', date: date });
-    } catch (error) {
-      throw failure('NETWORK_ERROR', (error && error.message) || '공유 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
-    }
-    if (!object(response)) throw invalid();
-    if (response.ok !== true) {
-      const message = typeof response.error === 'string' && response.error.trim()
-        ? response.error.trim().slice(0, 240) : '메가존 식단을 불러오지 못했어요.';
-      throw failure(response.reason === 'setup' ? 'SETUP_REQUIRED' : 'PROVIDER_ERROR', message);
-    }
-    return cleanMenu(response.menu, date);
-  }
-
-  return Object.freeze({
-    RESTAURANT_ID: RESTAURANT_ID,
-    RESTAURANT_NAME: RESTAURANT_NAME,
-    LUNCH_MEAL_TYPE: LUNCH_MEAL_TYPE,
-    dateKey: dateKey,
-    validImageURL: validImageURL,
-    imageURL: imageURL,
-    lunchMealType: lunchMealType,
-    parseMealList: parseMealList,
-    cleanMenu: cleanMenu,
-    fetchDay: fetchDay
-  });
-});
-
-/* 메가존 점심 식단: Welstory+ 회원 API를 Apps Script 서버에서만 호출합니다.
- * menu-source.js(LunchMenuSource) 다음, backend/server.js 앞에 붙여 Code.gs를 만듭니다.
- * 웰스토리 계정은 Apps Script > 프로젝트 설정 > 스크립트 속성에만 저장하고 GitHub 파일에는 넣지 않습니다.
- *   LUNCH_WELSTORY_USERNAME  웰스토리플러스 앱 로그인 아이디
- *   LUNCH_WELSTORY_PASSWORD  웰스토리플러스 앱 비밀번호
- * 나머지 LUNCH_WELSTORY_* 속성(기기 ID, 세션, 점심 코드, 로그인 일시 중지)은 서버가 자동으로 관리합니다.
- * 로그인은 세션이 없거나 만료될 때만 하고, 식단은 날짜별로 캐시해 웰스토리 요청을 최소화합니다.
- */
-const WELSTORY_BASE = 'https://welplus.welstory.com';
-const WELSTORY_USERNAME_PROPERTY = 'LUNCH_WELSTORY_USERNAME';
-const WELSTORY_PASSWORD_PROPERTY = 'LUNCH_WELSTORY_PASSWORD';
-const WELSTORY_DEVICE_PROPERTY = 'LUNCH_WELSTORY_DEVICE_ID';
-const WELSTORY_SESSION_PROPERTY = 'LUNCH_WELSTORY_SESSION';
-const WELSTORY_MEAL_TYPE_PROPERTY = 'LUNCH_WELSTORY_MEAL_TYPE';
-const WELSTORY_PAUSE_PROPERTY = 'LUNCH_WELSTORY_LOGIN_PAUSE';
-const WELSTORY_MENU_CACHE_PREFIX = 'lunch_welstory_menu_v1_';
-const WELSTORY_MENU_TTL_SECONDS = 30 * 60;
-const WELSTORY_PAST_MENU_TTL_SECONDS = 6 * 60 * 60;
-const WELSTORY_ERROR_TTL_SECONDS = 2 * 60;
-const WELSTORY_SESSION_MARGIN_MS = 5 * 60000;
-const WELSTORY_DEFAULT_SESSION_MS = 50 * 60000;
-// A rejected login is not retried for a while so a wrong password cannot lock the account.
-const WELSTORY_LOGIN_PAUSE_MS = 30 * 60000;
-const WELSTORY_SERVER_PAUSE_MS = 5 * 60000;
-const WELSTORY_DEVICE_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-const WELSTORY_SETUP_ERROR = '메가존 식단을 보려면 Apps Script 스크립트 속성에 LUNCH_WELSTORY_USERNAME과 LUNCH_WELSTORY_PASSWORD를 등록해 주세요.';
-const WELSTORY_NETWORK_ERROR = '웰스토리 식단 서버에 연결하지 못했어요. 잠시 후 다시 확인해 주세요.';
-
-function welstoryError_(code, message) {
-  const error = new Error(message);
-  error.code = code;
-  return error;
-}
-function welstoryHeader_(response, name) {
-  const headers = response.getAllHeaders ? response.getAllHeaders() : {};
-  const key = Object.keys(headers || {}).find(k => k.toLowerCase() === name);
-  const value = key ? headers[key] : '';
-  return String(Array.isArray(value) ? value[0] : value || '');
-}
-function welstoryCredentials_(properties) {
-  const username = String(properties.getProperty(WELSTORY_USERNAME_PROPERTY) || '').trim();
-  const password = String(properties.getProperty(WELSTORY_PASSWORD_PROPERTY) || '');
-  if (!username || !password) throw welstoryError_('SETUP', WELSTORY_SETUP_ERROR);
-  return { username: username, password: password };
-}
-function welstoryDeviceId_(properties) {
-  let id = String(properties.getProperty(WELSTORY_DEVICE_PROPERTY) || '');
-  if (!WELSTORY_DEVICE_ID.test(id)) {
-    id = String(Utilities.getUuid()).toLowerCase();
-    properties.setProperty(WELSTORY_DEVICE_PROPERTY, id);
-  }
-  return id;
-}
-function welstoryHeaders_(deviceId, token, extra) {
-  const headers = { 'User-Agent': 'Welplus', 'X-Device-Id': deviceId, Accept: 'application/json' };
-  if (token) headers.Authorization = token;
-  Object.keys(extra || {}).forEach(k => { headers[k] = extra[k]; });
-  return headers;
-}
-function welstoryTokenExpiry_(token) {
-  try {
-    const part = String(token).replace(/^Bearer\s+/i, '').split('.')[1] || '';
-    const padded = part + '='.repeat((4 - part.length % 4) % 4);
-    const exp = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(padded)).getDataAsString()).exp;
-    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0;
-  } catch (_) { return 0; }
-}
-function welstorySessionRecord_(token, via) {
-  const exp = welstoryTokenExpiry_(token);
-  return { token: token, exp: exp > Date.now() ? exp : Date.now() + WELSTORY_DEFAULT_SESSION_MS, via: via, at: new Date().toISOString() };
-}
-function welstorySession_(properties) {
-  let value = null;
-  try { value = JSON.parse(properties.getProperty(WELSTORY_SESSION_PROPERTY) || 'null'); } catch (_) {}
-  return value && typeof value.token === 'string' && value.token && Number.isFinite(value.exp) ? value : null;
-}
-// { until, reason: 'credentials' | 'server' }
-function welstoryPauseState_(properties) {
-  let value = null;
-  try { value = JSON.parse(properties.getProperty(WELSTORY_PAUSE_PROPERTY) || 'null'); } catch (_) {}
-  return value && Number.isFinite(value.until) && value.until > Date.now() ? value : null;
-}
-function welstoryPause_(properties, ms, reason) {
-  properties.setProperty(WELSTORY_PAUSE_PROPERTY, JSON.stringify({ until: Date.now() + ms, reason: reason }));
-}
-function welstoryPausedError_(pause) {
-  const time = Utilities.formatDate(new Date(pause.until), 'Asia/Seoul', 'HH:mm');
-  if (pause.reason === 'server') return welstoryError_('LOGIN_PAUSED', '웰스토리 로그인 서버가 응답하지 않아 ' + time + ' 이후에 다시 시도해요.');
-  return welstoryError_('LOGIN_PAUSED', '웰스토리 로그인이 거부되어 ' + time + '까지 다시 시도하지 않아요. 스크립트 속성의 아이디·비밀번호를 확인한 뒤 Apps Script에서 testWelstoryConnection을 실행해 주세요.');
-}
-function welstoryLogin_(properties, deviceId) {
-  const pause = welstoryPauseState_(properties);
-  if (pause) throw welstoryPausedError_(pause);
-  const account = welstoryCredentials_(properties);
-  let response;
-  try {
-    response = UrlFetchApp.fetch(WELSTORY_BASE + '/login', {
-      method: 'post',
-      contentType: 'application/x-www-form-urlencoded',
-      payload: 'username=' + encodeURIComponent(account.username) + '&password=' + encodeURIComponent(account.password) + '&remember-me=false',
-      headers: welstoryHeaders_(deviceId, '', { 'X-Autologin': 'N' }),
-      muteHttpExceptions: true,
-      followRedirects: false
-    });
-  } catch (_) { throw welstoryError_('NETWORK', WELSTORY_NETWORK_ERROR); }
-  const status = response.getResponseCode(), token = welstoryHeader_(response, 'authorization').trim();
-  if (status >= 200 && status < 300 && token) return welstorySessionRecord_(token, 'login');
-  if (status >= 500 || status === 429) {
-    welstoryPause_(properties, WELSTORY_SERVER_PAUSE_MS, 'server');
-    throw welstoryError_('LOGIN_UNAVAILABLE', '웰스토리 로그인 서버가 응답하지 않았어요 (' + status + '). 5분 뒤 다시 시도해요.');
-  }
-  welstoryPause_(properties, WELSTORY_LOGIN_PAUSE_MS, 'credentials');
-  throw welstoryError_('LOGIN_REJECTED', '웰스토리 로그인에 실패했어요 (' + status + '). 스크립트 속성의 아이디·비밀번호를 확인한 뒤 testWelstoryConnection을 실행해 주세요.');
-}
-function welstoryRefresh_(session, deviceId) {
-  try {
-    const response = UrlFetchApp.fetch(WELSTORY_BASE + '/session', { headers: welstoryHeaders_(deviceId, session.token), muteHttpExceptions: true, followRedirects: false });
-    if (response.getResponseCode() !== 200) return null;
-    const body = JSON.parse(response.getContentText() || 'null');
-    return body && typeof body.data === 'string' && body.data.trim() ? welstorySessionRecord_(body.data.trim(), 'refresh') : null;
-  } catch (_) { return null; }
-}
-// Returns a usable token. Logging in again can sign the same account out of the phone app,
-// so an unexpired session is reused and renewed through /session before a full login.
-function welstoryToken_(properties, deviceId, rejectedToken) {
-  const usable = s => s && s.token !== rejectedToken && s.exp - Date.now() > WELSTORY_SESSION_MARGIN_MS;
-  const current = welstorySession_(properties);
-  if (usable(current)) return { token: current.token, fresh: false };
-  // A user lock serializes logins (the web app always runs as its owner) without holding
-  // the script lock that attendance writes wait on.
-  const lock = LockService.getUserLock();
-  if (!lock.tryLock(15000)) throw welstoryError_('BUSY', '다른 요청이 웰스토리에 로그인하는 중이에요. 잠시 후 다시 확인해 주세요.');
-  try {
-    const latest = welstorySession_(properties);
-    if (usable(latest)) return { token: latest.token, fresh: false };
-    let next = latest && latest.token !== rejectedToken && latest.exp > Date.now() ? welstoryRefresh_(latest, deviceId) : null;
-    if (!next || next.token === rejectedToken) next = welstoryLogin_(properties, deviceId);
-    properties.setProperty(WELSTORY_SESSION_PROPERTY, JSON.stringify(next));
-    return { token: next.token, fresh: next.via === 'login' };
-  } finally { lock.releaseLock(); }
-}
-function welstoryGet_(properties, deviceId, path, extraHeaders) {
-  let rejected = '', emptyReplies = 0;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const session = welstoryToken_(properties, deviceId, rejected);
-    let response;
-    try {
-      response = UrlFetchApp.fetch(WELSTORY_BASE + path, { headers: welstoryHeaders_(deviceId, session.token, extraHeaders), muteHttpExceptions: true, followRedirects: false });
-    } catch (_) { throw welstoryError_('NETWORK', WELSTORY_NETWORK_ERROR); }
-    const status = response.getResponseCode(), body = response.getContentText() || '';
-    const html = /text\/html/i.test(welstoryHeader_(response, 'content-type')) || /^\s*<(?:!doctype html|html[\s>])/i.test(body);
-    if (status === 401 || status === 403 || (status >= 300 && status < 400) || (status === 200 && html)) {
-      properties.deleteProperty(WELSTORY_SESSION_PROPERTY);
-      if (session.fresh) {
-        // A token from a brand-new login was refused: stop instead of logging in again and again.
-        welstoryPause_(properties, WELSTORY_LOGIN_PAUSE_MS, 'credentials');
-        throw welstoryError_('AUTH_REJECTED', '웰스토리가 새 로그인 세션을 받지 않았어요. Apps Script에서 testWelstoryConnection을 실행해 원인을 확인해 주세요.');
-      }
-      rejected = session.token;
-      continue;
-    }
-    if (status !== 200) throw welstoryError_('HTTP_' + status, '웰스토리 식단 서버가 요청을 처리하지 못했어요 (' + status + '). 잠시 후 다시 확인해 주세요.');
-    if (!body.trim()) {
-      // Welstory sometimes answers concurrent requests with an empty body.
-      if (++emptyReplies >= 3) break;
-      Utilities.sleep(300 * emptyReplies);
-      continue;
-    }
-    try { return JSON.parse(body); } catch (_) { throw welstoryError_('INVALID_RESPONSE', '웰스토리 식단 응답 형식을 확인하지 못했어요.'); }
-  }
-  throw welstoryError_('EMPTY_RESPONSE', '웰스토리 식단 서버의 응답이 비어 있어요. 잠시 후 다시 확인해 주세요.');
-}
-function welstoryMealType_(properties, deviceId) {
-  let saved = null;
-  try { saved = JSON.parse(properties.getProperty(WELSTORY_MEAL_TYPE_PROPERTY) || 'null'); } catch (_) {}
-  if (saved && /^\d{1,2}$/.test(saved.code) && Date.now() - Date.parse(saved.checkedAt) < 7 * 86400000) return saved.code;
-  let raw;
-  try {
-    raw = welstoryGet_(properties, deviceId, '/api/menu/getMealTimeList', { Cookie: 'cafeteriaActiveId=' + LunchMenuSource.RESTAURANT_ID });
-  } catch (error) {
-    // Only a bad meal-time list falls back to the default lunch code; login and network problems surface as-is.
-    if (!/^(?:HTTP_\d+|INVALID_RESPONSE|EMPTY_RESPONSE)$/.test(String(error && error.code || ''))) throw error;
-    return LunchMenuSource.LUNCH_MEAL_TYPE;
-  }
-  const code = LunchMenuSource.lunchMealType(raw);
-  properties.setProperty(WELSTORY_MEAL_TYPE_PROPERTY, JSON.stringify({ code: code, checkedAt: new Date().toISOString() }));
-  return code;
-}
-function welstoryMenu_(date) {
-  if (typeof LunchMenuSource === 'undefined') throw welstoryError_('SETUP', '공유 서버 코드에 menu-source.js가 빠졌어요. setup.html에서 코드를 다시 복사해 주세요.');
-  const properties = PropertiesService.getScriptProperties();
-  welstoryCredentials_(properties);
-  const deviceId = welstoryDeviceId_(properties), mealType = welstoryMealType_(properties, deviceId);
-  const raw = welstoryGet_(properties, deviceId, '/api/meal?menuDt=' + date.replace(/-/g, '') + '&menuMealType=' + encodeURIComponent(mealType) + '&restaurantCode=' + LunchMenuSource.RESTAURANT_ID);
-  return LunchMenuSource.parseMealList(raw, date, mealType);
-}
-function welstoryMenuResponse_(date) {
-  const cache = CacheService.getScriptCache(), cacheKey = WELSTORY_MENU_CACHE_PREFIX + date;
-  try {
-    const cached = JSON.parse(cache.get(cacheKey) || 'null');
-    if (cached && cached.ok === true && cached.menu && cached.menu.date === date) return cached;
-    if (cached && cached.ok === false && typeof cached.error === 'string') return cached;
-  } catch (_) {}
-  let result;
-  try {
-    result = { ok: true, menu: welstoryMenu_(date) };
-  } catch (error) {
-    const known = error && typeof error.code === 'string' && typeof error.message === 'string';
-    result = { ok: false, reason: known && error.code === 'SETUP' ? 'setup' : 'provider', error: known ? error.message : WELSTORY_NETWORK_ERROR };
-    if (!known) console.log('Lunch Club Welstory menu failed: ' + String(error && error.message || error).slice(0, 120));
-  }
-  // Setup errors are not cached, so the menu appears as soon as the account is registered.
-  const ttl = result.ok ? (date < LunchCore.today() ? WELSTORY_PAST_MENU_TTL_SECONDS : WELSTORY_MENU_TTL_SECONDS) : WELSTORY_ERROR_TTL_SECONDS;
-  if (result.ok || result.reason !== 'setup') {
-    try { cache.put(cacheKey, JSON.stringify(result), ttl); } catch (_) {}
-  }
-  return result;
-}
-// Apps Script 편집기에서 직접 실행하는 연결 진단입니다. 비밀번호와 토큰은 로그에 쓰지 않습니다.
-function testWelstoryConnection() {
-  const properties = PropertiesService.getScriptProperties();
-  properties.deleteProperty(WELSTORY_PAUSE_PROPERTY);
-  properties.deleteProperty(WELSTORY_MEAL_TYPE_PROPERTY);
-  welstoryCredentials_(properties);
-  console.log('1) 웰스토리 계정 스크립트 속성: 확인됨');
-  const deviceId = welstoryDeviceId_(properties);
-  const before = welstorySession_(properties), session = welstoryToken_(properties, deviceId, '');
-  const saved = welstorySession_(properties);
-  console.log('2) 로그인 세션: ' + (session.fresh ? '새로 로그인' : before && before.token === session.token ? '기존 세션 재사용' : '세션 연장') +
-    ' · 만료 예상 ' + Utilities.formatDate(new Date(saved ? saved.exp : Date.now()), 'Asia/Seoul', 'MM-dd HH:mm'));
-  const mealType = welstoryMealType_(properties, deviceId);
-  console.log('3) 점심 식사 코드: ' + mealType);
-  let date = LunchCore.today();
-  while (LunchCore.weekday(date) === 0 || LunchCore.weekday(date) === 6) date = LunchCore.shiftDate(date, 1);
-  const menu = welstoryMenu_(date);
-  CacheService.getScriptCache().remove(WELSTORY_MENU_CACHE_PREFIX + date);
-  console.log('4) ' + date + ' ' + LunchMenuSource.RESTAURANT_NAME + ' 점심: ' + (menu.courses.length
-    ? menu.courses.map(c => c.name + (c.takeout ? ' [테이크아웃]' : '') + (c.imageUrl ? ' (사진 있음)' : '')).join(' / ')
-    : '아직 등록된 메뉴가 없어요.'));
-  console.log('완료. 배포 > 배포 관리 > 새 버전으로 배포한 뒤 점심판을 새로고침하세요.');
-}
-
-/* Append this file after core.js and lunchtime-source.js to create the copy/paste Code.gs. */
+/* Append after core.js, lunchtime-source.js and threads-menu-source.js to build Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
 const DATA_PREFIX = 'LUNCH_DAY_';
 const KEEP_DAYS = 90;
@@ -1102,12 +653,6 @@ const KAKAO_PROFILE_KEY = 'LUNCH_KAKAO_PROFILE';
 const KAKAO_PROFILE_CACHE_KEY = 'lunch_kakao_profile_v1';
 const KAKAO_PROFILE_TTL = 5 * 60000;
 const KAKAO_PROFILE_MIN_INTERVAL = 60000;
-const GANGNAM_TOKEN_PROPERTY = 'LUNCH_THREADS_ACCESS_TOKEN';
-const GANGNAM_RSS_FEED_PROPERTY = 'LUNCH_THREADS_RSS_FEED_URL';
-const GANGNAM_PUBLIC_FEEDS = ['https://rsshub.gneko.io/threads/gangnambab', 'https://rsshub.isrss.com/threads/gangnambab'];
-const GANGNAM_FORCE_THROTTLE = 'lunch_gangnam_refresh_';
-const GANGNAM_CACHE_PREFIX = 'lunch_gangnam_menu_v3_';
-const GANGNAM_ERROR = 'Threads 계정의 오늘 메뉴표를 아직 확인하지 못했어요.';
 const KAKAO_PROFILE_ERROR = '카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 잠시 후 다시 확인하거나 카카오 원문을 열어 주세요.';
 // Slack secrets are NEVER embedded in GitHub Pages files or generated Code.gs.
 // Set these in Apps Script > Project settings > Script properties.
@@ -1123,8 +668,6 @@ const DRIVE_NOTICE_TEST_MEMBER_PROPERTY = 'LUNCH_DRIVE_TEST_MEMBER';
 const DRIVE_NOTICE_CLEANUP_PROPERTY = 'LUNCH_DRIVE_NOTICE_CLEANUP';
 const DRIVE_NOTICE_FOLDER_MARKER = 'SANDS_LUNCH_CLUB_DRIVE_NOTICE_V1';
 const DRIVE_NOTICE_RETENTION_DAYS = 14;
-const DRIVE_SELF_RELAY_URL_PROPERTY = 'LUNCH_DRIVE_SELF_RELAY_URL';
-const DRIVE_SELF_RELAY_SECRET_PROPERTY = 'LUNCH_DRIVE_SELF_RELAY_SECRET';
 // Slack provides personal Slackbot email forwarding addresses on all plans.
 // A recipient must generate and privately share *their own* forwarding address.
 // These are effectively inbox secrets: keep them in Script Properties only.
@@ -1141,10 +684,7 @@ function initializeLunchClub() {
     menuImageFolder_(properties, properties.getProperties(), true);
     properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
   } finally { lock.releaseLock(); }
-  // Authorizes outbound requests (Welstory+, Kakao, Threads) while running this in the editor.
-  UrlFetchApp.fetch('https://welplus.welstory.com/', { muteHttpExceptions: true, followRedirects: false });
-  console.log('점심판 준비 완료. 배포 > 새 배포 > 웹 앱에서 실행 사용자: 나 / 액세스: 모든 사용자로 배포하세요.');
-  console.log('메가존 식단: 스크립트 속성에 LUNCH_WELSTORY_USERNAME과 LUNCH_WELSTORY_PASSWORD를 등록하고 testWelstoryConnection을 실행하세요.');
+  console.log('점심판 준비 완료. 메가존 식단은 웰스토리 로그인 없이 팀 공유 Drive 사진으로 운영합니다.');
 }
 
 function output_(body, callback) {
@@ -1232,99 +772,11 @@ function kakaoProfileResponse_(force) {
     return kakaoProfileResult_({ profile: record.profile, pending: false, error: KAKAO_PROFILE_ERROR });
   }
 }
-// A public RSSHub feed is the first attempt, so the restaurant need not authorize an app.
-// Public community-hosted feeds are not an official Meta service and can fail at any time.
-function gangnamRssUrls_(properties) {
-  const custom = String(properties.getProperty(GANGNAM_RSS_FEED_PROPERTY) || '').trim();
-  if (!custom) return GANGNAM_PUBLIC_FEEDS;
-  if (!/^https:\/\/(?:rsshub\.(?:gneko\.io|isrss\.com|app|uocat\.com))\/threads\/gangnambab(?:\?.*)?$/i.test(custom)) return [];
-  return [custom];
-}
-function gangnamFetchPosts_() {
-  const properties = PropertiesService.getScriptProperties();
-  const rssUrls = gangnamRssUrls_(properties), attempts = [];
-  for (let i = 0; i < rssUrls.length; i++) {
-    const record = { source: 'rsshub-' + (i + 1), httpStatus: null, code: '' };
-    attempts.push(record);
-    try {
-      const response = UrlFetchApp.fetch(rssUrls[i], { muteHttpExceptions: true, followRedirects: false,
-        headers: { Accept: 'application/rss+xml, application/xml, text/xml' } });
-      record.httpStatus = response.getResponseCode();
-      if (record.httpStatus !== 200) { record.code = 'HTTP_' + record.httpStatus; continue; }
-      const raw = response.getContentText();
-      if (!raw || raw.length > 650000) { record.code = 'INVALID_SIZE'; continue; }
-      let posts;
-      try { posts = LunchThreadsMenu.parseRss(raw); }
-      catch (_) { record.code = 'INVALID_RSS'; continue; }
-      if (!posts.data.length) { record.code = 'EMPTY_FEED'; continue; }
-      record.code = 'OK';
-      return { posts, source: 'rsshub', attempts };
-    } catch (_) { record.code = 'NETWORK_ERROR'; }
-  }
-  const token = properties.getProperty(GANGNAM_TOKEN_PROPERTY);
-  if (token && token.length >= 20) {
-    const record = { source: 'meta_api', httpStatus: null, code: '' }; attempts.push(record);
-    try {
-      const api = 'https://graph.threads.net/v1.0/profile_posts?username=gangnambab&fields=id,username,media_type,media_url,thumbnail_url,permalink,timestamp,text,alt_text,is_quote_post&limit=50';
-      const response = UrlFetchApp.fetch(api, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
-        muteHttpExceptions: true, followRedirects: false });
-      record.httpStatus = response.getResponseCode();
-      if (record.httpStatus !== 200) record.code = 'HTTP_' + record.httpStatus;
-      else {
-        const raw = response.getContentText();
-        if (!raw || raw.length > 350000) record.code = 'INVALID_SIZE';
-        else {
-          const posts = JSON.parse(raw);
-          if (!posts || !Array.isArray(posts.data) || posts.data.length > 100) record.code = 'INVALID_JSON';
-          else { record.code = 'OK'; return { posts, source: 'meta_api', attempts }; }
-        }
-      }
-    } catch (_) { record.code = record.httpStatus === 200 ? 'INVALID_JSON' : 'NETWORK_ERROR'; }
-  }
-  const error = new Error('Threads 게시물을 가져오지 못했습니다.');
-  error.diagnostics = { attempts, failure: rssUrls.length ? 'feed_unavailable' : 'invalid_feed_config' };
-  throw error;
-}
-function gangnamMenuResponse_(date, force) {
-  if (typeof LunchThreadsMenu === 'undefined') return { ok: false, reason: 'setup', error: '공유 서버를 업데이트해 주세요.' };
-  const today = LunchCore.today(), version = LunchThreadsMenu.VERSION;
-  const base = { date, checkedAt: new Date().toISOString(), version };
-  if (date > today) return { ...base, ok: false, reason: 'not_found', diagnostics: { failure: 'future_date', expectedDate: date }, error: '미래 날짜의 메뉴는 아직 조회하지 않습니다.' };
-  if (date < LunchCore.shiftDate(today, -7)) return { ...base, ok: false, reason: 'not_found', diagnostics: { failure: 'outside_range', expectedDate: date }, error: '최근 7일 이내 메뉴만 자동으로 확인합니다.' };
-  const cache = CacheService.getScriptCache(), cacheKey = GANGNAM_CACHE_PREFIX + date;
-  try { const cached = cache.get(cacheKey); if (cached && (!force || cache.get(GANGNAM_FORCE_THROTTLE + date))) return JSON.parse(cached); } catch (_) {}
-  let reply;
-  try {
-    const result = gangnamFetchPosts_();
-    const selected = LunchThreadsMenu.chooseMenu(result.posts, date);
-    const diagnostics = { ...(selected.diagnostics || {}), attempts: result.attempts || [] };
-    const reason = selected.reason === 'not_found' ? diagnostics.failure || 'not_found' : selected.reason;
-    reply = selected.ok ? { ...selected, ...base, provider: result.source, diagnostics }
-      : { ...base, ok: false, reason, alternatives: selected.alternatives || [], provider: result.source, diagnostics,
-          error: reason === 'ambiguous' ? '같은 날짜의 게시물 중 메뉴 공지를 구분하지 못했습니다.' : GANGNAM_ERROR };
-  } catch (error) {
-    reply = { ...base, ok: false, reason: 'feed_unavailable', diagnostics: error.diagnostics || { failure: 'processing_error' },
-      error: 'Threads 게시물 조회에 실패했습니다. 이 결과로 오늘 게시물이 없다고 판단할 수는 없습니다.' };
-  }
-  try { cache.put(cacheKey, JSON.stringify(reply), reply.ok ? 300 : 120); cache.put(GANGNAM_FORCE_THROTTLE + date, '1', 60); } catch (_) {}
-  return reply;
-}
-// Run from the Apps Script editor when investigating a live fetch failure.
-// Logs only counts/status codes; never log the team key, token or signed media URL.
-function testGangnamThreadsConnection() {
-  const result = gangnamMenuResponse_(LunchCore.today(), true);
-  const report = { version: result.version, date: result.date, ok: result.ok, reason: result.reason || 'ok',
-    provider: result.provider || '', diagnostics: result.diagnostics || {} };
-  console.log('강남밥상 조회 진단\n' + JSON.stringify(report, null, 2));
-  console.log(result.ok ? '게시물 주소 확인 완료. 실제 영상 재생은 점심판에서 확인하세요.' :
-    result.reason === 'ambiguous' ? '여러 게시물을 받았습니다. 점심판에서 후보를 확인하세요.' : '조회 결과의 reason과 diagnostics를 확인하세요.');
-  return report;
-}
-
 function menuImageSlot_(date, scope) {
-  if (!LunchCore.validDate(date) || !['day', 'week'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
-  const start = scope === 'week' ? LunchCore.weekDates(date)[0] : date;
-  return { key: scope + ':' + start, property: MENU_IMAGE_PREFIX + scope + '_' + start, scope: scope, date: start, startDate: start, endDate: scope === 'week' ? LunchCore.shiftDate(start, 6) : start };
+  if (!LunchCore.validDate(date) || !['day', 'week', 'megaDay', 'megaWeek'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
+  const weekly = scope === 'week' || scope === 'megaWeek';
+  const start = weekly ? LunchCore.weekDates(date)[0] : date;
+  return { key: scope + ':' + start, property: MENU_IMAGE_PREFIX + scope + '_' + start, scope: scope, date: start, startDate: start, endDate: weekly ? LunchCore.shiftDate(start, 6) : start };
 }
 function menuImageEntry_(all, slot) {
   if (!all[slot.property]) return null;
@@ -1339,7 +791,8 @@ function publicMenuImage_(entry) {
   return value;
 }
 function menuImageState_(all, date, dates) {
-  const slots = [menuImageSlot_(date, 'week')].concat(dates.map(d => menuImageSlot_(d, 'day'))), images = {};
+  // Keep the legacy day/week slots separate from the new Megazone screenshot slots.
+  const slots = [menuImageSlot_(date, 'week'), menuImageSlot_(date, 'megaWeek')].concat(dates.flatMap(d => [menuImageSlot_(d, 'day'), menuImageSlot_(d, 'megaDay')])), images = {};
   slots.forEach(slot => { const entry = menuImageEntry_(all, slot); if (entry) images[slot.key] = publicMenuImage_(entry); });
   return images;
 }
@@ -1355,7 +808,7 @@ function menuImageFolder_(properties, all, create) {
       return folder;
     }
     if (!create) throw new Error('folder not initialized');
-    folder = DriveApp.createFolder('SANDS Lunch Club · 런치타임 식단');
+    folder = DriveApp.createFolder('SANDS Lunch Club · 공유 식단 사진');
     folder.setDescription(MENU_IMAGE_FOLDER_MARKER);
     // PRIVATE + VIEW is valid; PRIVATE + NONE is not supported by DriveApp.
     folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
@@ -1410,7 +863,7 @@ function uploadMenuImage_(properties, all, date, op) {
   if (p.expectedImageId !== (previous ? previous.id : '')) throw new Error('다른 멤버가 식단 이미지를 먼저 바꿨어요. 새로고침 후 새 이미지를 확인하고 다시 올려 주세요.');
   const decoded = decodeMenuImage_(p.dataUrl), folder = menuImageFolder_(properties, all, true);
   const name = typeof p.name === 'string' ? p.name.replace(/[\u0000-\u001f\u007f/\\]/g, '').trim().slice(0, 100) : '';
-  const entry = { id: Utilities.getUuid(), scope: slot.scope, date: slot.date, startDate: slot.startDate, endDate: slot.endDate, name: name || '런치타임 식단', mimeType: decoded.mimeType, size: decoded.bytes.length, uploadedBy: op.actor, uploadedAt: new Date().toISOString(), operationId: op.id, operationDate: date, folderId: folder.getId() };
+  const entry = { id: Utilities.getUuid(), scope: slot.scope, date: slot.date, startDate: slot.startDate, endDate: slot.endDate, name: name || (slot.scope.startsWith('mega') ? '메가존 식단' : '런치타임 식단'), mimeType: decoded.mimeType, size: decoded.bytes.length, uploadedBy: op.actor, uploadedAt: new Date().toISOString(), operationId: op.id, operationDate: date, folderId: folder.getId() };
   const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[entry.mimeType];
   let file;
   try {
@@ -1471,9 +924,9 @@ function menuImageResponse_(date, scope, imageId) {
 }
 function pruneMenuImages_(properties, all, keepDate) {
   const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'), cutoff = LunchCore.shiftDate(today, -KEEP_DAYS);
-  const keep = [menuImageSlot_(keepDate, 'day').key, menuImageSlot_(keepDate, 'week').key];
+  const keep = ['day', 'week', 'megaDay', 'megaWeek'].map(scope => menuImageSlot_(keepDate, scope).key);
   Object.keys(all).forEach(key => {
-    const match = /^LUNCH_MENU_IMAGE_(day|week)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
+    const match = /^LUNCH_MENU_IMAGE_(day|week|megaDay|megaWeek)_(20\d{2}-\d{2}-\d{2})$/.exec(key);
     if (!match || !LunchCore.validDate(match[2])) return;
     const slot = menuImageSlot_(match[2], match[1]);
     if (key !== slot.property || keep.includes(slot.key) || slot.endDate >= cutoff) return;
@@ -1488,7 +941,7 @@ function pruneMenuImages_(properties, all, keepDate) {
       const file = files.next(), description = file.getDescription();
       if (!description.startsWith(MENU_IMAGE_FILE_MARKER)) continue;
       let tag; try { tag = JSON.parse(description.slice(MENU_IMAGE_FILE_MARKER.length)); } catch (_) { continue; }
-      const match = /^(day|week):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
+      const match = /^(day|week|megaDay|megaWeek):(20\d{2}-\d{2}-\d{2})$/.exec(tag.slot || '');
       if (!match || !MENU_IMAGE_UUID.test(tag.id || '') || !LunchCore.validDate(match[2]) || tag.folderId !== folder.getId()) continue;
       const slot = menuImageSlot_(match[2], match[1]);
       if (slot.key !== tag.slot || tag.endDate !== slot.endDate || slot.endDate >= cutoff || keep.includes(slot.key)) continue;
@@ -1663,30 +1116,6 @@ function pruneDriveNoticeFolder_(folder) {
   }
   properties.setProperty(DRIVE_NOTICE_CLEANUP_PROPERTY, new Date().toISOString());
 }
-// Self-share is impossible. A second Google account can safely originate the
-// recipient's Drive file. The receiving account must be fixed by that relay.
-function sendSelfDriveNoticeViaRelay_(notice, recipientEmail, all) {
-  const url = String(all[DRIVE_SELF_RELAY_URL_PROPERTY] || '').trim();
-  const secret = String(all[DRIVE_SELF_RELAY_SECRET_PROPERTY] || '').trim();
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/.test(url)) {
-    throw new Error('본인 알림용 중계 웹 앱 URL을 설정해 주세요.');
-  }
-  if (!/^[a-f0-9]{64}$/.test(secret)) {
-    throw new Error('본인 알림용 비밀키를 스크립트 속성에 설정해 주세요.');
-  }
-  const response = UrlFetchApp.fetch(url, {
-    method: 'post', contentType: 'application/json; charset=utf-8',
-    payload: JSON.stringify({ secret: secret, email: recipientEmail, text: notice.text,
-      nonce: Utilities.getUuid().replace(/-/g, '') }),
-    muteHttpExceptions: true, followRedirects: true, timeoutSeconds: 15
-  });
-  if (response.getResponseCode() !== 200) throw new Error('알림 중계 접속 실패: HTTP ' + response.getResponseCode());
-  let body; try { body = JSON.parse(response.getContentText()); } catch (_) {
-    throw new Error('알림 중계 응답을 읽지 못했습니다. 중계 웹 앱의 공개 범위를 확인해 주세요.');
-  }
-  if (!body || body.ok !== true) throw new Error('알림 중계 실패: ' + String(body && body.error || '설정을 확인해 주세요.').slice(0, 75));
-  return true;
-}
 function sendDriveNotices_(notices, all, strict) {
   const emails = driveNoticeEmails_(all), sent = new Set();
   if (!notices.length || !Object.keys(emails).length) return sent;
@@ -1699,11 +1128,7 @@ function sendDriveNotices_(notices, all, strict) {
       // An Apps Script deployed as "execute as me" cannot share its own file
       // *to the owner* and consequently cannot trigger a Drive self-share alert.
       const owner = Session.getEffectiveUser().getEmail().trim().toLowerCase();
-      if (owner && owner === to) {
-        // The file is shared by a teammate's standalone script, not by me.
-        if (sendSelfDriveNoticeViaRelay_(notice, to, all)) sent.add(notice.to);
-        continue;
-      }
+      if (owner && owner === to) throw new Error('same-as-script-owner: no Drive self-share notification');
       if (!folder) { folder = driveNoticeFolder_(); pruneDriveNoticeFolder_(folder); }
       const member = LunchCore.MEMBERS.find(m => m.id === notice.to);
       const parts = String(notice.text).split('\n');
@@ -1774,12 +1199,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 6, features: { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, gangnamMenu: true, separateGroups: true, separateVenues: true, joinRequests: true, welstoryMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
-}
-function menuResponse_(date) {
-  // 메가존 식단은 backend/welstory.js가 Welstory+ 회원 API에서 가져옵니다.
-  if (typeof welstoryMenuResponse_ !== 'function') return { ok: false, reason: 'setup', error: '공유 서버 코드에 웰스토리 연동이 빠졌어요. setup.html에서 코드를 다시 복사해 주세요.' };
-  return welstoryMenuResponse_(date);
+  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
@@ -1788,8 +1208,6 @@ function doGet(e) {
     if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
     if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
-    if (p.action === 'menu') return output_(menuResponse_(p.date), callback);
-    if (p.action === 'gangnamMenu') return output_(gangnamMenuResponse_(p.date, p.force === '1'), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);
     if (p.action === 'state') return output_(stateResponse_(p.date, p.receipt), callback);
     return output_({ ok: false, error: '지원하지 않는 조회입니다.' }, callback);
@@ -1835,14 +1253,12 @@ function doPost(e) {
     // Slack requests happen after the transaction is durable and after releasing the lock.
     lock.releaseLock();
     if (storedProperties) {
-      // Everyone with a Drive email mapping uses the SAME Drive alert route.
-      // Do not silently fall back to a different Slack/email route on failure.
-      const driveMap = driveNoticeEmails_(storedProperties);
-      sendDriveNotices_(notices, storedProperties, false);
-      const withoutDrive = notices.filter(n => !driveMap[n.to]);
-      // Legacy email/Slack plugins still work for people without a Drive map.
-      const emailed = sendSlackbotNotices_(withoutDrive, storedProperties, false);
-      sendSlackNotices_(withoutDrive.filter(n => !emailed.has(n.to)), storedProperties);
+      const emailed = sendSlackbotNotices_(notices, storedProperties, false);
+      const remaining = notices.filter(n => !emailed.has(n.to));
+      const shared = sendDriveNotices_(remaining, storedProperties, false);
+      // Priority: personal Slackbot forwarding email -> Google Drive file share
+      // -> (if configured) official Slack bot DM. Avoid duplicate sends.
+      sendSlackNotices_(remaining.filter(n => !shared.has(n.to)), storedProperties);
     }
     return output_({ ok: true, accepted: true });
   } catch (error) { return output_({ ok: false, error: error.message || '저장하지 못했어요. 다시 시도해 주세요.' }); }

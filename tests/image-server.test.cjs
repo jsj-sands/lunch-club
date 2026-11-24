@@ -33,9 +33,9 @@ function removeImage(c,meta,extra={},payload={}){
 }
 
 test('초기화는 비공개 식단 폴더 한 개를 만들고 새 서버 기능을 알린다',()=>{
- const c=client();assert.deepEqual(c.get().menuImages,{});assert.equal(c.get().serverVersion,6);assert.deepEqual(c.get().features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,welstoryMenu:true});
+ const c=client();assert.deepEqual(c.get().menuImages,{});assert.equal(c.get().serverVersion,7);assert.deepEqual(c.get().features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true});
  c.context.initializeLunchClub();c.context.initializeLunchClub();assert.equal(c.shared.folders.size,1);
- const folder=[...c.shared.folders.values()][0];assert.equal(folder.name,'SANDS Lunch Club · 런치타임 식단');assert.equal(folder.access,'PRIVATE');assert.equal(c.shared.locked(),false);
+ const folder=[...c.shared.folders.values()][0];assert.equal(folder.name,'SANDS Lunch Club · 공유 식단 사진');assert.equal(folder.access,'PRIVATE');assert.equal(c.shared.locked(),false);
 });
 test('다른 기기에서 주간 사진을 확인하고 원본은 팀 키가 있는 이미지 조회에만 전송한다',()=>{
  const a=client(),b=client(a.shared),uploaded=a.post({}, {date:'2026-10-21'});
@@ -225,4 +225,28 @@ test('이미지 삭제 후 영수증 저장 실패를 재시도해도 새 이미
   else assert.equal(c.get().menuImages['week:'+DATE],undefined);
   assert.equal(c.shared.events.filter(e=>e[0]==='trash').length,trashCount);assert.equal(c.submit(removed.body).duplicate,true);
  }
+});
+
+test('메가존 전용 하루·주간 사진은 기존 런치타임 이미지와 서로 다른 비공개 슬롯에 보관된다',()=>{
+ const c=client();
+ const old=c.post({scope:'day'});
+ const day=c.post({scope:'megaDay'});
+ const week=c.post({scope:'megaWeek'});
+ assert.equal(receipt(c,old).ok,true);
+ assert.equal(receipt(c,day).ok,true);
+ assert.equal(receipt(c,week).ok,true);
+ const images=c.get().menuImages;
+ assert.ok(images['day:2026-10-19']);
+ assert.equal(images['megaDay:2026-10-19'].scope,'megaDay');
+ assert.equal(images['megaWeek:2026-10-19'].endDate,'2026-10-25');
+ const meta=images['megaDay:2026-10-19'];
+ assert.equal(meta.dataUrl,undefined);
+ assert.equal(c.get({action:'menuImage',scope:'megaDay',imageId:meta.id}).image.dataUrl,DATA);
+ assert.equal(c.get({action:'menuImage',scope:'day',imageId:meta.id}).ok,false);
+ const remove=removeImage(c,meta);
+ assert.equal(receipt(c,remove).ok,true);
+ const remaining=c.get().menuImages;
+ assert.equal(remaining['megaDay:2026-10-19'],undefined);
+ assert.ok(remaining['megaWeek:2026-10-19']);
+ assert.ok(remaining['day:2026-10-19']);
 });

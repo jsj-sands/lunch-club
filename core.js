@@ -29,7 +29,7 @@
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
     meetingTime: '12:00'
   };
-  // 메가존 식단은 공유 서버가 웰스토리플러스에서 가져옵니다(menu-source.js, backend/welstory.js).
+  // 메가존 메뉴 사진은 직원이 앱 화면을 캡처해 팀 공유 Drive 폴더에 직접 올립니다.
   const MEGAZONE_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('메가존산학연센터');
   const PLACES = [
     { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },

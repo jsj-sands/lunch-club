@@ -1455,3 +1455,6 @@ footer { font-size:.9375rem; padding:26px 0 36px; }
 .gangnam-post-choices summary{font-size:16px;font-weight:750;cursor:pointer;padding:7px 3px}
 .gangnam-menu-video:focus-visible{outline:3px solid #314d77;outline-offset:3px}
 @media(max-width:560px){.gangnam-menu-video{max-height:440px}.gangnam-media-wrap{margin-top:12px}}
+
+/* Megazone manually uploaded screenshot */
+.mega-uploaded-photo{margin:12px 0;width:100%}.mega-uploaded-photo .menu-photo{width:100%;max-height:480px;object-fit:contain}.mega-image-actions{margin:16px 0;gap:10px;flex-wrap:wrap}.mega-image-actions .primary-button,.mega-image-actions .danger-button{min-height:48px;font-size:1rem}.mega-image-actions .primary-button{background:var(--brand-deep);color:#fff}#megaUploadForm{display:grid;gap:8px}#megaUploadForm label{font-size:1rem;font-weight:750;margin-top:10px}#megaUploadForm select,#megaUploadForm input{min-width:0;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--paper)}#megaSave{min-height:50px;margin-top:8px}#megaPreview{max-height:330px;overflow:auto}#megaPreview img{max-width:100%;height:auto;display:block;margin:auto}@media(max-width:560px){.mega-image-actions>*{width:100%}}
