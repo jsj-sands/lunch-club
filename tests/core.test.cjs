@@ -13,6 +13,7 @@ const newMembers = [
   { id: 'minjun', name: '최민준', team: '연구기획팀', days: [1,4] },
   { id: 'seongeun', name: '오성은', team: '경영지원팀', days: [3] },
   { id: 'yunseok', name: '장윤석', team: '경영지원팀', days: [3] },
+  { id: 'jihye', name: '서지혜', team: '경영지원팀', days: [] },
   { id: 'jiwoo', name: '서지우', team: '디자인팀', days: [2] },
   { id: 'hyunju', name: '조현주', team: '영업팀', days: [1,5] }
 ];
@@ -21,18 +22,18 @@ test('새 날짜에는 대표님과 점심만 자동 적용하고 그 외 멤버
   const days = C.weekDates(monday);
   const statuses = days.map(date => C.MEMBERS.map(m => C.memberStatus(m.id, date, C.emptyDay(), settings)));
   assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'ceo').length), [4,5,3,1,4]);
-  assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'pending').length), [6,5,7,9,6]);
+  assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'pending').length), [7,6,8,10,7]);
   assert.deepEqual(days.map(date => C.participants(date, C.emptyDay(), settings).length), [0,0,0,0,0]);
   assert.ok(statuses.flat().every(s => !s.in && !s.manual));
   assert.deepEqual(C.emptyDay().pairs, []);
 });
-test('기존 다섯 사람의 저장된 설정을 유지하면서 새 다섯 명의 기본 일정을 추가한다', () => {
+test('기존 다섯 사람의 저장된 설정을 유지하면서 추가된 여섯 명의 기본 일정을 추가한다', () => {
   const oldSettings = {
     scheduleEnd: '2027-06-30', meetingTime: '12:10',
     ceoDays: { seongjun: [1], juri: [2,4], hyunsu: [], yunchul: [3,5], jingi: [1,4] }
   };
   const original = JSON.stringify(oldSettings), restored = C.settings(oldSettings);
-  assert.deepEqual(restored.ceoDays, { ...oldSettings.ceoDays, minjun: [1,4], seongeun: [3], yunseok: [3], jiwoo: [2], hyunju: [1,5] });
+  assert.deepEqual(restored.ceoDays, { ...oldSettings.ceoDays, minjun: [1,4], seongeun: [3], yunseok: [3], jiwoo: [2], hyunju: [1,5], jihye: [] });
   assert.equal(restored.scheduleEnd, oldSettings.scheduleEnd);
   assert.equal(restored.meetingTime, oldSettings.meetingTime);
   assert.equal(JSON.stringify(oldSettings), original);
@@ -40,8 +41,8 @@ test('기존 다섯 사람의 저장된 설정을 유지하면서 새 다섯 명
   assert.equal(C.MEMBERS.find(m => m.id === 'jingi').team, '디자인팀');
   assert.deepEqual(C.settings({ ceoDays: { jingi: [] } }).ceoDays.jingi, []);
 });
-test('새 다섯 명의 이름·팀·기본 일정이 정확하며 모두 이름을 선택하고 투표할 수 있다', () => {
-  assert.equal(C.MEMBERS.length, 10);
+test('추가된 여섯 명의 이름·팀·기본 일정이 정확하며 모두 이름을 선택하고 투표할 수 있다', () => {
+  assert.equal(C.MEMBERS.length, 11);
   let day = C.emptyDay();
   for (const member of newMembers) {
     const matches = C.MEMBERS.filter(m => m.id === member.id);

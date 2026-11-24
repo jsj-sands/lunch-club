@@ -14,6 +14,7 @@
     { id: 'minjun', name: '최민준', team: '연구기획팀', days: [1, 4], color: 'blue' },
     { id: 'seongeun', name: '오성은', team: '경영지원팀', days: [3], color: 'green' },
     { id: 'yunseok', name: '장윤석', team: '경영지원팀', days: [3], color: 'green' },
+    { id: 'jihye', name: '서지혜', team: '경영지원팀', days: [], color: 'green' },
     { id: 'jiwoo', name: '서지우', team: '디자인팀', days: [2], color: 'amber' },
     { id: 'hyunju', name: '조현주', team: '영업팀', days: [1, 5], color: 'coral' }
   ];

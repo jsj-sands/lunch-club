@@ -50,7 +50,7 @@ function basicSharedState(request, extra = {}) {
 const profileData = (imageUrl = kakaoImage, checkedAt = fixedTime) => ({ ok: true, sourceUrl: kakaoChannel, imageUrl, checkedAt });
 
 const orderedTeams = [
-  ['경영지원팀', ['yunchul', 'seongeun', 'yunseok']],
+  ['경영지원팀', ['yunchul', 'jihye', 'seongeun', 'yunseok']],
   ['디자인팀', ['jiwoo', 'jingi']],
   ['연구기획팀', ['minjun']],
   ['영업팀', ['hyunju']],
@@ -73,7 +73,7 @@ function dailyMembers(ui, kind) {
 function assertDailyBoard(ui, date, expected) {
   const board = ui.element('membersGrid').innerHTML;
   assert.equal((board.match(/\bid="dailyGroup-(?:in|ceo|out|pending)"/g) || []).length, 4);
-  assert.equal((board.match(/\bid="dailyMember-[^"]+"/g) || []).length, 10);
+  assert.equal((board.match(/\bid="dailyMember-[^"]+"/g) || []).length, 11);
   const all = [];
   for (const kind of ['in', 'ceo', 'out', 'pending']) {
     assert.match(ui.element('dailyGroup-' + kind).className, new RegExp('\\bis-' + kind + '\\b'));
@@ -341,7 +341,7 @@ async function boot(options = {}) {
     storeFromOtherTab: (key, value) => storage.set(key, JSON.stringify(value)) };
 }
 
-test('기존 다섯 명의 저장값에서 열 멤버를 한 번씩 표시하고 이름 선택과 설정을 팀·이름 순으로 정렬한다', async () => {
+test('기존 다섯 명의 저장값에서 열한 멤버를 한 번씩 표시하고 이름 선택과 설정을 팀·이름 순으로 정렬한다', async () => {
   const ui = await boot({ storage: { [localKey]: { days: {}, settings: {
     scheduleEnd: '2026-12-31', meetingTime: '12:00',
     ceoDays: { seongjun: [2,5], juri: [1,2,5], hyunsu: [1,2,5], yunchul: [3], jingi: [2] }
@@ -352,19 +352,19 @@ test('기존 다섯 명의 저장값에서 열 멤버를 한 번씩 표시하고
   assert.equal(ui.element('heroCount').textContent, '오늘 함께 0명');
   assertDailyBoard(ui, monday, {
     in: [], ceo: ['minjun', 'hyunju', 'juri', 'hyunsu'], out: [],
-    pending: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'seongjun']
+    pending: ['yunchul', 'jihye', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'seongjun']
   });
   const identityGroups = [...ui.element('identitySelect').innerHTML.matchAll(/<optgroup\b[^>]*label="([^"]+)"[^>]*>([\s\S]*?)<\/optgroup>/g)]
     .map(match => [match[1], [...match[2].matchAll(/<option\b[^>]*value="([^"]+)"[^>]*>/g)].map(option => option[1])]);
   assert.deepEqual(identityGroups, orderedTeams);
-  for (const name of ['최민준','오성은','장윤석','서지우','조현주']) {
+  for (const name of ['최민준','오성은','장윤석','서지혜','서지우','조현주']) {
     assert.ok(ui.element('identitySelect').innerHTML.includes(name));
     assert.ok(ui.element('membersGrid').innerHTML.includes(name));
   }
   assert.doesNotMatch(visibleText(ui.html + ui.element('membersGrid').innerHTML), /CEO/);
   await ui.press('settingsBtn');
   assert.match(ui.element('dialogContent').innerHTML, /천진기/);
-  for (const name of ['최민준','오성은','장윤석','서지우','조현주']) assert.ok(ui.element('dialogContent').innerHTML.includes(name));
+  for (const name of ['최민준','오성은','장윤석','서지혜','서지우','조현주']) assert.ok(ui.element('dialogContent').innerHTML.includes(name));
   const settingsOrder = [...new Set([...ui.element('dialogContent').innerHTML.matchAll(/<input\b[^>]*name="([^"]+)"[^>]*>/g)]
     .map(match => match[1]).filter(id => orderedMembers.includes(id)))];
   assert.deepEqual(settingsOrder, orderedMembers);
@@ -396,9 +396,9 @@ test('함께 먹기를 직접 선택해야 녹색 그룹과 투표에 반영되�
   assert.equal(ui.saved(localKey).days['2026-10-20'], undefined);
 });
 
-test('새 다섯 명을 화면에서 각각 선택하고 투표하면 해당 이름으로 저장·집계된다', async () => {
+test('추가된 여섯 명을 화면에서 각각 선택하고 투표하면 해당 이름으로 저장·집계된다', async () => {
   const ui = await boot();
-  const members = [['minjun','최민준'],['seongeun','오성은'],['yunseok','장윤석'],['jiwoo','서지우'],['hyunju','조현주']];
+  const members = [['minjun','최민준'],['seongeun','오성은'],['yunseok','장윤석'],['jihye','서지혜'],['jiwoo','서지우'],['hyunju','조현주']];
   await ui.chooseDate('2026-10-22');
   assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
   for (const [index, [id, name]] of members.entries()) {
@@ -417,7 +417,7 @@ test('새 다섯 명을 화면에서 각각 선택하고 투표하면 해당 이
     assert.equal(ui.saved(localKey).days['2026-10-22'].votes[id], 'lunchtime');
     assert.ok(ui.element('voteResults').innerHTML.includes(name));
   }
-  assert.match(ui.element('voteSummary').textContent, /5명 중 5명/);
+  assert.match(ui.element('voteSummary').textContent, /6명 중 6명/);
 });
 
 test('하루 현황의 네 그룹 위에 내 선택과 전체 대표님 일정 취소를 구분해서 표시한다', async () => {
@@ -442,7 +442,7 @@ test('하루 현황의 네 그룹 위에 내 선택과 전체 대표님 일정 �
   await ui.chooseDate('2026-10-20');
   assertDailyBoard(ui, '2026-10-20', {
     in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: [],
-    pending: ['yunchul', 'seongeun', 'yunseok', 'minjun', 'hyunju']
+    pending: ['yunchul', 'jihye', 'seongeun', 'yunseok', 'minjun', 'hyunju']
   });
   assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
   assert.equal(ui.element('ceoCancelled').checked, false);
@@ -470,9 +470,9 @@ test('대표님과 점심 취소·복원은 선택한 하루에만 저장하고 
       assert.equal(saved[tuesday].overrides.juri, 'ceo');
       if (date === tuesday) {
         assertDailyBoard(ui, date, checked ? {
-          in: [], ceo: ['juri'], out: ['yunchul'], pending: ['seongeun', 'yunseok', 'jiwoo', 'jingi', 'minjun', 'hyunju', 'hyunsu', 'seongjun']
+          in: [], ceo: ['juri'], out: ['yunchul'], pending: ['jihye', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'minjun', 'hyunju', 'hyunsu', 'seongjun']
         } : {
-          in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: ['yunchul'], pending: ['seongeun', 'yunseok', 'minjun', 'hyunju']
+          in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: ['yunchul'], pending: ['jihye', 'seongeun', 'yunseok', 'minjun', 'hyunju']
         });
         await ui.action('dailyMember', 'yunchul', { 'data-date': date });
         assert.match(ui.element('dialogContent').innerHTML, /병원에 가요/);
@@ -559,13 +559,13 @@ test('상단 이전 날·다음 날·날짜 선택·오늘 이동은 현황판 �
   assert.equal(ui.element('dateInput').value, '2026-10-20');
   assertDailyBoard(ui, '2026-10-20', {
     in: [], ceo: ['jiwoo', 'jingi', 'juri', 'hyunsu', 'seongjun'], out: [],
-    pending: ['yunchul', 'seongeun', 'yunseok', 'minjun', 'hyunju']
+    pending: ['yunchul', 'jihye', 'seongeun', 'yunseok', 'minjun', 'hyunju']
   });
   await ui.press('nextDate');
   assert.equal(ui.element('dateInput').value, '2026-10-21');
   assertDailyBoard(ui, '2026-10-21', {
     in: [], ceo: ['yunchul', 'seongeun', 'yunseok'], out: [],
-    pending: ['jiwoo', 'jingi', 'minjun', 'hyunju', 'juri', 'hyunsu', 'seongjun']
+    pending: ['jihye', 'jiwoo', 'jingi', 'minjun', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   await ui.press('todayBtn');
   assert.equal(ui.element('dateInput').value, monday);
@@ -573,7 +573,7 @@ test('상단 이전 날·다음 날·날짜 선택·오늘 이동은 현황판 �
   assert.equal(ui.element('dateInput').value, '2026-10-22');
   assertDailyBoard(ui, '2026-10-22', {
     in: [], ceo: ['minjun'], out: [],
-    pending: ['yunchul', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'hyunju', 'juri', 'hyunsu', 'seongjun']
+    pending: ['yunchul', 'jihye', 'seongeun', 'yunseok', 'jiwoo', 'jingi', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   await ui.press('todayBtn');
   assert.equal(ui.element('dateInput').value, monday);
@@ -614,7 +614,7 @@ test('아직 조회하지 않은 날짜는 공유 응답 전까지 현황 확인
   assert.equal(ui.element('membersGrid').getAttribute('aria-busy'), 'false');
   assertDailyBoard(ui, target, {
     in: ['seongeun'], ceo: ['minjun'], out: ['jingi'],
-    pending: ['yunchul', 'yunseok', 'jiwoo', 'hyunju', 'juri', 'hyunsu', 'seongjun']
+    pending: ['yunchul', 'jihye', 'yunseok', 'jiwoo', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   assert.match(ui.element('dailyMember-jingi').getAttribute('aria-label'), /병원에 가요/);
   assert.equal(ui.posted.length, 0);
@@ -668,7 +668,7 @@ test('따로 먹기 초대는 상대 수락 후에만 두 사람 모임이 되�
   assert.match(recipient.element('pairBoard').innerHTML, /lunch-pair is-accepted/);
   assert.match(visibleText(recipient.element('pairBoard').innerHTML), /서지우\s*·\s*천진기/);
   assert.doesNotMatch(recipient.element('membersGrid').innerHTML, /id="dailyMember-(?:jingi|jiwoo)"/);
-  assert.equal(['in', 'ceo', 'out', 'pending'].flatMap(kind => dailyMembers(recipient, kind)).length, 8);
+  assert.equal(['in', 'ceo', 'out', 'pending'].flatMap(kind => dailyMembers(recipient, kind)).length, 9);
   assert.equal(recipient.element('heroCount').textContent, '이날 함께 0명');
   assert.equal(recipient.element('pairInvitations').innerHTML, '');
   await sender.chooseDate(target);
@@ -1144,7 +1144,7 @@ test('잘못된 채널·이미지 주소·미래 시각과 source 파일 누락�
     assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /id="kakaoProfilePhoto"/);
     assert.match(visibleText(ui.element('restaurantCards').innerHTML), /자동으로 가져오지 못했어요/);
     assert.equal(ui.element('dateInput').value, monday);
-    assert.equal(dailyMembers(ui, 'pending').length, 6);
+    assert.equal(dailyMembers(ui, 'pending').length, 7);
     assert.equal(ui.element('choiceIn').disabled, false);
     assert.doesNotMatch(ui.element('connectionBanner').className, /error/);
   }
