@@ -384,7 +384,7 @@ test('대표님 점심은 식당 하나를 그 날짜에만 공유하고 일반 
   d=C.applyOperation(d,tuesday,settings,op('ceoDecision','jingi',payload));
   assert.equal(d.ceoDecision.name,'만보성');
   assert.equal(d.ceoDecision.actor,'jingi');
-  assert.deepEqual(C.tally(tuesday,d,settings),{megazone:['yunchul'],lunchtime:[]});
+  assert.deepEqual(C.tally(tuesday,d,settings),{megazone:['yunchul'],lunchtime:[],gangnambab:[]});
   assert.equal(C.cleanDay(JSON.parse(JSON.stringify(d))).ceoDecision.url,payload.url);
   assert.equal(C.cleanDay(C.emptyDay()).ceoDecision,null);
   assert.equal(C.memberStatus('jingi',other,C.emptyDay(),settings).kind,'pending');
