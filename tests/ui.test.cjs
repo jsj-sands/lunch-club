@@ -1711,7 +1711,7 @@ test('메가존은 웰스토리 API를 전혀 호출하지 않고 사진 업로�
  const connected=await boot({connected:true,server:basicSharedState,identity:'seongjun'});
  assert.match(connected.element('restaurantCards').innerHTML,/data-action="megaUpload"/);
  assert.equal(connected.requests.some(r=>r.action==='menu'),false);
- await connected.action('megaUpload',undefined,{'data-scope':'megaDay'});
+ await connected.action('megaUpload');
  assert.equal(connected.element('megaUploadForm').dataset.date,monday);
  assert.equal(connected.element('megaScope'),undefined);
  assert.doesNotMatch(connected.element('restaurantCards').innerHTML,/data-action="menuView"|이번 주 식단/);
@@ -1737,7 +1737,7 @@ test('메가존 캡처는 하루별 Drive 슬롯에 압축 업로드하고 팀�
   receipts[body.op.id]={ok:true};return {type:'opaque',status:0};
  };
  const uploader=await boot({connected:true,server,post,identity:'seongjun'});
- await uploader.action('megaUpload',undefined,{'data-scope':'megaDay'});
+ await uploader.action('megaUpload');
  uploader.element('megaFile').files=[imageFile];await uploader.dispatch('change',uploader.element('megaFile'));
  assert.equal(uploader.element('megaSave').disabled,false);
  await uploader.dispatch('submit',uploader.element('megaUploadForm'));
