@@ -275,6 +275,7 @@ async function boot(options = {}) {
   vm.runInContext(fs.readFileSync(path.join(root, 'core.js'), 'utf8'), context, { filename: 'core.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'restaurant-guide.js'), 'utf8'), context, { filename: 'restaurant-guide.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'lunchtime-source.js'), 'utf8'), context, { filename: 'lunchtime-source.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'threads-menu-source.js'), 'utf8'), context, { filename: 'threads-menu-source.js' });
   if (options.omitKakaoSource) {
     context.LunchKakaoSource = undefined;
     assert.equal(vm.runInContext('window.LunchKakaoSource', context), undefined);
@@ -1760,4 +1761,35 @@ test('런치타임을 첫 번째 기본 픽으로 표시하고 메가존은 두 
  assert.match(html.slice(first,second),/우리의 기본 픽/);
  assert.match(html.slice(second),/기분 좋은 대안/);
  assert.deepEqual(C.PLACES.map(p=>p.id),['lunchtime','megazone','gangnambab']);
+});
+
+test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데이트 안내를 표시하지 않는다',async()=>{
+ const target='2026-10-19',post='https://www.threads.com/@gangnambab/post/ABC123x';
+ const result={ok:true,date:target,kind:'image',imageUrl:'https://img.cdninstagram.com/menus/test-1019.jpg',
+  postUrl:post,publishedAt:'2026-10-19T03:00:00.000Z',checkedAt:fixedTime,
+  version:'20261124-threads-rss-restored',diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1}};
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='gangnamMenu')return result;
+  throw Error('Unexpected '+req.action);
+ };
+ const ui=await boot({connected:true,server,identity:'seongjun'});
+ assert.ok(ui.requests.some(r=>r.action==='gangnamMenu'&&r.date===target));
+ const html=ui.element('restaurantCards').innerHTML;
+ assert.match(html,/gangnamMenuPhoto/);
+ assert.match(html,/게시물 확인/);
+ assert.doesNotMatch(html,/공유 서버 수정본을 적용해 주세요/);
+});
+test('강남밥상 RSSHub 장애는 서버 업데이트 오류가 아니라 피드 접속 오류로 표시한다',async()=>{
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',reason:'feed_unavailable',version:'20261124-threads-rss-restored',
+    diagnostics:{failure:'feed_unavailable',attempts:[{source:'rsshub.gneko.io',code:'http_403'}]}};
+  throw Error('Unexpected '+req.action);
+ };
+ const ui=await boot({connected:true,server,identity:'seongjun'});
+ const text=visibleText(ui.element('restaurantCards').innerHTML);
+ assert.match(text,/게시물 연결에 실패했어요/);
+ assert.match(text,/rsshub.gneko.io: http_403/);
+ assert.doesNotMatch(text,/공유 서버 수정본을 적용해 주세요/);
 });

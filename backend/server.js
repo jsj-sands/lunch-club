@@ -132,6 +132,78 @@ function kakaoProfileResponse_(force) {
     return kakaoProfileResult_({ profile: record.profile, pending: false, error: KAKAO_PROFILE_ERROR });
   }
 }
+// Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
+// feeds. No Welstory session, Threads login, cookies or end-user credentials.
+const GANGNAM_MENU_VERSION = '20261124-threads-rss-restored';
+const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v2_';
+const GANGNAM_MENU_MIN_REFRESH_MS = 60000;
+const GANGNAM_MENU_CACHE_TTL = 180;
+const GANGNAM_MENU_RSS_DEFAULTS = [
+  'https://rsshub.gneko.io/threads/gangnambab',
+  'https://rsshub.isrss.com/threads/gangnambab'
+];
+const GANGNAM_MENU_RSS_HOSTS = ['rsshub.gneko.io', 'rsshub.isrss.com', 'rsshub.uocat.com'];
+function gangnamFeedParts_(url) {
+  if (typeof url !== 'string' || url.length > 220) return null;
+  const match = /^https:\/\/([a-z0-9.-]+)(?:\:443)?\/threads\/gangnambab\/?$/i.exec(url.trim());
+  if (!match || !GANGNAM_MENU_RSS_HOSTS.includes(match[1].toLowerCase())) return null;
+  return { url: url.trim(), source: match[1].toLowerCase() };
+}
+function gangnamMenuResponse_(date, force) {
+  const checkedAt = new Date().toISOString(), today = LunchCore.today();
+  const base = { ok: false, date: date, checkedAt: checkedAt, version: GANGNAM_MENU_VERSION };
+  if (date > today) return Object.assign({}, base, { reason: 'future_date' });
+  if (date < LunchCore.shiftDate(today, -7)) return Object.assign({}, base, { reason: 'outside_range' });
+  if (typeof LunchThreadsMenu === 'undefined') return Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { failure: 'threads_module_missing' } });
+  const cacheKey = GANGNAM_MENU_CACHE_PREFIX + date;
+  let cache;
+  try { cache = CacheService.getScriptCache(); } catch (_) { cache = null; }
+  if (cache) {
+    try {
+      const saved = JSON.parse(cache.get(cacheKey) || 'null');
+      if (saved && saved.version === GANGNAM_MENU_VERSION && saved.date === date &&
+          (!force || Date.now() - Date.parse(saved.checkedAt) < GANGNAM_MENU_MIN_REFRESH_MS)) return saved;
+    } catch (_) {}
+  }
+  const all = PropertiesService.getScriptProperties().getProperties();
+  const custom = typeof all.LUNCH_THREADS_RSS_FEED_URL === 'string' ? all.LUNCH_THREADS_RSS_FEED_URL.trim() : '';
+  const requested = custom ? [custom] : GANGNAM_MENU_RSS_DEFAULTS;
+  const sources = requested.map(gangnamFeedParts_);
+  if (sources.some(item => !item)) return Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { attempts: [{ source: 'settings', code: 'invalid_feed_url' }], failure: 'feed_unavailable' } });
+  const attempts = [];
+  let candidate = null;
+  for (const item of sources) {
+    try {
+      const response = UrlFetchApp.fetch(item.url, {
+        headers: { Accept: 'application/rss+xml, application/xml, text/xml;q=0.9' },
+        muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 10
+      });
+      const status = response.getResponseCode();
+      if (status !== 200) { attempts.push({ source: item.source, code: 'http_' + status }); continue; }
+      const raw = response.getContentText();
+      if (typeof raw !== 'string' || raw.length > 600000 ||
+          Utilities.newBlob(raw).getBytes().length > 650000) {
+        attempts.push({ source: item.source, code: 'invalid_size' }); continue;
+      }
+      const chosen = LunchThreadsMenu.chooseMenu(LunchThreadsMenu.parseRss(raw), date);
+      const result = Object.assign({}, base, chosen, { date: date, checkedAt: checkedAt, version: GANGNAM_MENU_VERSION,
+        diagnostics: Object.assign({}, chosen.diagnostics || {}, { attempts: attempts.concat([{ source: item.source, code: 'parsed' }]) }) });
+      if (result.ok || (result.reason === 'ambiguous' && Array.isArray(result.alternatives) && result.alternatives.length)) {
+        if (cache) { try { cache.put(cacheKey, JSON.stringify(result), GANGNAM_MENU_CACHE_TTL); } catch (_) {} }
+        return result;
+      }
+      // Do not treat a stale RSS feed or posts without a date as proof that no menu exists.
+      if (!candidate || (result.diagnostics?.matchingDatePosts || 0) > (candidate.diagnostics?.matchingDatePosts || 0)) candidate = result;
+      attempts.push({ source: item.source, code: result.reason || 'no_menu' });
+    } catch (_) { attempts.push({ source: item.source, code: 'fetch_or_parse_error' }); }
+  }
+  const final = candidate ? Object.assign({}, candidate, {
+    diagnostics: Object.assign({}, candidate.diagnostics || {}, { attempts: attempts })
+  }) : Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { failure: 'feed_unavailable', attempts: attempts } });
+  if (cache) { try { cache.put(cacheKey, JSON.stringify(final), 60); } catch (_) {} }
+  return final;
+}
+
 function menuImageSlot_(date, scope) {
   if (!LunchCore.validDate(date) || !['day', 'week', 'megaDay'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
   const weekly = scope === 'week';
@@ -559,7 +631,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
@@ -568,6 +640,7 @@ function doGet(e) {
     if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
     if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
+    if (p.action === 'gangnamMenu') return output_(gangnamMenuResponse_(p.date, p.force === '1'), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);
     if (p.action === 'state') return output_(stateResponse_(p.date, p.receipt), callback);
     return output_({ ok: false, error: '지원하지 않는 조회입니다.' }, callback);

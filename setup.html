@@ -10,8 +10,8 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
 <div class="intro"><p class="tag">ONE-TIME SETUP</p><h1>코딩은 끝났어요.<br>이제 우리 점심판을 열어볼까요?</h1><p>파일을 GitHub에 올리면 화면이 열립니다. 동료와 선택을 공유하려면 Google 연결을 한 번 더 진행해 주세요. 코드 작성 없이 복사·붙여넣기로 설정할 수 있습니다.</p></div>
 <section id="update">
 <h2>이번 수정 · 메가존 식단을 캡처 사진으로 공유하기</h2>
-<p><strong>수정 버전: 20261124-mega-dayonly-mainpick</strong></p>
-<p>웰스토리플러스 자동 로그인·토큰·API 조회를 완전히 중단하고, 직원이 앱에서 찍은 식단 캡처를 선택한 날짜에만 직접 업로드합니다. 사진은 기존 비공개 Google Drive 폴더에 보관되며 팀 공유에 연결된 직원만 볼 수 있습니다. 런치타임 카카오·강남밥상 Threads 연동과 기존 점심 선택은 유지됩니다.</p>
+<p><strong>수정 버전: 20261124-threads-restored</strong></p>
+<p>웰스토리플러스 자동 로그인·토큰·API 조회를 완전히 중단하고, 직원이 앱에서 찍은 식단 캡처를 선택한 날짜에만 직접 업로드합니다. 사진은 기존 비공개 Google Drive 폴더에 보관되며 팀 공유에 연결된 직원만 볼 수 있습니다. 런치타임 카카오·강남밥상 Threads 공개 RSS 조회와 기존 점심 선택은 유지됩니다. 단, Threads 자동 조회는 외부 RSSHub 피드에 의존하므로 접속이 실패하면 오류 원인과 Threads 원문 링크를 표시합니다.</p>
 <div class="note warn"><strong>중요: 화면 배포는 이미 GitHub에서 처리되지만 실제 사진 공유는 Google Apps Script 업데이트가 필요합니다.</strong> 기존 프로젝트·팀 키·웹 앱 주소를 유지하세요. 새로운 프로젝트를 만들면 기존 기록과 연결이 끊어집니다.</div>
 <ol>
 <li>평소 점심판을 팀 공유로 사용하던 <strong>동일한 브라우저</strong>에서 이 페이지를 엽니다. 이 페이지가 기존 팀 키를 기억합니다.</li>
@@ -19,6 +19,7 @@ header{flex-wrap:wrap;gap:12px}.brand{gap:9px;min-width:0;letter-spacing:0}.bran
 <li>편집기의 실행 함수 목록에서 <code>initializeLunchClub</code>을 선택해 한 번 실행하고 Drive 접근 권한을 승인합니다. 기존 폴더와 출석 기록은 유지됩니다.</li>
 <li><strong>배포 → 배포 관리 → 기존 웹 앱 수정(연필) → 버전 ‘새 버전’ → 배포</strong>를 선택합니다. 기존 <code>/exec</code> 주소를 그대로 이용합니다.</li>
 <li>웰스토리 로그인은 이제 전혀 사용하지 않으므로 스크립트 속성의 <code>LUNCH_WELSTORY_*</code> 항목(아이디·비밀번호·세션·기기ID·일시중지 등)을 삭제해도 됩니다. 기존 <code>WelstoryDiagnostics.gs</code> 진단 파일도 더 이상 필요하지 않습니다. <strong>팀 키·식단 이미지 폴더·이메일 알림 속성은 삭제하지 마세요.</strong></li>
+<li>강남밥상은 공개 Threads 게시물을 RSSHub에서 가져옵니다. 강남밥상 카드에 <strong>공유 서버 업데이트 필요</strong>가 뜨지 않고 조회 진단이 표시되면 정상 기능 연결 상태입니다. RSSHub가 접속을 거절하거나 Threads에서 미디어를 숨기면 실제 메뉴 게시물이 표시되지 않을 수도 있습니다.</li>
 <li>점심사이트에서 <strong>내 이름 선택 → 날짜 선택 → 메가존 → 사진 올리기 → 파일 선택 → 사진 공유</strong> 순서로 확인합니다. 사진을 교체하거나 삭제할 수 있고 날짜가 지난 사진은 자동으로 잘못 적용되지 않습니다.</li>
 </ol>
 <p class="note">사진은 업로드 전에 브라우저에서 자동으로 압축되어 최대 1MB로 저장합니다. 실물 앱 로그인 정보나 QR 코드가 캡처에 포함되지 않도록 메뉴 부분만 잘라서 올려 주세요.</p>
@@ -844,6 +845,78 @@ function kakaoProfileResponse_(force) {
     return kakaoProfileResult_({ profile: record.profile, pending: false, error: KAKAO_PROFILE_ERROR });
   }
 }
+// Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
+// feeds. No Welstory session, Threads login, cookies or end-user credentials.
+const GANGNAM_MENU_VERSION = '20261124-threads-rss-restored';
+const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v2_';
+const GANGNAM_MENU_MIN_REFRESH_MS = 60000;
+const GANGNAM_MENU_CACHE_TTL = 180;
+const GANGNAM_MENU_RSS_DEFAULTS = [
+  'https://rsshub.gneko.io/threads/gangnambab',
+  'https://rsshub.isrss.com/threads/gangnambab'
+];
+const GANGNAM_MENU_RSS_HOSTS = ['rsshub.gneko.io', 'rsshub.isrss.com', 'rsshub.uocat.com'];
+function gangnamFeedParts_(url) {
+  if (typeof url !== 'string' || url.length > 220) return null;
+  const match = /^https:\/\/([a-z0-9.-]+)(?:\:443)?\/threads\/gangnambab\/?$/i.exec(url.trim());
+  if (!match || !GANGNAM_MENU_RSS_HOSTS.includes(match[1].toLowerCase())) return null;
+  return { url: url.trim(), source: match[1].toLowerCase() };
+}
+function gangnamMenuResponse_(date, force) {
+  const checkedAt = new Date().toISOString(), today = LunchCore.today();
+  const base = { ok: false, date: date, checkedAt: checkedAt, version: GANGNAM_MENU_VERSION };
+  if (date > today) return Object.assign({}, base, { reason: 'future_date' });
+  if (date < LunchCore.shiftDate(today, -7)) return Object.assign({}, base, { reason: 'outside_range' });
+  if (typeof LunchThreadsMenu === 'undefined') return Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { failure: 'threads_module_missing' } });
+  const cacheKey = GANGNAM_MENU_CACHE_PREFIX + date;
+  let cache;
+  try { cache = CacheService.getScriptCache(); } catch (_) { cache = null; }
+  if (cache) {
+    try {
+      const saved = JSON.parse(cache.get(cacheKey) || 'null');
+      if (saved && saved.version === GANGNAM_MENU_VERSION && saved.date === date &&
+          (!force || Date.now() - Date.parse(saved.checkedAt) < GANGNAM_MENU_MIN_REFRESH_MS)) return saved;
+    } catch (_) {}
+  }
+  const all = PropertiesService.getScriptProperties().getProperties();
+  const custom = typeof all.LUNCH_THREADS_RSS_FEED_URL === 'string' ? all.LUNCH_THREADS_RSS_FEED_URL.trim() : '';
+  const requested = custom ? [custom] : GANGNAM_MENU_RSS_DEFAULTS;
+  const sources = requested.map(gangnamFeedParts_);
+  if (sources.some(item => !item)) return Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { attempts: [{ source: 'settings', code: 'invalid_feed_url' }], failure: 'feed_unavailable' } });
+  const attempts = [];
+  let candidate = null;
+  for (const item of sources) {
+    try {
+      const response = UrlFetchApp.fetch(item.url, {
+        headers: { Accept: 'application/rss+xml, application/xml, text/xml;q=0.9' },
+        muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 10
+      });
+      const status = response.getResponseCode();
+      if (status !== 200) { attempts.push({ source: item.source, code: 'http_' + status }); continue; }
+      const raw = response.getContentText();
+      if (typeof raw !== 'string' || raw.length > 600000 ||
+          Utilities.newBlob(raw).getBytes().length > 650000) {
+        attempts.push({ source: item.source, code: 'invalid_size' }); continue;
+      }
+      const chosen = LunchThreadsMenu.chooseMenu(LunchThreadsMenu.parseRss(raw), date);
+      const result = Object.assign({}, base, chosen, { date: date, checkedAt: checkedAt, version: GANGNAM_MENU_VERSION,
+        diagnostics: Object.assign({}, chosen.diagnostics || {}, { attempts: attempts.concat([{ source: item.source, code: 'parsed' }]) }) });
+      if (result.ok || (result.reason === 'ambiguous' && Array.isArray(result.alternatives) && result.alternatives.length)) {
+        if (cache) { try { cache.put(cacheKey, JSON.stringify(result), GANGNAM_MENU_CACHE_TTL); } catch (_) {} }
+        return result;
+      }
+      // Do not treat a stale RSS feed or posts without a date as proof that no menu exists.
+      if (!candidate || (result.diagnostics?.matchingDatePosts || 0) > (candidate.diagnostics?.matchingDatePosts || 0)) candidate = result;
+      attempts.push({ source: item.source, code: result.reason || 'no_menu' });
+    } catch (_) { attempts.push({ source: item.source, code: 'fetch_or_parse_error' }); }
+  }
+  const final = candidate ? Object.assign({}, candidate, {
+    diagnostics: Object.assign({}, candidate.diagnostics || {}, { attempts: attempts })
+  }) : Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { failure: 'feed_unavailable', attempts: attempts } });
+  if (cache) { try { cache.put(cacheKey, JSON.stringify(final), 60); } catch (_) {} }
+  return final;
+}
+
 function menuImageSlot_(date, scope) {
   if (!LunchCore.validDate(date) || !['day', 'week', 'megaDay'].includes(scope)) throw new Error('식단 이미지 날짜와 적용 범위를 확인해 주세요.');
   const weekly = scope === 'week';
@@ -1271,7 +1344,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
@@ -1280,6 +1353,7 @@ function doGet(e) {
     if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
     if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
+    if (p.action === 'gangnamMenu') return output_(gangnamMenuResponse_(p.date, p.force === '1'), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);
     if (p.action === 'state') return output_(stateResponse_(p.date, p.receipt), callback);
     return output_({ ok: false, error: '지원하지 않는 조회입니다.' }, callback);

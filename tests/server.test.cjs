@@ -10,7 +10,7 @@ function server(){
  const properties={getProperties:()=>({...store}),getProperty:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setProperty(k,v){if(Buffer.byteLength(v)>9000)throw Error('property quota');store[k]=v;return this;},setProperties(v){Object.entries(v).forEach(([k,x])=>this.setProperty(k,x));return this;},deleteProperty(k){delete store[k];return this;}};
  const context={console,Date,Intl,URL,Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)}),getUuid:()=>crypto.randomUUID(),formatDate:()=>DATE},PropertiesService:{getScriptProperties:()=>properties},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},hasLock:()=>locked,releaseLock(){locked=false;}})},ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput:s=>({text:s,setMimeType(t){this.mime=t;return this;}})},UrlFetchApp:{fetch(){fetches++;return {getResponseCode:()=>200,getContentText:()=>'- Vendor: 삼성웰스토리\n- Date: 2026년 10월 19일 (월)\n# 메가존산학연센터\n## 점심\n- 나주곰탕\n- 김치볶음밥\n## Discovery\n- RSS: test'};}}};
  vm.createContext(context);
- vm.runInContext(['core.js','backend/server.js'].map(f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8')).join('\n').replace("'__TEAM_KEY__'",`'${KEY}'`),context);
+ vm.runInContext(['core.js','threads-menu-source.js','backend/server.js'].map(f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8')).join('\n').replace("'__TEAM_KEY__'",`'${KEY}'`),context);
  let seq=0;
  const post=(type,actor,payload,extra={})=>{const id=(++seq).toString(16).padStart(24,'0');const body={key:KEY,date:DATE,op:{type,actor,payload,id},...extra};return {body,response:JSON.parse(context.doPost({postData:{contents:JSON.stringify(body)}}).text)};};
  const get=(extra={})=>JSON.parse(context.doGet({parameter:{key:KEY,date:DATE,action:'state',...extra}}).text);
@@ -24,7 +24,7 @@ test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요
 });
 test('버전 5 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,7);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true});
+ assert.equal(state.serverVersion,7);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true,gangnamMenu:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
