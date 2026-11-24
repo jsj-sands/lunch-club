@@ -1713,7 +1713,7 @@ test('메가존은 웰스토리 API를 전혀 호출하지 않고 사진 업로�
  assert.equal(connected.requests.some(r=>r.action==='menu'),false);
  await connected.action('megaUpload');
  assert.equal(connected.element('megaUploadForm').dataset.date,monday);
- assert.equal(connected.element('megaScope'),undefined);
+ assert.doesNotMatch(connected.element('dialogContent').innerHTML,/id="megaScope"/);
  assert.doesNotMatch(connected.element('restaurantCards').innerHTML,/data-action="menuView"|이번 주 식단/);
  assert.doesNotMatch(connected.element('dialogContent').innerHTML,/megaWeek|주 전체|사진 적용 기간/);
  assert.match(connected.element('dialogContent').innerHTML,/웰스토리플러스 앱에서 메뉴만 캡처/);
