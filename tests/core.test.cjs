@@ -176,19 +176,19 @@ test('일정 적용기한 이후에는 종료된 대표님과 점심 반복 규�
   assert.equal(C.participants('2027-01-01',C.emptyDay(),extended).length,0);
   assert.equal(C.memberStatus('juri','2027-01-01',C.emptyDay(),extended).kind,'ceo');
 });
-test('일반 점심은 메가존과 런치타임만 선택할 수 있고 재선택은 한 사람 한 표로 변경된다', () => {
+test('일반 점심은 메가존·런치타임·강남밥상을 선택할 수 있고 재선택은 한 사람 한 표로 변경된다', () => {
   let d=choose(C.emptyDay(),'seongjun','in');
   d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'megazone'}));
-  assert.deepEqual(C.tally(monday,d,settings),{megazone:['seongjun'],lunchtime:[]});
+  assert.deepEqual(C.tally(monday,d,settings),{megazone:['seongjun'],lunchtime:[],gangnambab:[]});
   d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'lunchtime'}));
-  assert.deepEqual(C.tally(monday,d,settings),{megazone:[],lunchtime:['seongjun']});
-  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:null})),/메가존 또는 런치타임/);
-  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'})),/메가존 또는 런치타임/);
+  assert.deepEqual(C.tally(monday,d,settings),{megazone:[],lunchtime:['seongjun'],gangnambab:[]});
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:null})),/메가존·런치타임·강남밥상/);
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'})),/메가존·런치타임·강남밥상/);
 });
 test('허용된 멤버, 식당, 링크, 시간만 처리한다', () => {
   const day = choose(C.emptyDay(),'seongjun','in');
   assert.throws(()=>C.applyOperation(C.emptyDay(),monday,settings,op('vote','other',{placeId:'megazone'})),/이름/);
-  assert.throws(()=>C.applyOperation(day,monday,settings,op('vote','seongjun',{placeId:'does-not-exist'})),/메가존 또는 런치타임/);
+  assert.throws(()=>C.applyOperation(day,monday,settings,op('vote','seongjun',{placeId:'does-not-exist'})),/메가존·런치타임·강남밥상/);
   assert.equal(C.safeUrl('javascript:alert(1)'), '');
   assert.equal(C.safeUrl('https://example.com/\n<script>'), '');
   assert.throws(()=>C.applyOperation(day,monday,settings,op('decision','seongjun',{placeId:'megazone',time:'25:00'})),/시간/);
@@ -224,7 +224,7 @@ test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 �
   assert.deepEqual(restored,{...legacy,ceoDecision:null,separateVenues:{},pairs:[],joinRequests:[]});
   assert.equal(JSON.stringify(legacy),before);
   assert.deepEqual(C.participants(monday,restored,settings).map(m => m.id),['seongjun']);
-  assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[]});
+  assert.deepEqual(C.tally(monday,restored,settings),{megazone:[],lunchtime:[],gangnambab:[]});
   const returned = choose(restored,'yunchul','in');
   assert.deepEqual(C.tally(monday,returned,settings).megazone,['yunchul']);
   assert.deepEqual(returned.decision,legacy.decision);

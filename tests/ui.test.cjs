@@ -124,7 +124,7 @@ async function boot(options = {}) {
       this.hidden = 'hidden' in attributes; this.disabled = 'disabled' in attributes;
       this.className = attributes.class || ''; this.style = {}; this.open = 'open' in attributes;
       this.children = []; this.events = new Map(); this._html = ''; this._text = '';
-      this.classList = { toggle() {}, add() {}, remove() {} };
+      this.classList = { toggle() {}, add() {}, remove() {}, contains: name => this.className.split(/\s+/).includes(name) };
     }
     get innerHTML() { return this._html; }
     set innerHTML(value) {
@@ -1519,10 +1519,8 @@ test('구버전 공유 서버는 새 참석 기능 업데이트를 안내하고 
     assert.deepEqual(dailyMembers(ui, 'in'), []);
     await ui.press('closeDialog');
     if (!features.menuImages) {
-      await ui.action('menuImageUpload');
-      assert.match(ui.element('dialogTitle').textContent, /업데이트/);
-      assert.match(ui.element('dialogContent').innerHTML, /setup\.html#update/);
-      assert.doesNotMatch(ui.element('dialogContent').innerHTML, /id="menuImageForm"/);
+      assert.match(ui.element('restaurantCards').innerHTML, /공유 서버 업데이트|사진 업로드 서버 업데이트/);
+      assert.doesNotMatch(ui.element('restaurantCards').innerHTML, /data-action="megaUpload"/);
     }
     assert.equal(ui.posted.length, 0);
   }
@@ -1547,7 +1545,7 @@ test('대표님 점심 확정 후 다른 식당으로 변경하고 취소하며 
  assert.equal(ui.findControl({'data-action':'guideConfirm','data-id':first.id}).disabled,false);
  await ui.action('vote','lunchtime');
  assert.equal(ui.saved(localKey).days[date].votes.jingi,'lunchtime');
- assert.equal(ui.element('restaurantCards').innerHTML.match(/class="restaurant-card/g).length,2);
+ assert.equal(ui.element('restaurantCards').innerHTML.match(/class="restaurant-card/g).length,3);
 });
 
 test('따로 먹기 복수선택으로 3~4명 모임을 만들고 과천 맛집을 모임별로 공유·수정한다', async () => {
@@ -1737,6 +1735,7 @@ test('메가존 캡처는 하루별 Drive 슬롯에 압축 업로드하고 팀�
  };
  const uploader=await boot({connected:true,server,post,identity:'seongjun'});
  await uploader.action('megaUpload',undefined,{'data-scope':'megaDay'});
+ uploader.element('megaScope').value='megaDay';
  uploader.element('megaFile').files=[imageFile];await uploader.dispatch('change',uploader.element('megaFile'));
  assert.equal(uploader.element('megaSave').disabled,false);
  await uploader.dispatch('submit',uploader.element('megaUploadForm'));
