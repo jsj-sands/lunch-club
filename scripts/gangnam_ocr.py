@@ -256,7 +256,8 @@ def images_from_video(path: Path, folder: Path) -> list[Path]:
 def inspect_post(post: dict) -> dict:
     result = {"post_url": post["post_url"], "kind": post["kind"],
               "status": "unavailable", "strong_frames": 0,
-              "supporting_frames": 0, "promotion_frames": 0, "sampled_frames": 0, "score": 0}
+              "supporting_frames": 0, "promotion_frames": 0, "sampled_frames": 0, "score": 0,
+              "reason": "not_processed"}
     try:
         media = download(post["media_url"], media=True, limit=MAX_MEDIA)
         with tempfile.TemporaryDirectory(prefix="gangnam-ocr-") as directory:
@@ -266,6 +267,7 @@ def inspect_post(post: dict) -> dict:
             original.write_bytes(media)
             frames = images_from_video(original, folder) if post["kind"] == "video" else [original]
             if not frames:
+                result["reason"] = "no_video_frames"
                 return result
             scores = []
             for frame in frames:
@@ -281,9 +283,15 @@ def inspect_post(post: dict) -> dict:
                 verdict["verified"] = bool(scores[0]["strong"] and scores[0]["score"] >= 10)
             result.update({k: v for k, v in verdict.items() if k != "verified"})
             result["status"] = "verified" if verdict["verified"] else "unverified"
-    except (ValueError, urllib.error.URLError, OSError, TimeoutError, subprocess.CalledProcessError,
-            subprocess.TimeoutExpired):
-        pass
+            result["reason"] = "ocr_insufficient" if scores and not verdict["verified"] else "ocr_verified" if scores else "no_ocr_text"
+    except urllib.error.HTTPError as exc:
+        result["reason"] = "media_http_" + str(exc.code)
+    except (urllib.error.URLError, OSError, TimeoutError):
+        result["reason"] = "media_network_error"
+    except ValueError:
+        result["reason"] = "invalid_media_or_redirect"
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        result["reason"] = "video_decoder_error"
     return result
 
 
@@ -323,6 +331,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("invalid date")
     posts, feed_available = get_posts(day)
     results = [inspect_post(p) for p in posts]
+    for index, result in enumerate(results, 1):
+        print("Candidate", index, "kind", result["kind"], "status", result["status"],
+              "frames", result["sampled_frames"], "menu", result["strong_frames"],
+              "promo", result["promotion_frames"], "reason", result["reason"])
     status, selected_url, best = choose_results(results)
     if not feed_available:
         status = "unavailable"
@@ -336,6 +348,12 @@ def main(argv: list[str] | None = None) -> int:
             "score": best["score"] if best else 0,
         },
         "candidates_checked": len(results),
+        "diagnostics": [
+            {"index": i + 1, "kind": result["kind"], "status": result["status"],
+             "frames": result["sampled_frames"], "menu_frames": result["strong_frames"],
+             "promotion_frames": result["promotion_frames"], "reason": result["reason"]}
+            for i, result in enumerate(results)
+        ],
     }
     # An earlier same-day verified menu can survive a later transient RSS outage.
     path = Path(args.output)
