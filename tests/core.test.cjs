@@ -13,7 +13,7 @@ const newMembers = [
   { id: 'minjun', name: '최민준', team: '연구기획팀', days: [1,4] },
   { id: 'seongeun', name: '오성은', team: '경영지원팀', days: [3] },
   { id: 'yunseok', name: '장윤석', team: '경영지원팀', days: [3] },
-  { id: 'jihye', name: '서지혜', team: '경영지원팀', days: [] },
+  { id: 'jihye', name: '서지혜', team: '경영지원팀', days: [3] },
   { id: 'jiwoo', name: '서지우', team: '디자인팀', days: [2] },
   { id: 'hyunju', name: '조현주', team: '영업팀', days: [1,5] }
 ];
@@ -21,8 +21,8 @@ const newMembers = [
 test('새 날짜에는 대표님과 점심만 자동 적용하고 그 외 멤버는 미선택에서 시작한다', () => {
   const days = C.weekDates(monday);
   const statuses = days.map(date => C.MEMBERS.map(m => C.memberStatus(m.id, date, C.emptyDay(), settings)));
-  assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'ceo').length), [4,5,3,1,4]);
-  assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'pending').length), [7,6,8,10,7]);
+  assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'ceo').length), [4,5,4,1,4]);
+  assert.deepEqual(statuses.map(items => items.filter(s => s.kind === 'pending').length), [7,6,7,10,7]);
   assert.deepEqual(days.map(date => C.participants(date, C.emptyDay(), settings).length), [0,0,0,0,0]);
   assert.ok(statuses.flat().every(s => !s.in && !s.manual));
   assert.deepEqual(C.emptyDay().pairs, []);
@@ -33,7 +33,7 @@ test('기존 다섯 사람의 저장된 설정을 유지하면서 추가된 여�
     ceoDays: { seongjun: [1], juri: [2,4], hyunsu: [], yunchul: [3,5], jingi: [1,4] }
   };
   const original = JSON.stringify(oldSettings), restored = C.settings(oldSettings);
-  assert.deepEqual(restored.ceoDays, { ...oldSettings.ceoDays, minjun: [1,4], seongeun: [3], yunseok: [3], jiwoo: [2], hyunju: [1,5], jihye: [] });
+  assert.deepEqual(restored.ceoDays, { ...oldSettings.ceoDays, minjun: [1,4], seongeun: [3], yunseok: [3], jiwoo: [2], hyunju: [1,5], jihye: [3] });
   assert.equal(restored.scheduleEnd, oldSettings.scheduleEnd);
   assert.equal(restored.meetingTime, oldSettings.meetingTime);
   assert.equal(JSON.stringify(oldSettings), original);
@@ -541,4 +541,13 @@ test('모임 생성자가 상태를 변경하면 합류 대기 요청은 취소�
   assert.deepEqual(d.joinRequests,[]);
   assert.deepEqual(C.cleanDay(JSON.parse(JSON.stringify(d))).joinRequests,[]);
   assert.equal(old.joinRequests.length,1);
+});
+
+test('서지혜 대리의 수요일 기본 일정은 새 날짜에서 일관되며 개인 설정 변경은 여전히 가능하다', () => {
+ const jihye=C.MEMBERS.find(m=>m.id==='jihye');
+ assert.deepEqual(jihye.days,[3]);
+ assert.deepEqual(C.settings().ceoDays.jihye,[3]);
+ assert.equal(C.memberStatus('jihye','2026-11-25',C.emptyDay(),C.settings()).kind,'ceo');
+ assert.equal(C.memberStatus('jihye','2026-11-26',C.emptyDay(),C.settings()).kind,'pending');
+ assert.deepEqual(C.settings({ceoDays:{jihye:[]}}).ceoDays.jihye,[]);
 });

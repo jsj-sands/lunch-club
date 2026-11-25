@@ -565,8 +565,8 @@ test('상단 이전 날·다음 날·날짜 선택·오늘 이동은 현황판 �
   await ui.press('nextDate');
   assert.equal(ui.element('dateInput').value, '2026-10-21');
   assertDailyBoard(ui, '2026-10-21', {
-    in: [], ceo: ['yunchul', 'seongeun', 'yunseok'], out: [],
-    pending: ['jihye', 'jiwoo', 'jingi', 'minjun', 'hyunju', 'juri', 'hyunsu', 'seongjun']
+    in: [], ceo: ['yunchul', 'jihye', 'seongeun', 'yunseok'], out: [],
+    pending: ['jiwoo', 'jingi', 'minjun', 'hyunju', 'juri', 'hyunsu', 'seongjun']
   });
   await ui.press('todayBtn');
   assert.equal(ui.element('dateInput').value, monday);
@@ -1767,7 +1767,7 @@ test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데�
  const target='2026-10-19',post='https://www.threads.com/@gangnambab/post/ABC123x';
  const result={ok:true,date:target,kind:'image',imageUrl:'https://img.cdninstagram.com/menus/test-1019.jpg',
   postUrl:post,publishedAt:'2026-10-19T03:00:00.000Z',checkedAt:fixedTime,confidence:'caption',
-  version:'20261125-menu-screening',diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1}};
+  version:'20261125-gangnam-review',diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1}};
  const server=req=>{
   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
   if(req.action==='gangnamMenu')return result;
@@ -1783,7 +1783,7 @@ test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데�
 test('강남밥상 RSSHub 장애는 서버 업데이트 오류가 아니라 피드 접속 오류로 표시한다',async()=>{
  const server=req=>{
   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
-  if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',reason:'feed_unavailable',version:'20261125-menu-screening',
+  if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',reason:'feed_unavailable',version:'20261125-gangnam-review',
     diagnostics:{failure:'feed_unavailable',attempts:[{source:'rsshub.gneko.io',code:'http_403'}]}};
   throw Error('Unexpected '+req.action);
  };
@@ -1798,7 +1798,7 @@ test('강남밥상 조회에서 단일 5초 홍보물은 화면에 노출하지 
  const server=req=>{
   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
   if(req.action==='gangnamMenu')return {
-   ok:false,date:'2026-10-19',reason:'promotion_only',version:'20261125-menu-screening',
+   ok:false,date:'2026-10-19',reason:'promotion_only',version:'20261125-gangnam-review',
    diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1,promotionPosts:1,identifiedMenuPosts:0}
   };
   throw Error('Unexpected '+req.action);
@@ -1814,7 +1814,7 @@ test('강남밥상 후보 영상이 여러 개여도 자동 재생하지 않고 
  const server=req=>{
   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
   if(req.action==='gangnamMenu')return {
-   ok:false,date:'2026-10-19',reason:'unverified_menu',version:'20261125-menu-screening',
+   ok:false,date:'2026-10-19',reason:'unverified_menu',version:'20261125-gangnam-review',
    alternatives:[{kind:'video',postUrl:source,videoUrl:'https://video.cdninstagram.com/streams/video.mp4',
      date:'2026-10-19',publishedAt:'2026-10-19T03:00:00.000Z',caption:'게시물 설명 없음'}],
    diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1,identifiedMenuPosts:0,promotionPosts:0}
@@ -1825,7 +1825,9 @@ test('강남밥상 후보 영상이 여러 개여도 자동 재생하지 않고 
  const html=ui.element('restaurantCards').innerHTML;
  assert.match(visibleText(html),/오늘 메뉴 공지인지 확인되지 않았어요/);
  assert.match(html,/href="https:\/\/www\.threads\.com\/@gangnambab\/post\/UnconfirmedA"/);
- assert.doesNotMatch(html,/<video\b|<source\b|gangnam-menu-video/);
+ assert.match(html,/<details><summary>영상·사진 직접 확인하기<\/summary>/);
+ assert.match(html,/preload="none"/);
+ assert.doesNotMatch(html,/<video[^>]*autoplay/);
 });
 test('검증 전 서버의 성공 응답이라도 메뉴로 표시하지 않고 새 배포를 안내한다',async()=>{
  const server=req=>{
@@ -1841,4 +1843,42 @@ test('검증 전 서버의 성공 응답이라도 메뉴로 표시하지 않고 
  const html=ui.element('restaurantCards').innerHTML;
  assert.doesNotMatch(html,/<video\b/);
  assert.match(visibleText(html),/공유 서버 수정본을 적용해 주세요/);
+});
+
+test('Threads 설명이 @gangnambab뿐이어도 영상 후보를 번호·시각으로 구분하고 확인 후 팀원에게 공유한다',async()=>{
+ const clip='https://video.cdninstagram.com/clip/verified.mp4';
+ const link='https://www.threads.com/@gangnambab/post/ManuallyChosen';
+ let confirmed=false,receipts={},calls=[];
+ const candidate={kind:'video',postUrl:link,videoUrl:clip,posterUrl:'',
+   publishedAt:'2026-10-19T03:00:00.000Z',caption:'@gangnambab',promotion:false};
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true,gangnamManualPick:true},
+    receipt:receipts[req.receipt]});
+  if(req.action==='gangnamMenu')return confirmed?{ok:true,date:'2026-10-19',kind:'video',postUrl:link,videoUrl:clip,
+     publishedAt:candidate.publishedAt,confidence:'manual',selectedBy:'seongjun',version:'20261125-gangnam-review'}:
+    {ok:false,date:'2026-10-19',reason:'unverified_menu',version:'20261125-gangnam-review',
+      alternatives:[candidate],diagnostics:{matchingDatePosts:1,unverifiedPosts:1}};
+  throw Error('Unexpected '+req.action);
+ };
+ const post=async(url,init)=>{
+  const body=JSON.parse(init.body);calls.push(body);
+  if(body.op.type==='gangnamPick')confirmed=true;
+  if(body.op.type==='gangnamClear')confirmed=false;
+  receipts[body.op.id]={ok:true};return {type:'opaque',status:0};
+ };
+ const ui=await boot({connected:true,server,post,identity:'seongjun'});
+ const initial=ui.element('restaurantCards').innerHTML;
+ assert.match(initial,/게시물 1/);
+ assert.match(initial,/data-action="gangnamMark"/);
+ assert.match(initial,/preload="none"/);
+ await ui.action('gangnamMark','0');
+ assert.equal(calls[0].op.type,'gangnamPick');
+ assert.equal(calls[0].op.payload.postUrl,link);
+ assert.match(ui.element('restaurantCards').innerHTML,/팀원이 메뉴로 확인한 영상/);
+ assert.match(ui.element('restaurantCards').innerHTML,/data-action="gangnamUnpick"/);
+ const other=await boot({connected:true,server,identity:'yunseok'});
+ assert.match(other.element('restaurantCards').innerHTML,/팀원이 메뉴로 확인한 영상/);
+ await ui.action('gangnamUnpick');
+ assert.equal(calls[1].op.type,'gangnamClear');
+ assert.match(ui.element('restaurantCards').innerHTML,/게시물 1/);
 });

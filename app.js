@@ -4,7 +4,7 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v5' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v6' };
   const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
   const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
@@ -294,10 +294,10 @@
     for (const a of attempts) lines.push(String(a.source || 'feed').slice(0, 30) + ': ' + String(a.code || 'unknown').slice(0, 40));
     return '<details class="gangnam-diagnostics"><summary>조회 진단 보기</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:14px;line-height:1.6">' + esc(lines.join('\n')) + '</pre></details>';
   }
-  const VERIFIED_GANGNAM_VERSION = '20261125-menu-screening';
+  const VERIFIED_GANGNAM_VERSION = '20261125-gangnam-review';
   function renderGangnamMenu() {
     const entry = gangnamMenus[date], supported = !!connection && connectedReady && shared.features.gangnamMenu;
-    const ready = entry?.ok && entry.version === VERIFIED_GANGNAM_VERSION && entry.confidence === 'caption' && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
+    const ready = entry?.ok && entry.version === VERIFIED_GANGNAM_VERSION && ['caption','manual'].includes(entry.confidence) && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
       (entry.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(entry.videoUrl) : window.LunchThreadsMenu.validImageURL(entry.imageUrl)) &&
       window.LunchThreadsMenu.seoulDate(entry.publishedAt) === date;
     const oldServer = !!entry && !!entry.version && entry.version !== VERIFIED_GANGNAM_VERSION;
@@ -306,14 +306,32 @@
     if (ready && !(entry.kind === 'image' && gangnamPhotoErrors.has(entry.imageUrl))) {
       content += gangnamMediaHTML(entry);
       content += `<p class="gangnam-menu-meta">${esc(dateText(date))} 게시 · 마지막 성공 조회 ${esc(timeText(entry.checkedAt || entry.publishedAt))}</p>`;
+      if (entry.confidence === 'manual') content += '<div class="gangnam-pick-confirmed"><strong>팀원이 메뉴로 확인한 영상</strong><span>' + esc(nameOf(entry.selectedBy) || '팀원') + '님이 선택 · ' + esc(dateText(date)) +
+        '</span><button class="text-button" data-action="gangnamUnpick">메뉴 지정 취소·다시 선택</button></div>';
       if (entry.refreshFailure) content += '<p class="inline-warning">새로 조회하지 못해 이전에 확인한 메뉴 게시물을 표시합니다. 아래 진단을 확인해 주세요.</p>';
     } else if (['ambiguous', 'unverified_menu'].includes(entry?.reason) && Array.isArray(entry.alternatives) && entry.alternatives.length) {
       const ambiguous = entry.reason === 'ambiguous';
       content += '<div class="image-empty"><strong>' + (ambiguous ? '메뉴 공지 후보가 여러 개예요' : '오늘 메뉴 공지인지 확인되지 않았어요') +
         '</strong><p>짧은 홍보 영상도 식단으로 잘못 표시될 수 있어 자동 선택하지 않습니다. 아래에서 해당 날짜의 게시물을 직접 확인해 주세요.</p></div>';
-      content += '<div class="gangnam-post-links">' + entry.alternatives.filter(p => window.LunchThreadsMenu?.validPostURL(p.postUrl))
-        .slice(0,4).map((p,i) => '<a href="' + esc(p.postUrl) + '" target="_blank" rel="noopener noreferrer">' +
-          esc(p.caption || '게시물 ' + (i + 1)) + ' ↗</a>').join('') + '</div>';
+      content += '<div class="gangnam-review-list">' + entry.alternatives.slice(0,4).map((p,i) => {
+        if (!window.LunchThreadsMenu?.validPostURL(p.postUrl)) return '';
+        const time = p.publishedAt ? timeText(p.publishedAt) : '등록 시각 미상';
+        const label = (p.caption || '').trim().toLowerCase().replace(/[^@a-z]/g, '') === '@gangnambab' || !(p.caption || '').trim() ?
+          '게시물 ' + (i + 1) : p.caption.slice(0, 70);
+        const validVideo = p.kind === 'video' && window.LunchThreadsMenu.validMediaURL(p.videoUrl);
+        const validImage = p.kind === 'image' && window.LunchThreadsMenu.validImageURL(p.imageUrl);
+        if (!validVideo && !validImage) return '';
+        const media = validVideo ?
+          '<video controls playsinline muted preload="none" referrerpolicy="no-referrer" class="gangnam-review-video"><source src="' + esc(p.videoUrl) +
+          '" type="video/mp4">이 브라우저에서는 영상을 표시하지 못해요.</video>' :
+          '<img src="' + esc(p.imageUrl) + '" referrerpolicy="no-referrer" loading="lazy" alt="게시물 ' + (i+1) + ' 사진">';
+        return '<div class="gangnam-review-item"><strong>' + esc(label) + '</strong><span>' + esc(time) + '</span>' +
+          '<details><summary>영상·사진 직접 확인하기</summary>' + media + '</details><div class="gangnam-review-actions">' +
+          '<a href="' + esc(p.postUrl) + '" target="_blank" rel="noopener noreferrer">Threads 원문 ↗</a>' +
+          (shared.features.gangnamManualPick ? '<button class="secondary-button" data-action="gangnamMark" data-id="' + i +
+          '">이 게시물이 오늘 메뉴표예요</button>' : '') + '</div></div>';
+      }).join('') + '</div>' + (!shared.features.gangnamManualPick ?
+        '<p class="inline-warning">팀원에게 메뉴 선택을 공유하려면 최신 공유 서버 코드로 업데이트해 주세요. <a href="setup.html#update">업데이트 안내 ↗</a></p>' : '');
     } else {
       let title = '아직 게시물을 조회하지 않았어요', detail = '게시물 조회가 완료되면 이곳에 표시됩니다.';
       if (!connection) { title = '팀 공유 연결 후 조회할 수 있어요'; detail = '기존 팀 공유 연결을 사용해 주세요.'; }
@@ -339,6 +357,38 @@
     content += gangnamDiagnosticsHTML(entry?.refreshFailure || entry);
     content += `<div class="gangnam-menu-actions"><button class="text-button" data-action="refreshGangnamMenu" ${!supported || gangnamLoading ? 'disabled' : ''}>${gangnamLoading ? '확인 중…' : 'Threads 새 게시물 확인 ↻'}</button><a href="https://www.threads.com/@gangnambab" target="_blank" rel="noopener noreferrer">원문 링크(예비) ↗</a></div></div>`;
     return content;
+  }
+  async function markGangnam(index) {
+    const item = gangnamMenus[date], indexNum = Number(index);
+    if (!connection || !connectedReady || !shared.features.gangnamManualPick) return toast('최신 공유 서버를 연결한 뒤 메뉴를 지정할 수 있어요.');
+    if (!identity) return showIdentity();
+    if (!Number.isInteger(indexNum) || indexNum < 0 || indexNum > 3 || !Array.isArray(item?.alternatives)) return;
+    const candidate = item.alternatives[indexNum];
+    if (!candidate || candidate.promotion || !window.LunchThreadsMenu?.validPostURL(candidate.postUrl) ||
+        window.LunchThreadsMenu.seoulDate(candidate.publishedAt) !== date ||
+        !(candidate.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(candidate.videoUrl) :
+          candidate.kind === 'image' && window.LunchThreadsMenu.validImageURL(candidate.imageUrl)))
+      return toast('게시물 정보를 다시 확인해 주세요.');
+    if (!confirm('영상을 직접 확인하고 오늘 메뉴표가 맞는지 확인하셨나요? 팀원 모두에게 이 영상이 식단으로 표시됩니다.')) return;
+    const selectedDate = date, payload = { kind: candidate.kind, postUrl: candidate.postUrl,
+      publishedAt: candidate.publishedAt, videoUrl: candidate.videoUrl || '',
+      imageUrl: candidate.imageUrl || '', posterUrl: candidate.posterUrl || '' };
+    if (await mutate('gangnamPick', payload, selectedDate)) {
+      delete gangnamMenus[selectedDate]; delete gangnamAttempt[selectedDate];
+      renderMenuCards(); await loadGangnamMenu(selectedDate,true);
+      toast('선택한 메뉴 게시물을 팀 점심판에 공유했어요.');
+    }
+  }
+  async function unmarkGangnam() {
+    if (!connection || !shared.features.gangnamManualPick) return toast('팀 공유 연결을 확인해 주세요.');
+    if (!identity) return showIdentity();
+    if (!confirm('이 날짜의 메뉴 선택을 취소할까요? 팀원 화면에서도 사라집니다.')) return;
+    const selectedDate = date;
+    if (await mutate('gangnamClear', {}, selectedDate)) {
+      delete gangnamMenus[selectedDate]; delete gangnamAttempt[selectedDate];
+      renderMenuCards(); await loadGangnamMenu(selectedDate,true);
+      toast('메뉴 선택을 취소했습니다.');
+    }
   }
   function viewGangnamMenu() {
     const entry = gangnamMenus[date];
@@ -578,7 +628,7 @@
       try {
         const result = await jsonp({ action: 'gangnamMenu', date: when, force: force ? '1' : '0' }, target);
         if (target !== connection) return;
-        if (result?.ok && result.version === VERIFIED_GANGNAM_VERSION && result.confidence === 'caption' && result.date === when && window.LunchThreadsMenu?.validPostURL(result.postUrl) && window.LunchThreadsMenu?.seoulDate(result.publishedAt) === when &&
+        if (result?.ok && result.version === VERIFIED_GANGNAM_VERSION && ['caption','manual'].includes(result.confidence) && result.date === when && window.LunchThreadsMenu?.validPostURL(result.postUrl) && window.LunchThreadsMenu?.seoulDate(result.publishedAt) === when &&
             (result.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(result.videoUrl) : window.LunchThreadsMenu.validImageURL(result.imageUrl))) {
           gangnamMenus[when] = { ...result };
           if (result.kind === 'image') gangnamPhotoErrors.delete(result.imageUrl);
@@ -608,11 +658,11 @@
     if (needsServerUpdate()) { toast('모임 참여 요청·알림 기능을 위해 공유 서버를 업데이트해야 합니다. 설정 안내를 확인해 주세요.'); return false; }
     const opDate = requestedDate, actor = identity, op = { type, payload, actor, id: uid() }, target = connection;
     let next;
-    try { if (!['settings','menuImageUpload','menuImageDelete'].includes(type)) next = C.applyOperation(day(opDate), opDate, config(), op); }
+    try { if (!['settings','menuImageUpload','menuImageDelete','gangnamPick','gangnamClear'].includes(type)) next = C.applyOperation(day(opDate), opDate, config(), op); }
     
     catch (e) { toast(e.message); return false; }
     if (!target) {
-      if (type === 'menuImageUpload' || type === 'menuImageDelete') { toast('팀 공유 연결 후 이용해 주세요.'); return false; }
+      if (['menuImageUpload','menuImageDelete','gangnamPick','gangnamClear'].includes(type)) { toast('팀 공유 연결 후 이용해 주세요.'); return false; }
       const prev = C.clone(local);
       try { if (type === 'settings') local.settings = C.settings(payload); else local.days[opDate] = next; persistLocal(); render(); return true; }
       catch (_) { local = prev; toast('기기에 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.'); return false; }
@@ -800,6 +850,8 @@
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
     else if (action === 'refreshGangnamMenu') loadGangnamMenu(date, true);
+    else if (action === 'gangnamMark') await markGangnam(id);
+    else if (action === 'gangnamUnpick') await unmarkGangnam();
     else if (action === 'viewGangnamMenu') viewGangnamMenu();
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }

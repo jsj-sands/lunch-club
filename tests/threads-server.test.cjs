@@ -38,8 +38,17 @@ function harness() {
  vm.runInContext(source,context);
  const raw=(p={})=>context.doGet({parameter:{action:'gangnamMenu',key:KEY,date:DATE,...p}});
  const get=p=>JSON.parse(raw(p).text);
+ let seq=0;
+ const post=(type,payload,actor='seongjun')=>{
+  const id=(++seq).toString(16).padStart(24,'0');
+  const op={type,payload,actor,id};
+  const body={key:KEY,date:DATE,op};
+  const result=JSON.parse(context.doPost({postData:{contents:JSON.stringify(body)}}).text);
+  const receipt=get({action:'state',receipt:id}).receipt;
+  return {result,receipt,body};
+ };
  const state=()=>get({action:'state'});
- return {store,requests,cached,raw,get,state,
+ return {store,requests,cached,raw,get,state,post,
   advance:ms=>{now+=ms;},setHandler:fn=>{handler=fn;},locked:()=>locked};
 }
 test('강남밥상 조회를 팀 공유에서 지원하고 공개 RSS 이미지 1장만 유효 날짜에 표시한다',()=>{
@@ -51,7 +60,7 @@ test('강남밥상 조회를 팀 공유에서 지원하고 공개 RSS 이미지 
  assert.equal(v.kind,'image');
  assert.equal(v.imageUrl,PHOTO);
  assert.equal(v.postUrl,POST);
- assert.equal(v.version,'20261125-menu-screening');
+ assert.equal(v.version,'20261125-gangnam-review');
  assert.equal(v.confidence,'caption');
  assert.equal(v.diagnostics.validMediaPosts,1);
  assert.equal(s.requests.length,1);
@@ -168,4 +177,50 @@ test('메뉴 공지가 여러 건이면 영상 길이로 하나를 선택하지 
  const v=s.get();
  assert.equal(v.ok,false);assert.equal(v.reason,'ambiguous');
  assert.equal(v.alternatives.length,2);
+});
+
+test('RSSHub 제목이 계정 이름이어도 설명에 실제 오늘 메뉴표가 있으면 자동 판별한다',()=>{
+ const S=require('../threads-menu-source.js');
+ const feed='<rss version="2.0"><channel><item><title>@gangnambab</title>'+
+  '<link>'+POST+'</link><pubDate>'+new Date(NOW).toUTCString()+'</pubDate>'+
+  '<description><![CDATA[<p>11월 24일 오늘 점심 메뉴표</p><video><source src="https://video.cdninstagram.com/clip/menu.mp4"></video>]]></description>'+
+  '</item></channel></rss>';
+ const parsed=S.parseRss(feed);
+ assert.match(parsed.data[0].text,/오늘 점심 메뉴표/);
+ assert.equal(S.chooseMenu(parsed,DATE).ok,true);
+});
+test('팀원이 직접 메뉴 영상으로 선택하면 다른 사용자의 조회에도 고정되고 취소하면 후보로 돌아온다',()=>{
+ const s=harness();
+ const video='https://video.cdninstagram.com/clip/menu.mp4';
+ const unverified='<rss version="2.0"><channel><item><title>@gangnambab</title>'+
+  '<link>'+POST+'</link><pubDate>'+new Date(NOW).toUTCString()+'</pubDate>'+
+  '<description><![CDATA[<video><source src="'+video+'"></video>]]></description></item></channel></rss>';
+ s.setHandler(()=>response(unverified));
+ assert.equal(s.state().features.gangnamManualPick,true);
+ const before=s.get();assert.equal(before.reason,'unverified_menu');
+ assert.equal(before.alternatives.length,1);
+ const picked=s.post('gangnamPick',{kind:'video',postUrl:POST,videoUrl:video,publishedAt:NOW});
+ assert.equal(picked.receipt.ok,true);
+ const requestsBefore=s.requests.length;
+ const chosen=s.get();assert.equal(chosen.ok,true);
+ assert.equal(chosen.confidence,'manual');
+ assert.equal(chosen.selectedBy,'seongjun');assert.equal(chosen.postUrl,POST);
+ assert.equal(chosen.videoUrl,video);
+ assert.equal(s.requests.length,requestsBefore,'Saved pick must be returned without fetching RSS again');
+ const cleared=s.post('gangnamClear',{});
+ assert.equal(cleared.receipt.ok,true);
+ assert.equal(s.get().reason,'unverified_menu');
+});
+test('팀 공유 메뉴 지정 시 날짜, 게시물 도메인, 미디어 URL을 검증한다',()=>{
+ const invalid=[
+  {kind:'video',postUrl:'https://evil.test/clip',videoUrl:'https://video.cdninstagram.com/clip/ok.mp4',publishedAt:NOW},
+  {kind:'video',postUrl:POST,videoUrl:'https://evil.test/promo.mp4',publishedAt:NOW},
+  {kind:'video',postUrl:POST,videoUrl:'https://video.cdninstagram.com/clip/ok.mp4',publishedAt:'2026-11-23T04:00:00.000Z'},
+  {kind:'other',postUrl:POST,videoUrl:'https://video.cdninstagram.com/clip/ok.mp4',publishedAt:NOW}
+ ];
+ for(const p of invalid){
+  const s=harness(),r=s.post('gangnamPick',p);
+  assert.equal(r.receipt.ok,false);
+  assert.equal(s.store['LUNCH_GANGNAM_PICK_'+DATE],undefined);
+ }
 });

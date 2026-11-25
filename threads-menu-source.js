@@ -69,7 +69,12 @@ var LunchThreadsMenu = (function (root) {
       const imgUrl = image ? attr(image[0], 'src') : '';
       const title = elementContent(raw, 'title');
       const pub = elementContent(raw, 'pubDate');
-      return { username: ACCOUNT, timestamp: pub, permalink: postUrl, text: title, media_type: media.length ? 'VIDEO' : imgUrl ? 'IMAGE' : 'TEXT_POST',
+      // RSSHub's title is frequently just "@gangnambab"; inspect the public
+      // description's readable caption text as well (never expose raw HTML).
+      const descriptionText = desc.replace(/<video\b[^>]*>[\s\S]*?<\/video>/gi, ' ')
+        .replace(/<img\b[^>]*>/gi, ' ').replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ').trim().slice(0, 240);
+      return { username: ACCOUNT, timestamp: pub, permalink: postUrl, text: (title + ' ' + descriptionText).trim(), media_type: media.length ? 'VIDEO' : imgUrl ? 'IMAGE' : 'TEXT_POST',
         media_url: media.length ? media[0].videoUrl : imgUrl, thumbnail_url: media.length ? media[0].posterUrl : '', is_quote_post: false };
     }) };
   }

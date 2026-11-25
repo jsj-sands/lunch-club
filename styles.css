@@ -1463,3 +1463,18 @@ footer { font-size:.9375rem; padding:26px 0 36px; }
 .gangnam-post-links{display:grid;gap:9px;margin:12px 0}
 .gangnam-post-links a{display:block;padding:12px 14px;border:1px solid var(--line);border-radius:10px;overflow-wrap:anywhere;background:var(--paper);color:var(--ink);font-size:1rem;text-decoration:underline;text-underline-offset:3px}
 .gangnam-post-links a:hover{background:var(--surface)}
+
+/* Gangnambab candidate review: display distinguishable posts, never autoplay */
+.gangnam-review-list{display:grid;gap:12px;margin:14px 0}
+.gangnam-review-item{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--paper);display:grid;gap:10px;min-width:0}
+.gangnam-review-item>strong{font-size:1.04rem;overflow-wrap:anywhere}
+.gangnam-review-item>span{color:var(--muted);font-size:.9rem}
+.gangnam-review-item details{background:var(--surface);padding:10px;border-radius:10px}
+.gangnam-review-item details summary{cursor:pointer;font-weight:650}
+.gangnam-review-item video,.gangnam-review-item img{display:block;max-width:100%;width:auto;max-height:440px;margin:12px auto 2px;border-radius:10px}
+.gangnam-review-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.gangnam-review-actions a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.gangnam-review-actions button{min-height:42px}
+.gangnam-pick-confirmed{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);padding:12px;border-radius:10px;margin-top:10px}
+.gangnam-pick-confirmed>span{font-size:.9rem;color:var(--muted)}
+@media(max-width:520px){.gangnam-review-actions button{width:100%}}

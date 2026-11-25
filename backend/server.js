@@ -134,8 +134,8 @@ function kakaoProfileResponse_(force) {
 }
 // Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
 // feeds. No Welstory session, Threads login, cookies or end-user credentials.
-const GANGNAM_MENU_VERSION = '20261125-menu-screening';
-const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v3_';
+const GANGNAM_MENU_VERSION = '20261125-gangnam-review';
+const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v4_';
 const GANGNAM_MENU_MIN_REFRESH_MS = 60000;
 const GANGNAM_MENU_CACHE_TTL = 180;
 const GANGNAM_MENU_RSS_DEFAULTS = [
@@ -149,12 +149,54 @@ function gangnamFeedParts_(url) {
   if (!match || !GANGNAM_MENU_RSS_HOSTS.includes(match[1].toLowerCase())) return null;
   return { url: url.trim(), source: match[1].toLowerCase() };
 }
+const GANGNAM_PICK_PREFIX = 'LUNCH_GANGNAM_PICK_';
+function gangnamValidPick_(pick, date) {
+  if (!pick || typeof pick !== 'object' || !['image', 'video'].includes(pick.kind) ||
+      typeof pick.postUrl !== 'string' || typeof pick.publishedAt !== 'string' ||
+      typeof pick.selectedBy !== 'string' || !LunchCore.MEMBERS.some(m => m.id === pick.selectedBy) ||
+      !LunchThreadsMenu.validPostURL(pick.postUrl) || LunchThreadsMenu.seoulDate(pick.publishedAt) !== date) return false;
+  const media = pick.kind === 'video' ? pick.videoUrl : pick.imageUrl;
+  return typeof media === 'string' && media.length < 3000 && LunchThreadsMenu.validMediaURL(media);
+}
+function gangnamChoosePick_(properties, date, op) {
+  if (typeof LunchThreadsMenu === 'undefined') throw new Error('Threads 메뉴 소스를 찾지 못했어요.');
+  const p = op.payload || {}, kind = p.kind;
+  if (!['image','video'].includes(kind) || typeof p.postUrl !== 'string' ||
+      typeof p.publishedAt !== 'string' || p.publishedAt.length > 80 ||
+      !LunchThreadsMenu.validPostURL(p.postUrl) || LunchThreadsMenu.seoulDate(p.publishedAt) !== date)
+    throw new Error('해당 날짜의 Threads 게시물을 다시 확인해 주세요.');
+  const media = kind === 'video' ? p.videoUrl : p.imageUrl;
+  if (typeof media !== 'string' || media.length > 3000 || !LunchThreadsMenu.validMediaURL(media))
+    throw new Error('게시물 사진·영상 주소를 확인해 주세요.');
+  const verified = {
+    kind, postUrl: p.postUrl, publishedAt: p.publishedAt,
+    videoUrl: kind === 'video' ? media : '', imageUrl: kind === 'image' ? media : '',
+    posterUrl: LunchThreadsMenu.validImageURL(p.posterUrl) ? p.posterUrl : '',
+    selectedBy: op.actor, selectedAt: new Date().toISOString()
+  };
+  properties.setProperty(GANGNAM_PICK_PREFIX + date, JSON.stringify(verified));
+}
+function gangnamClearPick_(properties, date) {
+  properties.deleteProperty(GANGNAM_PICK_PREFIX + date);
+}
+function gangnamPickedResponse_(all, date) {
+  let pick;
+  try { pick = JSON.parse(all[GANGNAM_PICK_PREFIX + date] || 'null'); } catch (_) { pick = null; }
+  if (!gangnamValidPick_(pick, date)) return null;
+  return { ok: true, date, version: GANGNAM_MENU_VERSION, confidence: 'manual',
+    kind: pick.kind, imageUrl: pick.imageUrl, videoUrl: pick.videoUrl, posterUrl: pick.posterUrl,
+    postUrl: pick.postUrl, publishedAt: pick.publishedAt, checkedAt: pick.selectedAt,
+    selectedBy: pick.selectedBy, source: LunchThreadsMenu.PAGE };
+}
 function gangnamMenuResponse_(date, force) {
   const checkedAt = new Date().toISOString(), today = LunchCore.today();
   const base = { ok: false, date: date, checkedAt: checkedAt, version: GANGNAM_MENU_VERSION };
   if (date > today) return Object.assign({}, base, { reason: 'future_date' });
   if (date < LunchCore.shiftDate(today, -7)) return Object.assign({}, base, { reason: 'outside_range' });
   if (typeof LunchThreadsMenu === 'undefined') return Object.assign({}, base, { reason: 'feed_unavailable', diagnostics: { failure: 'threads_module_missing' } });
+  const all = PropertiesService.getScriptProperties().getProperties();
+  const chosenByTeam = gangnamPickedResponse_(all, date);
+  if (chosenByTeam) return chosenByTeam;
   const cacheKey = GANGNAM_MENU_CACHE_PREFIX + date;
   let cache;
   try { cache = CacheService.getScriptCache(); } catch (_) { cache = null; }
@@ -165,7 +207,6 @@ function gangnamMenuResponse_(date, force) {
           (!force || Date.now() - Date.parse(saved.checkedAt) < GANGNAM_MENU_MIN_REFRESH_MS)) return saved;
     } catch (_) {}
   }
-  const all = PropertiesService.getScriptProperties().getProperties();
   const custom = typeof all.LUNCH_THREADS_RSS_FEED_URL === 'string' ? all.LUNCH_THREADS_RSS_FEED_URL.trim() : '';
   const requested = custom ? [custom] : GANGNAM_MENU_RSS_DEFAULTS;
   const sources = requested.map(gangnamFeedParts_);
@@ -420,6 +461,9 @@ function prune_(properties, all, keepDate) {
     Object.keys(all).filter(k => k === prefix || k.startsWith(prefix + '_')).forEach(k => properties.deleteProperty(k));
   });
   pruneMenuImages_(properties, all, keepDate);
+  Object.keys(all).filter(k => /^LUNCH_GANGNAM_PICK_20\d{2}-\d{2}-\d{2}$/.test(k) &&
+    k.slice(GANGNAM_PICK_PREFIX.length) < LunchCore.shiftDate(today, -14))
+    .forEach(k => properties.deleteProperty(k));
 }
 function slackNotices_(op, before, after, date) {
   const memberName = id => (LunchCore.MEMBERS.find(item => item.id === id) || {}).name || '';
@@ -633,7 +677,7 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true, gangnamManualPick: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
@@ -666,6 +710,8 @@ function doPost(e) {
     try {
       if (body.op.type === 'menuImageUpload') uploadMenuImage_(properties, all, body.date, body.op);
       else if (body.op.type === 'menuImageDelete') deleteMenuImage_(properties, all, body.date, body.op);
+      else if (body.op.type === 'gangnamPick') gangnamChoosePick_(properties, body.date, body.op);
+      else if (body.op.type === 'gangnamClear') gangnamClearPick_(properties, body.date);
       else if (body.op.type === 'settings') {
         const p = body.op.payload || {};
         if (body.configRevision !== cfg.revision) throw new Error('다른 멤버가 기본 일정을 먼저 바꿨어요. 설정을 다시 열어 저장해 주세요.');
