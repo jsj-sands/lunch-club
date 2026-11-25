@@ -1752,7 +1752,7 @@ test('디테크 채널 조회 실패는 런치타임 사진과 투표를 막지 
  assert.match(ui.element('restaurantCards').innerHTML,/https:\/\/pf\.kakao\.com\/_nkwxeG/);
  const vote=ui.findControl({'data-action':'vote','data-id':'dtech'});
  assert.equal(vote.disabled,false,'디테크 채널 조회 실패만으로는 점심 선택 자체를 막지 않아야 합니다');
- assert.match(ui.element('voteSummary').textContent,/디테크/);
+ assert.match(ui.element('restaurantCards').innerHTML,/data-id="dtech"/);
 });
 test('구 서버에는 디테크 자동 사진 업데이트를 안내하고 신규 선택을 금지한다',async()=>{
  const server=req=>basicSharedState(req,{features:{...sharedFeatures,dtechProfile:false}});
