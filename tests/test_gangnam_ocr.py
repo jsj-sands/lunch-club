@@ -44,6 +44,26 @@ class MenuOcrTests(unittest.TestCase):
         self.assertTrue(m['strong'])
         self.assertTrue(O.frame_verdict([m,m,m])['verified'])
 
+    def test_actual_nov25_weekday_menu_caption_from_live_video(self):
+        recognized = """강남밥상 과천점(지식정보타운)
+@@ NB 25일 수요일 메뉴@@
+단호박죽 주먹밥
+순살닭갈비
+칠리탕수육
+직화짜장
+계란후라이 콘푸레이크
+우유 베이컨 매실차
+콩나물
+단무지무침
+조미김
+묵겉절이
+야채샐러드
+배추김치"""
+        frame = O.frame_score(recognized)
+        self.assertTrue(frame["strong"])
+        self.assertFalse(frame["promo"])
+        self.assertTrue(O.frame_verdict([frame,frame])["verified"])
+
     def test_one_frame_not_enough(self):
         m=O.frame_score('오늘의 식단\n밥\n김치찌개\n제육볶음')
         self.assertFalse(O.frame_verdict([m])['verified'])
