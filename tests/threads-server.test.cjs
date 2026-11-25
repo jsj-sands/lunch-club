@@ -51,7 +51,8 @@ test('강남밥상 조회를 팀 공유에서 지원하고 공개 RSS 이미지 
  assert.equal(v.kind,'image');
  assert.equal(v.imageUrl,PHOTO);
  assert.equal(v.postUrl,POST);
- assert.equal(v.version,'20261124-threads-rss-restored');
+ assert.equal(v.version,'20261125-menu-screening');
+ assert.equal(v.confidence,'caption');
  assert.equal(v.diagnostics.validMediaPosts,1);
  assert.equal(s.requests.length,1);
  assert.equal(s.requests[0].url,'https://rsshub.gneko.io/threads/gangnambab');
