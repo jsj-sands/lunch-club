@@ -1,13 +1,13 @@
 {
   "version": 1,
   "date": "2026-11-25",
-  "status": "unverified",
-  "checked_at": "2026-11-25T02:25:34Z",
-  "selected_post_url": "",
+  "status": "verified",
+  "checked_at": "2026-11-25T02:26:59Z",
+  "selected_post_url": "https://www.threads.com/@gangnambab/post/DgJLD3Ojuir",
   "evidence": {
-    "menu_frames": 0,
-    "sampled_frames": 0,
-    "score": 0
+    "menu_frames": 7,
+    "sampled_frames": 7,
+    "score": 84
   },
   "candidates_checked": 3,
   "diagnostics": [
@@ -32,11 +32,11 @@
     {
       "index": 3,
       "kind": "video",
-      "status": "unverified",
+      "status": "verified",
       "frames": 7,
-      "menu_frames": 0,
+      "menu_frames": 7,
       "promotion_frames": 0,
-      "reason": "ocr_insufficient"
+      "reason": "ocr_verified"
     }
   ]
 }
