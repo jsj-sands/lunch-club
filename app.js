@@ -31,6 +31,7 @@
   if (!gangnamMenus || typeof gangnamMenus !== 'object') gangnamMenus = {};
   let gangnamLoading = false, gangnamAttempt = {}, gangnamRequests = {}, gangnamPhotoErrors = new Set();
   let gangnamOcrVerdict = null, gangnamOcrCheckedAt = 0, gangnamOcrRequest = null;
+  const gangnamDismissedOCR = new Set();
   let connectedReady = false, dialogReturnFocus = null, selectedDecision = '', draftTime = '';
   const state = () => connection ? shared : local;
   const config = () => C.settings(state().settings);
@@ -298,6 +299,7 @@
   const VERIFIED_GANGNAM_VERSION = '20261125-gangnam-review';
   const OCR_REPORT_URL = 'https://raw.githubusercontent.com/jsj-sands/lunch-club/main/data/gangnam-ocr.json';
   function autoGangnamChoice(entry, forDate) {
+    if (gangnamDismissedOCR.has(forDate)) return null;
     const choice = window.LunchOcrChoice?.pick?.(entry, gangnamOcrVerdict, forDate, Date.now());
     return choice && window.LunchThreadsMenu?.validPostURL(choice.postUrl) &&
       window.LunchThreadsMenu?.validMediaURL(choice.videoUrl) &&
@@ -344,7 +346,7 @@
     if (ready && !(entry.kind === 'image' && gangnamPhotoErrors.has(entry.imageUrl))) {
       content += gangnamMediaHTML(entry);
       content += `<p class="gangnam-menu-meta">${esc(dateText(date))} 게시 · 마지막 성공 조회 ${esc(timeText(entry.checkedAt || entry.publishedAt))}</p>`;
-      if (entry.confidence === 'ocr') content += '<div class="gangnam-pick-confirmed"><strong>영상 글자 자동 분석으로 메뉴표 추정</strong><span>' + esc(String(entry.ocrFrames)) + '개 장면에서 식단 단서를 확인했어요. 실제 메뉴 날짜를 확인해 주세요.</span></div>';
+      if (entry.confidence === 'ocr') content += '<div class="gangnam-pick-confirmed"><strong>영상 글자 자동 분석으로 메뉴표 추정</strong><span>' + esc(String(entry.ocrFrames)) + '개 장면에서 식단 단서를 확인했어요. 실제 메뉴 날짜를 확인해 주세요.</span><button class="secondary-button" data-action="gangnamReviewOcr">잘못 선택됐나요? 다른 영상 확인</button></div>';
       if (entry.confidence === 'manual') content += '<div class="gangnam-pick-confirmed"><strong>팀원이 메뉴로 확인한 영상</strong><span>' + esc(nameOf(entry.selectedBy) || '팀원') + '님이 선택 · ' + esc(dateText(date)) +
         '</span><button class="text-button" data-action="gangnamUnpick">메뉴 지정 취소·다시 선택</button></div>';
       if (entry.refreshFailure) content += '<p class="inline-warning">새로 조회하지 못해 이전에 확인한 메뉴 게시물을 표시합니다. 아래 진단을 확인해 주세요.</p>';
@@ -902,6 +904,7 @@
     else if (action === 'refreshGangnamMenu') { loadGangnamMenu(date,true); loadGangnamOcr(true); }
     else if (action === 'gangnamMark') await markGangnam(id);
     else if (action === 'gangnamUnpick') await unmarkGangnam();
+    else if (action === 'gangnamReviewOcr') { gangnamDismissedOCR.add(date); renderMenuCards(); }
     else if (action === 'viewGangnamMenu') viewGangnamMenu();
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }
