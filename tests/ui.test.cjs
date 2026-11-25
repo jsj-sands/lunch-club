@@ -1932,7 +1932,7 @@ test('자동 OCR 결과가 서버의 식단 미확인 후보와 정확히 일치
   checked_at:fixedTime,evidence:{menu_frames:4,sampled_frames:7,score:37}
  })});
  const ui=await boot({connected:true,server,identity:'seongjun',ocrFetch});
- await ui.press('refreshGangnamMenu');
+ await ui.action('refreshGangnamMenu');
  assert.match(ui.element('restaurantCards').innerHTML,/영상 글자 자동 분석으로 메뉴표 추정/);
  assert.match(ui.element('restaurantCards').innerHTML,/gangnamMenuVideo/);
  assert.doesNotMatch(ui.element('restaurantCards').innerHTML,/data-action="gangnamMark"/);
