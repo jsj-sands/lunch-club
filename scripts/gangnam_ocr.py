@@ -236,6 +236,10 @@ def images_from_video(path: Path, folder: Path) -> list[Path]:
     if duration <= 0 or duration > MAX_SECONDS:
         return []
     times = [t for t in SAMPLE_SECONDS if t < duration - 0.12]
+    near_end = max(.05, duration - .28)
+    if not any(abs(t - near_end) < .18 for t in times):
+        times.append(near_end)
+    times = sorted(set(round(t, 2) for t in times if t < duration))
     if len(times) < 2:
         times = [max(.05, duration * .25), max(.08, duration * .7)]
     frames = []
@@ -244,7 +248,7 @@ def images_from_video(path: Path, folder: Path) -> list[Path]:
         try:
             run(["ffmpeg", "-nostdin", "-loglevel", "error", "-ss", str(sec),
                  "-i", str(path), "-frames:v", "1", "-vf",
-                 "scale=if(gte(iw\\,ih)\\,min(1080\\,iw)\\,-2):if(gte(iw\\,ih)\\,-2\\,min(1080\\,ih))",
+                 "scale=min(max(960\\,iw*2)\\,1440):-2,eq=contrast=1.18:brightness=0.03",
                  "-y", str(file)], timeout=20)
             if file.is_file() and file.stat().st_size > 100:
                 frames.append(file)
@@ -274,7 +278,20 @@ def inspect_post(post: dict) -> dict:
                 try:
                     captured = run(["tesseract", str(frame), "stdout", "-l", "kor+eng",
                                     "--psm", "11"], timeout=18).stdout.decode("utf-8", "replace")
-                    scores.append(frame_score(captured))
+                    first = frame_score(captured)
+                    if not first["strong"]:
+                        try:
+                            additional = run(["tesseract", str(frame), "stdout", "-l", "kor+eng",
+                                              "--psm", "6"], timeout=18).stdout.decode("utf-8", "replace")
+                            alternative = frame_score(additional)
+                            if alternative["strong"] or alternative["score"] > first["score"]:
+                                captured, first = additional, alternative
+                        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+                            pass
+                    if len(scores) < 2:
+                        excerpt = re.sub(r"\\s+", " ", captured).strip()[:140]
+                        print("OCR sample", len(scores) + 1, "chars", len(captured), "text", repr(excerpt))
+                    scores.append(first)
                 except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
                     continue
             verdict = frame_verdict(scores)
@@ -372,7 +389,7 @@ def main(argv: list[str] | None = None) -> int:
                     age = (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(previous_checked.replace("Z", "+00:00"))).total_seconds()
                 except (ValueError, TypeError):
                     age = 10_000
-                if 0 <= age < 90 * 60:
+                if 0 <= age < 90 * 60 and previous.get("diagnostics") == out.get("diagnostics"):
                     out = previous
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
