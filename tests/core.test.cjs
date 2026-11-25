@@ -82,10 +82,10 @@ test('새 멤버 천진기도 투표와 참석 변경을 저장하고 다시 불
   d = C.cleanDay(JSON.parse(JSON.stringify(d)));
   assert.deepEqual(C.tally(monday,d,settings).lunchtime, ['jingi']);
   assert.equal(d.votes.jingi, 'lunchtime');
-  assert.throws(() => C.applyOperation(C.emptyDay(),'2026-10-20',settings,op('vote','jingi',{placeId:'megazone'})), /함께 먹는 상태/);
+  assert.throws(() => C.applyOperation(C.emptyDay(),'2026-10-20',settings,op('vote','jingi',{placeId:'dtech'})), /함께 먹는 상태/);
   d = C.applyOperation(C.emptyDay(),'2026-10-20',settings,op('availability','jingi',{value:'in'}));
-  d = C.applyOperation(d,'2026-10-20',settings,op('vote','jingi',{placeId:'megazone'}));
-  assert.deepEqual(C.tally('2026-10-20',C.cleanDay(d),settings).megazone, ['jingi']);
+  d = C.applyOperation(d,'2026-10-20',settings,op('vote','jingi',{placeId:'dtech'}));
+  assert.deepEqual(C.tally('2026-10-20',C.cleanDay(d),settings).dtech, ['jingi']);
 });
 test('기본 일정과 수동 예외 모두 대표님과 점심 문구를 표시한다', () => {
   assert.equal(C.memberStatus('jingi','2026-10-20',C.emptyDay(),settings).reason,'대표님과 점심');
@@ -107,14 +107,14 @@ test('서울 자정, 주말, 달력 날짜를 일관되게 처리한다', () => 
 });
 test('오늘 안 먹음은 이유를 보관하고 인원과 투표 집계에서 제외한다', () => {
   let d = choose(C.emptyDay(), 'seongjun', 'in');
-  d = C.applyOperation(d, monday, settings, op('vote','seongjun',{placeId:'megazone'}));
+  d = C.applyOperation(d, monday, settings, op('vote','seongjun',{placeId:'dtech'}));
   d = C.applyOperation(d,monday,settings,op('availability','seongjun',{value:'out',reason:'병원에 가요'}));
   assert.equal(C.memberStatus('seongjun',monday,d,settings).detail,'병원에 가요');
   assert.equal(C.participants(monday,d,settings).length,0);
-  assert.equal(C.tally(monday,d,settings).megazone.length,0);
+  assert.equal(C.tally(monday,d,settings).dtech.length,0);
   assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'lunchtime'})),/함께 먹는 상태/);
   d = C.applyOperation(d,monday,settings,op('availability','seongjun',{value:'in'}));
-  assert.equal(C.tally(monday,d,settings).megazone.length,1);
+  assert.equal(C.tally(monday,d,settings).dtech.length,1);
   assert.equal(d.absenceReasons.seongjun,undefined);
 });
 test('사유 미입력이 가능하고, 개인 불참을 대표님과 점심 취소가 되돌리지 않는다', () => {
@@ -176,22 +176,22 @@ test('일정 적용기한 이후에는 종료된 대표님과 점심 반복 규�
   assert.equal(C.participants('2027-01-01',C.emptyDay(),extended).length,0);
   assert.equal(C.memberStatus('juri','2027-01-01',C.emptyDay(),extended).kind,'ceo');
 });
-test('일반 점심은 메가존·런치타임·강남밥상을 선택할 수 있고 재선택은 한 사람 한 표로 변경된다', () => {
+test('일반 점심은 런치타임·디테크 한식뷔페·강남밥상을 선택할 수 있고 재선택은 한 사람 한 표로 변경된다', () => {
   let d=choose(C.emptyDay(),'seongjun','in');
-  d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'megazone'}));
-  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:[],megazone:['seongjun'],gangnambab:[]});
+  d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'dtech'}));
+  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:[],dtech:['seongjun'],gangnambab:[]});
   d=C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'lunchtime'}));
-  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:['seongjun'],megazone:[],gangnambab:[]});
-  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:null})),/메가존·런치타임·강남밥상/);
-  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'})),/메가존·런치타임·강남밥상/);
+  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:['seongjun'],dtech:[],gangnambab:[]});
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:null})),/런치타임·디테크 한식뷔페·강남밥상/);
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'extra_test'})),/런치타임·디테크 한식뷔페·강남밥상/);
 });
 test('허용된 멤버, 식당, 링크, 시간만 처리한다', () => {
   const day = choose(C.emptyDay(),'seongjun','in');
-  assert.throws(()=>C.applyOperation(C.emptyDay(),monday,settings,op('vote','other',{placeId:'megazone'})),/이름/);
-  assert.throws(()=>C.applyOperation(day,monday,settings,op('vote','seongjun',{placeId:'does-not-exist'})),/메가존·런치타임·강남밥상/);
+  assert.throws(()=>C.applyOperation(C.emptyDay(),monday,settings,op('vote','other',{placeId:'dtech'})),/이름/);
+  assert.throws(()=>C.applyOperation(day,monday,settings,op('vote','seongjun',{placeId:'does-not-exist'})),/런치타임·디테크 한식뷔페·강남밥상/);
   assert.equal(C.safeUrl('javascript:alert(1)'), '');
   assert.equal(C.safeUrl('https://example.com/\n<script>'), '');
-  assert.throws(()=>C.applyOperation(day,monday,settings,op('decision','seongjun',{placeId:'megazone',time:'25:00'})),/시간/);
+  assert.throws(()=>C.applyOperation(day,monday,settings,op('decision','seongjun',{placeId:'dtech',time:'25:00'})),/시간/);
 });
 test('명시적으로 함께 먹기를 고른 멤버만 투표하고 확정하며 다른 상태는 집계하지 않는다', () => {
   for (const value of ['auto','pending','out','ceo','separate','in']) {
@@ -201,13 +201,13 @@ test('명시적으로 함께 먹기를 고른 멤버만 투표하고 확정하�
     assert.equal(status.in, value === 'in');
     assert.equal(status.manual, value !== 'auto');
     if (value === 'in') {
-      day = apply(day,'vote','seongjun',{placeId:'megazone'});
-      day = apply(day,'decision','seongjun',{placeId:'megazone',time:'12:00'});
-      assert.deepEqual(C.tally(monday,day,settings).megazone,['seongjun']);
+      day = apply(day,'vote','seongjun',{placeId:'dtech'});
+      day = apply(day,'decision','seongjun',{placeId:'dtech',time:'12:00'});
+      assert.deepEqual(C.tally(monday,day,settings).dtech,['seongjun']);
       assert.equal(day.decision.actor,'seongjun');
     } else {
-      assert.throws(() => apply(day,'vote','seongjun',{placeId:'megazone'}),/함께 먹는 상태/);
-      assert.throws(() => apply(day,'decision','seongjun',{placeId:'megazone',time:'12:00'}),/함께 먹는 상태/);
+      assert.throws(() => apply(day,'vote','seongjun',{placeId:'dtech'}),/함께 먹는 상태/);
+      assert.throws(() => apply(day,'decision','seongjun',{placeId:'dtech',time:'12:00'}),/함께 먹는 상태/);
       assert.equal(JSON.stringify(day),before);
     }
   }
@@ -215,7 +215,7 @@ test('명시적으로 함께 먹기를 고른 멤버만 투표하고 확정하�
 test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 새 기본값과 함께 복원된다', () => {
   const legacy = {
     ceoCancelled: true, overrides: { seongjun:'in', jingi:'out', juri:'ceo' },
-    absenceReasons: { jingi:'외부 미팅' }, votes: { seongjun:'extra_old', yunchul:'megazone', jingi:'lunchtime' },
+    absenceReasons: { jingi:'외부 미팅' }, votes: { seongjun:'extra_old', yunchul:'dtech', jingi:'lunchtime' },
     extras: [{ id:'extra_old', name:'국수집', subtitle:'전에 추가한 곳', url:'https://example.com/' }],
     notes: { extra_old:'기존 메모' }, decision: { placeId:'extra_old', time:'12:10', actor:'yunchul', at:'2026-10-19T02:00:00Z' },
     revision:42, updatedAt:'2026-10-19T02:00:00Z'
@@ -224,22 +224,22 @@ test('이전 날짜 기록의 직접 참석·불참·투표·확정·설명은 �
   assert.deepEqual(restored,{...legacy,ceoDecision:null,separateVenues:{},pairs:[],joinRequests:[]});
   assert.equal(JSON.stringify(legacy),before);
   assert.deepEqual(C.participants(monday,restored,settings).map(m => m.id),['seongjun']);
-  assert.deepEqual(C.tally(monday,restored,settings),{lunchtime:[],megazone:[],gangnambab:[]});
+  assert.deepEqual(C.tally(monday,restored,settings),{lunchtime:[],dtech:[],gangnambab:[]});
   const returned = choose(restored,'yunchul','in');
-  assert.deepEqual(C.tally(monday,returned,settings).megazone,['yunchul']);
+  assert.deepEqual(C.tally(monday,returned,settings).dtech,['yunchul']);
   assert.deepEqual(returned.decision,legacy.decision);
 });
 test('짝 초대는 초대한 본인만 따로 먹기로 바꾸고 수신자의 이전 선택과 투표를 보존한다', () => {
   for (const value of ['auto','in','out','ceo','pending','separate']) {
     let day = choose(C.emptyDay(),'jingi',value);
     day.absenceReasons.jingi = value === 'out' ? '약속이 있어요' : undefined;
-    day.votes.jingi = 'megazone';
+    day.votes.jingi = 'dtech';
     const before = JSON.stringify(day), previousStatus = C.memberStatus('jingi',monday,day,settings);
     const next = invite(day);
     assert.equal(JSON.stringify(day),before);
     assert.equal(next.overrides.seongjun,'separate');
     assert.deepEqual(C.memberStatus('jingi',monday,next,settings),previousStatus);
-    assert.equal(next.votes.jingi,'megazone');
+    assert.equal(next.votes.jingi,'dtech');
     assert.equal(next.absenceReasons.jingi,day.absenceReasons.jingi);
     assert.deepEqual(next.pairs,[{id:pairId(1),from:'seongjun',to:'jingi',status:'pending'}]);
     assert.deepEqual(C.pairFor('seongjun',next),next.pairs[0]);
@@ -251,16 +251,16 @@ test('짝 초대는 초대한 본인만 따로 먹기로 바꾸고 수신자의 
 });
 test('수신자의 수락 뒤에만 둘이 따로 먹으며 기존 투표는 보관하되 함께 먹는 집계에서 뺀다', () => {
   let day = choose(choose(C.emptyDay(),'seongjun','in'),'jingi','in');
-  day = apply(apply(day,'vote','seongjun',{placeId:'megazone'}),'vote','jingi',{placeId:'megazone'});
+  day = apply(apply(day,'vote','seongjun',{placeId:'dtech'}),'vote','jingi',{placeId:'dtech'});
   day = invite(day);
-  assert.deepEqual(C.tally(monday,day,settings).megazone,['jingi']);
+  assert.deepEqual(C.tally(monday,day,settings).dtech,['jingi']);
   const before = JSON.stringify(day), next = accept(day);
   assert.equal(JSON.stringify(day),before);
   assert.equal(next.pairs[0].status,'accepted');
   assert.equal(next.overrides.seongjun,'separate');
   assert.equal(next.overrides.jingi,'separate');
-  assert.deepEqual(next.votes,{seongjun:'megazone',jingi:'megazone'});
-  assert.deepEqual(C.tally(monday,next,settings).megazone,[]);
+  assert.deepEqual(next.votes,{seongjun:'dtech',jingi:'dtech'});
+  assert.deepEqual(C.tally(monday,next,settings).dtech,[]);
   assert.deepEqual(C.incomingPairs('jingi',next),[]);
   assert.deepEqual(C.cleanDay(JSON.parse(JSON.stringify(next))),next);
 });
@@ -366,11 +366,12 @@ test('저장된 쌍은 유효한 두 멤버·동의 상태·개인 선택이 맞
   const detached = C.pairFor('seongjun',restored); detached.status = 'pending';
   assert.equal(restored.pairs[0].status,'accepted');
 });
-test('메가존 카드는 중단된 Welplan 대신 지도 링크를 쓰고 식단 원문 주소를 만들지 않는다', () => {
-  const megazone = C.PLACES.find(p => p.id === 'megazone');
-  assert.equal(megazone.url, C.MEGAZONE_MAP);
-  assert.equal(new URL(megazone.url).hostname, 'map.naver.com');
-  assert.equal(C.safeUrl(megazone.url), megazone.url);
+test('디테크 한식뷔페 카드는 중단된 Welplan 대신 지도 링크를 쓰고 식단 원문 주소를 만들지 않는다', () => {
+  const dtech = C.PLACES.find(p => p.id === 'dtech');
+  assert.equal(dtech.url, C.DTECH_MAP);
+  assert.equal(dtech.menuUrl, 'https://pf.kakao.com/_nkwxeG');
+  assert.equal(new URL(dtech.url).hostname, 'map.naver.com');
+  assert.equal(C.safeUrl(dtech.url), dtech.url);
   assert.equal(C.menuUrl, undefined);
   assert.equal(C.parseMenuMarkdown, undefined);
 });
@@ -379,12 +380,12 @@ test('메가존 카드는 중단된 Welplan 대신 지도 링크를 쓰고 식�
 test('대표님 점심은 식당 하나를 그 날짜에만 공유하고 일반 점심 선택과 서로 침범하지 않는다', () => {
   const tuesday='2026-10-20', other='2026-10-21';
   let d=C.applyOperation(C.emptyDay(), tuesday, settings, op('availability','yunchul',{value:'in'}));
-  d=C.applyOperation(d,tuesday,settings,op('vote','yunchul',{placeId:'megazone'}));
+  d=C.applyOperation(d,tuesday,settings,op('vote','yunchul',{placeId:'dtech'}));
   const payload={placeId:'guide_1764937561',name:'만보성',url:'https://m.place.naver.com/place/1764937561/home',time:'12:00',category:'중식'};
   d=C.applyOperation(d,tuesday,settings,op('ceoDecision','jingi',payload));
   assert.equal(d.ceoDecision.name,'만보성');
   assert.equal(d.ceoDecision.actor,'jingi');
-  assert.deepEqual(C.tally(tuesday,d,settings),{megazone:['yunchul'],lunchtime:[],gangnambab:[]});
+  assert.deepEqual(C.tally(tuesday,d,settings),{dtech:['yunchul'],lunchtime:[],gangnambab:[]});
   assert.equal(C.cleanDay(JSON.parse(JSON.stringify(d))).ceoDecision.url,payload.url);
   assert.equal(C.cleanDay(C.emptyDay()).ceoDecision,null);
   assert.equal(C.memberStatus('jingi',other,C.emptyDay(),settings).kind,'pending');
@@ -476,20 +477,20 @@ test('다중 초대에서 대상 중복·중복 그룹 가입·잘못된 식당�
 const joinId = n => 'join_' + n.toString(16).padStart(24, '0');
 test('공개된 따로 먹는 모임에 참여 요청 시 원래의 함께 점심 상태는 승인 전까지 유지되고 승인 시 이동한다', () => {
   let d = choose(C.emptyDay(), 'juri', 'in');
-  d = apply(d,'vote','juri',{placeId:'megazone'});
+  d = apply(d,'vote','juri',{placeId:'dtech'});
   d = choose(d,'seongjun','separate');
   d = apply(d,'joinRequest','juri',{id:joinId(1),to:'seongjun'});
   assert.equal(C.myJoinRequest('juri',d).to,'seongjun');
   assert.equal(C.incomingJoinRequests('seongjun',d).length,1);
   assert.equal(C.memberStatus('juri',monday,d,settings).kind,'in');
-  assert.deepEqual(C.tally(monday,d,settings).megazone,['juri']);
+  assert.deepEqual(C.tally(monday,d,settings).dtech,['juri']);
   d = apply(d,'joinApprove','seongjun',{requestId:joinId(1)});
   assert.equal(d.joinRequests.length,0);
   assert.deepEqual(C.separateGroup('juri',d).members,['seongjun','juri']);
   assert.equal(C.memberStatus('juri',monday,d,settings).kind,'separate');
   assert.deepEqual(C.participants(monday,d,settings),[]);
-  assert.deepEqual(C.tally(monday,d,settings).megazone,[]);
-  assert.equal(d.votes.juri,'megazone','기존 개인 선택 기록은 보관하지만 집계에서는 빼야 한다');
+  assert.deepEqual(C.tally(monday,d,settings).dtech,[]);
+  assert.equal(d.votes.juri,'dtech','기존 개인 선택 기록은 보관하지만 집계에서는 빼야 한다');
 });
 test('손주리가 초대를 수락하면 초록색 함께 점심에서 빠지고 따로 먹는 모임으로 이동한다', () => {
   let d=choose(C.emptyDay(),'juri','in');
@@ -550,4 +551,12 @@ test('서지혜 대리의 수요일 기본 일정은 새 날짜에서 일관되�
  assert.equal(C.memberStatus('jihye','2026-11-25',C.emptyDay(),C.settings()).kind,'ceo');
  assert.equal(C.memberStatus('jihye','2026-11-26',C.emptyDay(),C.settings()).kind,'pending');
  assert.deepEqual(C.settings({ceoDays:{jihye:[]}}).ceoDays.jihye,[]);
+});
+
+test('폐지된 메가존 선택은 디테크 인원으로 자동 전환하지 않고 날짜 기록에만 보존한다',()=>{
+  const d=C.cleanDay({overrides:{seongjun:'in'}, votes:{seongjun:'megazone'}});
+  assert.equal(d.votes.seongjun,'megazone');
+  assert.deepEqual(C.tally(monday,d,settings),{lunchtime:[],dtech:[],gangnambab:[]});
+  assert.throws(()=>C.applyOperation(d,monday,settings,op('vote','seongjun',{placeId:'megazone'})),/런치타임·디테크 한식뷔페·강남밥상/);
+  assert.deepEqual(C.PLACES.map(p=>p.id),['lunchtime','dtech','gangnambab']);
 });

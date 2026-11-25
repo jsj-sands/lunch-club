@@ -8,7 +8,7 @@ const KEY='a'.repeat(48),DATE='2026-10-19';
 function server(){
  const store={},cache=new Map();let locked=false,fetches=0;
  const properties={getProperties:()=>({...store}),getProperty:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setProperty(k,v){if(Buffer.byteLength(v)>9000)throw Error('property quota');store[k]=v;return this;},setProperties(v){Object.entries(v).forEach(([k,x])=>this.setProperty(k,x));return this;},deleteProperty(k){delete store[k];return this;}};
- const context={console,Date,Intl,URL,Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)}),getUuid:()=>crypto.randomUUID(),formatDate:()=>DATE},PropertiesService:{getScriptProperties:()=>properties},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},hasLock:()=>locked,releaseLock(){locked=false;}})},ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput:s=>({text:s,setMimeType(t){this.mime=t;return this;}})},UrlFetchApp:{fetch(){fetches++;return {getResponseCode:()=>200,getContentText:()=>'- Vendor: 삼성웰스토리\n- Date: 2026년 10월 19일 (월)\n# 메가존산학연센터\n## 점심\n- 나주곰탕\n- 김치볶음밥\n## Discovery\n- RSS: test'};}}};
+ const context={console,Date,Intl,URL,Utilities:{newBlob:s=>({getBytes:()=>Buffer.from(s)}),getUuid:()=>crypto.randomUUID(),formatDate:()=>DATE},PropertiesService:{getScriptProperties:()=>properties},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},hasLock:()=>locked,releaseLock(){locked=false;}})},ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput:s=>({text:s,setMimeType(t){this.mime=t;return this;}})},UrlFetchApp:{fetch(){fetches++;return {getResponseCode:()=>200,getContentText:()=>'- Vendor: 삼성웰스토리\n- Date: 2026년 10월 19일 (월)\n# 디테크 한식뷔페산학연센터\n## 점심\n- 나주곰탕\n- 김치볶음밥\n## Discovery\n- RSS: test'};}}};
  vm.createContext(context);
  vm.runInContext(['core.js','threads-menu-source.js','backend/server.js'].map(f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8')).join('\n').replace("'__TEAM_KEY__'",`'${KEY}'`),context);
  let seq=0;
@@ -18,28 +18,28 @@ function server(){
 }
 test('서버가 각 멤버의 변경을 최신 상태에 병합하고 중복 요청을 한 번만 적용한다',()=>{
  const s=server();s.post('availability','seongjun',{value:'in'});s.post('availability','yunchul',{value:'in'});
- const a=s.post('vote','seongjun',{placeId:'megazone'});s.post('vote','yunchul',{placeId:'lunchtime'});
- let d=s.get().days[DATE];assert.equal(d.votes.seongjun,'megazone');assert.equal(d.votes.yunchul,'lunchtime');assert.equal(d.revision,4);
+ const a=s.post('vote','seongjun',{placeId:'dtech'});s.post('vote','yunchul',{placeId:'lunchtime'});
+ let d=s.get().days[DATE];assert.equal(d.votes.seongjun,'dtech');assert.equal(d.votes.yunchul,'lunchtime');assert.equal(d.revision,4);
  s.context.doPost({postData:{contents:JSON.stringify(a.body)}});assert.equal(s.get().days[DATE].revision,4);assert.equal(s.get({receipt:a.body.op.id}).receipt.ok,true);assert.equal(s.locked(),false);
 });
 test('버전 5 서버는 미선택 기본값과 페어링을 알리고 명시적 참석만 투표·확정하도록 검증한다',()=>{
  const s=server(),state=s.get(),C=s.context.LunchCore;
- assert.equal(state.serverVersion,7);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true,gangnamMenu:true,gangnamManualPick:true});
+ assert.equal(state.serverVersion,8);assert.deepEqual(state.features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true,gangnamMenu:true,gangnamManualPick:true,dtechProfile:true});
  assert.equal(C.memberStatus('seongjun',DATE,state.days[DATE],state.settings).kind,'pending');
  assert.equal(C.memberStatus('juri',DATE,state.days[DATE],state.settings).kind,'ceo');
  assert.equal(C.participants(DATE,state.days[DATE],state.settings).length,0);assert.deepEqual(state.days[DATE].pairs,[]);
  s.post('availability','yunchul',{value:'in'});
- for(const [type,payload] of [['vote',{placeId:'megazone'}],['decision',{placeId:'megazone',time:'12:00'}]]){
+ for(const [type,payload] of [['vote',{placeId:'dtech'}],['decision',{placeId:'dtech',time:'12:00'}]]){
   const failed=s.post(type,'seongjun',payload),received=s.get({receipt:failed.body.op.id});
   assert.equal(received.receipt.ok,false);assert.match(received.receipt.error,/함께 먹는 상태/);assert.equal(received.days[DATE].revision,1);
  }
- s.post('availability','seongjun',{value:'in'});const confirmed=s.post('decision','seongjun',{placeId:'megazone',time:'12:00'});
+ s.post('availability','seongjun',{value:'in'});const confirmed=s.post('decision','seongjun',{placeId:'dtech',time:'12:00'});
  assert.equal(s.get({receipt:confirmed.body.op.id}).receipt.ok,true);assert.equal(s.get().days[DATE].decision.actor,'seongjun');
 });
 test('개인 불참 사유가 서버에 보관되고 오류 요청은 성공으로 확인하지 않는다',()=>{
  const s=server();const a=s.post('availability','seongjun',{value:'out',reason:'속이 안 좋아요'});
  assert.equal(s.get().days[DATE].absenceReasons.seongjun,'속이 안 좋아요');
- const failed=s.post('vote','seongjun',{placeId:'megazone'});const r=s.get({receipt:failed.body.op.id});assert.equal(r.receipt.ok,false);assert.match(r.receipt.error,/함께 먹는 상태/);assert.equal(r.days[DATE].revision,1);
+ const failed=s.post('vote','seongjun',{placeId:'dtech'});const r=s.get({receipt:failed.body.op.id});assert.equal(r.receipt.ok,false);assert.match(r.receipt.error,/함께 먹는 상태/);assert.equal(r.days[DATE].revision,1);
  assert.equal(s.get({receipt:a.body.op.id}).receipt.ok,true);
 });
 test('잘못된 키와 콜백의 실행을 차단한다',()=>{
@@ -54,7 +54,7 @@ test('기본 일정 동시 수정은 버전 충돌을 안내하고 이전 설정
  cfg.scheduleEnd='2026-11-30';const result=s.post('settings','juri',cfg,{configRevision:0});
  const current=s.get({receipt:result.body.op.id});assert.equal(current.receipt.ok,false);assert.equal(current.settings.scheduleEnd,'2027-12-31');
 });
-test('메가존 로그인 API가 완전히 비활성화되어 메뉴 요청이 거부된다',()=>{
+test('디테크 한식뷔페 로그인 API가 완전히 비활성화되어 메뉴 요청이 거부된다',()=>{
  const s=server(),result=s.get({action:'menu'});
  assert.equal(result.ok,false);assert.match(result.error,/지원하지 않는 조회/);
  assert.equal(s.fetches(),0);
@@ -112,7 +112,7 @@ test('짝 탈퇴와 개인 상태 변경은 해당 날짜에만 적용되고 다
 });
 test('기존 버전의 저장된 일일 기록·영수증·사용자 일정은 새로운 상태와 함께 유지된다',()=>{
  const s=server(),oldReceipt='f'.repeat(24);
- const data={ceoCancelled:true,overrides:{seongjun:'in',jingi:'out'},absenceReasons:{jingi:'외부 일정'},votes:{seongjun:'megazone',yunchul:'lunchtime'},extras:[],notes:{megazone:'기존 메뉴 메모'},decision:{placeId:'megazone',time:'12:10',actor:'yunchul',at:'2026-10-19T01:00:00Z'},revision:27,updatedAt:'2026-10-19T01:00:00Z'};
+ const data={ceoCancelled:true,overrides:{seongjun:'in',jingi:'out'},absenceReasons:{jingi:'외부 일정'},votes:{seongjun:'dtech',yunchul:'lunchtime'},extras:[],notes:{dtech:'기존 메뉴 메모'},decision:{placeId:'dtech',time:'12:10',actor:'yunchul',at:'2026-10-19T01:00:00Z'},revision:27,updatedAt:'2026-10-19T01:00:00Z'};
  const cfg={scheduleEnd:'2027-06-30',meetingTime:'12:10',ceoDays:{seongjun:[1],juri:[2],hyunsu:[],yunchul:[4],jingi:[1,5],minjun:[3]}};
  s.store.LUNCH_CONFIG=JSON.stringify({settings:cfg,revision:9});
  s.store['LUNCH_DAY_'+DATE]=JSON.stringify({parts:1,generation:'legacy'});
@@ -148,7 +148,7 @@ test('대표님 점심 식당 확정은 기존 서버 저장·수신 확인을 �
 test('Google 공유 서버는 3명 이상 모임과 모임별 맛집 장소를 다른 접속자에게 복원하고 기존 데이터는 보존한다',()=>{
  const s=server(),id1='pair_'+'a'.repeat(24),id2='pair_'+'b'.repeat(24);
  const venue={placeId:'guide_123456789',name:'테스트 식당',url:'https://m.place.naver.com/place/123456789/home',category:'한식'};
- s.post('availability','seongjun',{value:'in'});s.post('vote','seongjun',{placeId:'megazone'});
+ s.post('availability','seongjun',{value:'in'});s.post('vote','seongjun',{placeId:'dtech'});
  const sent=s.post('groupInvite','seongjun',{invites:[{id:id1,to:'jingi'},{id:id2,to:'jiwoo'}]});
  assert.equal(s.get({receipt:sent.body.op.id}).receipt.ok,true);
  const waiting=s.get().days[DATE];
@@ -160,7 +160,7 @@ test('Google 공유 서버는 3명 이상 모임과 모임별 맛집 장소를 �
  const shared=s.get({receipt:placeSaved.body.op.id});
  assert.equal(shared.receipt.ok,true);
  assert.equal(shared.days[DATE].separateVenues.seongjun.placeId,venue.placeId);
- assert.equal(shared.days[DATE].votes.seongjun,'megazone');
+ assert.equal(shared.days[DATE].votes.seongjun,'dtech');
  assert.equal(shared.days[DATE].ceoDecision,null);
  s.post('pairAccept','jiwoo',{pairId:id2});
  const other=s.get().days[DATE];
@@ -177,16 +177,16 @@ test('여러 직원이 만든 합류 요청과 승인 상태를 공유 서버가
  const s=server(),join='join_'+'d'.repeat(24),tuesday='2026-10-20';
  s.post('availability','seongjun',{value:'separate'},{date:tuesday});
  s.post('availability','juri',{value:'in'},{date:tuesday});
- s.post('vote','juri',{placeId:'megazone'},{date:tuesday});
+ s.post('vote','juri',{placeId:'dtech'},{date:tuesday});
  const requested=s.post('joinRequest','juri',{id:join,to:'seongjun'},{date:tuesday});
  assert.equal(s.get({date:tuesday,receipt:requested.body.op.id}).receipt.ok,true);
  assert.deepEqual(s.get({date:tuesday}).days[tuesday].joinRequests.map(x=>x.from),['juri']);
- assert.equal(s.context.LunchCore.tally(tuesday,s.get({date:tuesday}).days[tuesday],s.get().settings).megazone.join(','),'juri');
+ assert.equal(s.context.LunchCore.tally(tuesday,s.get({date:tuesday}).days[tuesday],s.get().settings).dtech.join(','),'juri');
  const approved=s.post('joinApprove','seongjun',{requestId:join},{date:tuesday});
  assert.equal(s.get({date:tuesday,receipt:approved.body.op.id}).receipt.ok,true);
  assert.deepEqual(s.get({date:tuesday}).days[tuesday].joinRequests,[]);
  assert.equal(s.get({date:tuesday}).days[tuesday].overrides.juri,'separate');
- assert.equal(s.context.LunchCore.tally(tuesday,s.get({date:tuesday}).days[tuesday],s.get().settings).megazone.length,0);
+ assert.equal(s.context.LunchCore.tally(tuesday,s.get({date:tuesday}).days[tuesday],s.get().settings).dtech.length,0);
  assert.equal(s.get({date:DATE}).days[DATE].pairs.length,0);
 });
 

@@ -1,4 +1,4 @@
-/* Append after core.js, lunchtime-source.js and threads-menu-source.js to build Code.gs. */
+/* Append after core.js, lunchtime-source.js, dtech-source.js and threads-menu-source.js to build Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
 const DATA_PREFIX = 'LUNCH_DAY_';
 const KEEP_DAYS = 90;
@@ -14,6 +14,9 @@ const KAKAO_PROFILE_CACHE_KEY = 'lunch_kakao_profile_v1';
 const KAKAO_PROFILE_TTL = 5 * 60000;
 const KAKAO_PROFILE_MIN_INTERVAL = 60000;
 const KAKAO_PROFILE_ERROR = '카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 잠시 후 다시 확인하거나 카카오 원문을 열어 주세요.';
+const DTECH_PROFILE_KEY = 'LUNCH_DTECH_PROFILE';
+const DTECH_PROFILE_CACHE_KEY = 'lunch_dtech_profile_v1';
+const DTECH_PROFILE_ERROR = '디테크 한식뷔페 카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 카카오 원문을 열어 확인해 주세요.';
 // Slack secrets are NEVER embedded in GitHub Pages files or generated Code.gs.
 // Set these in Apps Script > Project settings > Script properties.
 const SLACK_TOKEN_PROPERTY = 'LUNCH_SLACK_BOT_TOKEN';
@@ -44,7 +47,7 @@ function initializeLunchClub() {
     menuImageFolder_(properties, properties.getProperties(), true);
     properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
   } finally { lock.releaseLock(); }
-  console.log('점심판 준비 완료. 메가존 식단은 웰스토리 로그인 없이 팀 공유 Drive 사진으로 운영합니다.');
+  console.log('점심판 준비 완료. 런치타임·디테크 한식뷔페의 카카오 프로필을 독립적으로 조회합니다. 이전 메가존 사진 저장소는 기록 보존용으로 유지합니다.');
 }
 
 function output_(body, callback) {
@@ -54,12 +57,12 @@ function output_(body, callback) {
 }
 
 function authorized_(key) { return /^[a-f0-9]{48,64}$/.test(TEAM_KEY) && typeof key === 'string' && key === TEAM_KEY; }
-function kakaoProfileRecord_(text) {
+function kakaoProfileRecord_(text, source) {
   let value = {}; try { value = JSON.parse(text || '{}') || {}; } catch (_) {}
   let profile = null;
   const p = value.profile, checked = p && typeof p.checkedAt === 'string' ? Date.parse(p.checkedAt) : NaN;
-  if (typeof LunchKakaoSource !== 'undefined' && p && p.sourceUrl === LunchKakaoSource.SOURCE_URL && LunchKakaoSource.validImageURL(p.imageUrl) && Number.isFinite(checked) && checked <= Date.now() + 60000) {
-    profile = { ok: true, sourceUrl: LunchKakaoSource.SOURCE_URL, imageUrl: p.imageUrl, checkedAt: new Date(checked).toISOString() };
+  if (source && p && p.sourceUrl === source.SOURCE_URL && source.validImageURL(p.imageUrl) && Number.isFinite(checked) && checked <= Date.now() + 60000) {
+    profile = { ok: true, sourceUrl: source.SOURCE_URL, imageUrl: p.imageUrl, checkedAt: new Date(checked).toISOString() };
   }
   const attempted = typeof value.attemptedAt === 'string' ? Date.parse(value.attemptedAt) : NaN;
   return { profile: profile, attemptedAt: Number.isFinite(attempted) && attempted <= Date.now() + 60000 ? new Date(attempted).toISOString() : null, requestId: typeof value.requestId === 'string' && MENU_IMAGE_UUID.test(value.requestId) ? value.requestId : '', pending: value.pending === true, error: typeof value.error === 'string' ? value.error.slice(0, 160) : '' };
@@ -76,60 +79,66 @@ function kakaoProfileResult_(record) {
   if (record.error) profile.error = true;
   return { ok: true, profile: profile };
 }
-function cacheKakaoProfile_(record) {
-  try { CacheService.getScriptCache().put(KAKAO_PROFILE_CACHE_KEY, JSON.stringify(record), record.error || record.pending ? 60 : 300); } catch (_) {}
+function cacheKakaoProfile_(record, cacheKey) {
+  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(record), record.error || record.pending ? 60 : 300); } catch (_) {}
 }
-function kakaoProfileResponse_(force) {
-  if (typeof LunchKakaoSource === 'undefined') return { ok: false, error: '카카오 자동 식단 기능을 사용하려면 공유 서버 코드를 최신 버전으로 업데이트해 주세요.' };
+function kakaoProfileResponse_(force, channel) {
+  const dtech = channel === 'dtech';
+  const source = dtech ? (typeof LunchDtechSource !== 'undefined' ? LunchDtechSource : null)
+    : (typeof LunchKakaoSource !== 'undefined' ? LunchKakaoSource : null);
+  const propertyKey = dtech ? DTECH_PROFILE_KEY : KAKAO_PROFILE_KEY;
+  const cacheKey = dtech ? DTECH_PROFILE_CACHE_KEY : KAKAO_PROFILE_CACHE_KEY;
+  const errorText = dtech ? DTECH_PROFILE_ERROR : KAKAO_PROFILE_ERROR;
+  if (!source) return { ok: false, error: '카카오 자동 식단 기능을 사용하려면 공유 서버 코드를 최신 버전으로 업데이트해 주세요.' };
   if (!force) {
     try {
-      const cached = kakaoProfileRecord_(CacheService.getScriptCache().get(KAKAO_PROFILE_CACHE_KEY));
+      const cached = kakaoProfileRecord_(CacheService.getScriptCache().get(cacheKey), source);
       if (kakaoProfileReusable_(cached, false)) return kakaoProfileResult_(cached);
     } catch (_) {}
   }
   const properties = PropertiesService.getScriptProperties(), lock = LockService.getScriptLock();
-  let record = kakaoProfileRecord_(properties.getProperties()[KAKAO_PROFILE_KEY]), requestId;
+  let record = kakaoProfileRecord_(properties.getProperties()[propertyKey], source), requestId;
   if (kakaoProfileReusable_(record, force)) return kakaoProfileResult_(record);
   try {
     // Reserve a request briefly; external network I/O must not hold up attendance writes.
     lock.waitLock(1000);
     try {
-      record = kakaoProfileRecord_(properties.getProperties()[KAKAO_PROFILE_KEY]);
+      record = kakaoProfileRecord_(properties.getProperties()[propertyKey], source);
       if (kakaoProfileReusable_(record, force)) return kakaoProfileResult_(record);
       requestId = Utilities.getUuid();
       record.attemptedAt = new Date().toISOString(); record.requestId = requestId; record.pending = true;
-      properties.setProperty(KAKAO_PROFILE_KEY, JSON.stringify(record));
+      properties.setProperty(propertyKey, JSON.stringify(record));
     } finally { lock.releaseLock(); }
     let profile = null, error = '';
     try {
-      const response = UrlFetchApp.fetch(LunchKakaoSource.HOME_ENDPOINT, { headers: LunchKakaoSource.REQUEST_HEADERS, muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 12 });
+      const response = UrlFetchApp.fetch(source.HOME_ENDPOINT, { headers: source.REQUEST_HEADERS, muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 12 });
       if (response.getResponseCode() !== 200) throw new Error('source status');
       const headers = response.getAllHeaders(), header = name => {
         const key = Object.keys(headers).find(k => k.toLowerCase() === name);
         const value = key ? headers[key] : ''; return String(Array.isArray(value) ? value[0] : value);
       };
       if (header('content-type').split(';')[0].trim().toLowerCase() !== 'application/json') throw new Error('source content type');
-      const maxBytes = Math.min(LunchKakaoSource.MAX_RESPONSE_BYTES, 512 * 1024), length = Number(header('content-length'));
+      const maxBytes = Math.min(source.MAX_RESPONSE_BYTES, 512 * 1024), length = Number(header('content-length'));
       if (Number.isFinite(length) && length > maxBytes) throw new Error('source size');
       const raw = response.getContentText();
       if (typeof raw !== 'string' || raw.length > maxBytes || Utilities.newBlob(raw).getBytes().length > maxBytes) throw new Error('source size');
-      const normalized = LunchKakaoSource.normalizeProfile(raw);
+      const normalized = source.normalizeProfile(raw);
       profile = { ok: true, sourceUrl: normalized.sourceUrl, imageUrl: normalized.imageUrl, checkedAt: new Date().toISOString() };
-    } catch (_) { error = KAKAO_PROFILE_ERROR; }
+    } catch (_) { error = errorText; }
     lock.waitLock(1000);
     try {
-      const latest = kakaoProfileRecord_(properties.getProperties()[KAKAO_PROFILE_KEY]);
+      const latest = kakaoProfileRecord_(properties.getProperties()[propertyKey], source);
       // If an execution outlives the minimum interval, its late result cannot replace a newer request.
       if (latest.requestId !== requestId) return kakaoProfileResult_(latest);
       record = latest;
       if (profile) record.profile = profile;
       record.pending = false; record.error = error;
-      properties.setProperty(KAKAO_PROFILE_KEY, JSON.stringify(record));
-      cacheKakaoProfile_(record);
+      properties.setProperty(propertyKey, JSON.stringify(record));
+      cacheKakaoProfile_(record, cacheKey);
       return kakaoProfileResult_(record);
     } finally { lock.releaseLock(); }
   } catch (_) {
-    return kakaoProfileResult_({ profile: record.profile, pending: false, error: KAKAO_PROFILE_ERROR });
+    return kakaoProfileResult_({ profile: record.profile, pending: false, error: errorText });
   }
 }
 // Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
@@ -677,14 +686,15 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true, gangnamManualPick: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 8, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, dtechProfile: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true, gangnamManualPick: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
   try {
     if (callback && !/^lunchReply_[a-f0-9]{24}$/.test(callback)) return output_({ ok: false, error: '콜백 형식이 올바르지 않습니다.' });
     if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
-    if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
+    if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1', 'lunchtime'), callback);
+    if (p.action === 'dtechProfile') return output_(kakaoProfileResponse_(p.force === '1', 'dtech'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
     if (p.action === 'gangnamMenu') return output_(gangnamMenuResponse_(p.date, p.force === '1'), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);

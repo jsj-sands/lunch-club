@@ -1,4 +1,4 @@
-// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + threads-menu-source.js + backend/server.js.
+// SANDS Lunch Club backend. Generated from core.js + lunchtime-source.js + dtech-source.js + threads-menu-source.js + backend/server.js.
 /* Shared, dependency-free rules used by the page and the Apps Script server. */
 (function (root, factory) {
   const api = factory();
@@ -30,11 +30,10 @@
     ceoDays: Object.fromEntries(MEMBERS.map(m => [m.id, m.days])),
     meetingTime: '12:00'
   };
-  // 메가존 메뉴 사진은 직원이 앱 화면을 캡처해 팀 공유 Drive 폴더에 직접 올립니다.
-  const MEGAZONE_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('메가존산학연센터');
+  const DTECH_MAP = 'https://map.naver.com/p/search/' + encodeURIComponent('디테크 한식뷔페 과천');
   const PLACES = [
     { id: 'lunchtime', name: '런치타임', subtitle: '과천 어반허브 구내식당', url: 'https://naver.me/Fr054Jzy', menuUrl: 'https://pf.kakao.com/_xbbMPn', type: 'buffet' },
-    { id: 'megazone', name: '메가존', subtitle: '메가존산학연센터 · 삼성웰스토리', url: MEGAZONE_MAP, type: 'cafeteria' },
+    { id: 'dtech', name: '디테크 한식뷔페', subtitle: '과천 디테크타워 B동 · 카카오 채널 식단', url: DTECH_MAP, menuUrl: 'https://pf.kakao.com/_nkwxeG', type: 'buffet' },
     { id: 'gangnambab', name: '강남밥상', subtitle: 'Threads 최신 게시물 · 메뉴 공지 화면 자동 보기', url: 'https://www.threads.com/@gangnambab', menuUrl: 'https://www.threads.com/@gangnambab', type: 'cafeteria' }
   ];
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
@@ -254,7 +253,7 @@
       }
       case 'vote':
         if (!memberStatus(op.actor, date, d, config).in) throw new Error('오늘 함께 먹는 상태로 바꾼 뒤 선택해 주세요.');
-        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 메가존·런치타임·강남밥상 중 선택해 주세요.');
+        if (!PLACES.some(place => place.id === p.placeId)) throw new Error('일반 점심은 런치타임·디테크 한식뷔페·강남밥상 중 선택해 주세요.');
         d.votes[op.actor] = p.placeId; break;
       case 'ceoDecision': {
         if (memberStatus(op.actor, date, d, config).kind !== 'ceo') throw new Error('해당 날짜의 대표님 점심 참석자만 장소를 확정할 수 있어요.');
@@ -308,7 +307,7 @@
     }
     d.revision += 1; d.updatedAt = now || new Date().toISOString(); return d;
   }
-  return { MEMBERS, PLACES, DEFAULT_SETTINGS, MEGAZONE_MAP, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation };
+  return { MEMBERS, PLACES, DEFAULT_SETTINGS, DTECH_MAP, clone, validDate, today, weekday, shiftDate, weekDates, settings, emptyDay, cleanDay, safeUrl, memberStatus, pairFor, incomingPairs, incomingJoinRequests, myJoinRequest, separateGroup, participants, places, tally, applyOperation };
 });
 
 /* Public channel metadata only. No login, friend relationship, or menu date is inferred.
@@ -402,6 +401,197 @@
     }
     if (profile.permalink !== undefined && !validSourceURL(profile.permalink)) {
       throw failure('CHANNEL_MISMATCH', '런치타임 채널의 원문 주소가 일치하지 않아요.');
+    }
+    const image = profile.profile_image;
+    if (!object(image) || image.type !== 'image') throw invalid();
+    if (image.mimetype !== undefined && !/^image\/(?:jpeg|png|webp|gif)$/.test(image.mimetype)) throw invalid();
+    const fields = ['xlarge_url', 'url', 'large_url', 'medium_url'];
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i];
+      if (image[field] !== undefined) return result(image[field]);
+    }
+    throw invalid();
+  }
+
+  function decodeAttribute(value) {
+    return value.replace(/&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|(amp|quot|apos|lt|gt));/gi,
+      function (_all, decimal, hex, named) {
+        if (named) return { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>' }[named.toLowerCase()];
+        const code = parseInt(decimal || hex, decimal ? 10 : 16);
+        if (code < 1 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) throw invalid();
+        return String.fromCodePoint(code);
+      });
+  }
+
+  function attributes(text) {
+    const values = Object.create(null);
+    const pattern = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+    let match;
+    let end = 0;
+    while ((match = pattern.exec(text))) {
+      if (text.slice(end, match.index).trim()) throw invalid();
+      const name = match[1].toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(values, name)) throw invalid();
+      values[name] = decodeAttribute(match[2] !== undefined ? match[2] :
+        match[3] !== undefined ? match[3] : match[4] !== undefined ? match[4] : '');
+      end = pattern.lastIndex;
+    }
+    if (text.slice(end).trim()) throw invalid();
+    return values;
+  }
+
+  function parseHTML(raw) {
+    const html = boundedText(raw);
+    if (html.indexOf('Invalid CORS request') !== -1) {
+      throw failure('CORS_BLOCKED', '채널이 브라우저의 직접 프로필 조회를 허용하지 않았어요.');
+    }
+    // Tokenize detached text; never create DOM nodes or run page scripts.
+    const tags = /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\/?[a-z][a-z0-9:-]*(?:"[^"]*"|'[^']*'|[^'">])*>/gi;
+    const meta = Object.create(null);
+    let inHead = false;
+    let closedHead = false;
+    let ignore = '';
+    let templateDepth = 0;
+    let token;
+    while ((token = tags.exec(html))) {
+      const tag = /^<(\/?)([a-z][a-z0-9:-]*)([\s\S]*?)>$/i.exec(token[0]);
+      if (!tag) continue;
+      const closing = tag[1] === '/';
+      const name = tag[2].toLowerCase();
+      if (ignore) {
+        if (ignore === 'template' && name === 'template' && !closing) templateDepth++;
+        if (name === ignore && closing && (ignore !== 'template' || --templateDepth === 0)) ignore = '';
+        continue;
+      }
+      if (!closing && /^(?:script|style|title|textarea|noscript|template)$/.test(name)) {
+        ignore = name;
+        templateDepth = 1;
+        continue;
+      }
+      if (name === 'head') {
+        if (closing) { closedHead = inHead; break; }
+        if (inHead) throw invalid();
+        inHead = true;
+        continue;
+      }
+      if (name === 'body') break;
+      if (!inHead || closing || name !== 'meta') continue;
+      const attrs = attributes(tag[3].replace(/\/\s*$/, ''));
+      const property = (attrs.property || '').toLowerCase();
+      if (property !== 'og:url' && property !== 'og:image') continue;
+      if (Object.prototype.hasOwnProperty.call(meta, property) || typeof attrs.content !== 'string') throw invalid();
+      meta[property] = attrs.content;
+    }
+    if (!closedHead || !meta['og:url'] || !meta['og:image']) throw invalid();
+    if (!validSourceURL(meta['og:url'])) {
+      throw failure('CHANNEL_MISMATCH', '다른 채널의 원문이어서 이미지를 표시하지 않았어요.');
+    }
+    return result(meta['og:image']);
+  }
+
+  return Object.freeze({
+    SOURCE_URL: SOURCE_URL,
+    HOME_ENDPOINT: HOME_ENDPOINT,
+    PROFILE_ID: PROFILE_ID,
+    MAX_RESPONSE_BYTES: MAX_RESPONSE_BYTES,
+    REQUEST_HEADERS: REQUEST_HEADERS,
+    normalizeProfile: normalizeProfile,
+    validImageURL: validImageURL,
+    parseHTML: parseHTML
+  });
+});
+
+/* Public channel metadata only. No login, friend relationship, or menu date is inferred.
+ * Fetch HOME_ENDPOINT on the server: browser Origin requests omit the public OG data.
+ * This module is dependency-free and also runs in Apps Script V8.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.LunchDtechSource = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const SOURCE_URL = 'https://pf.kakao.com/_nkwxeG';
+  const HOME_ENDPOINT = 'https://pf.kakao.com/rocket-web/web/profiles/_nkwxeG/home';
+  const PROFILE_ID = '_nkwxeG';
+  const MAX_RESPONSE_BYTES = 256 * 1024;
+  const REQUEST_HEADERS = Object.freeze({ Accept: 'application/json' });
+
+  function failure(code, message) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+  }
+
+  function invalid() {
+    return failure('INVALID_RESPONSE', '디테크 한식뷔페 공개 프로필의 응답 형식을 확인하지 못했어요.');
+  }
+
+  function object(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function boundedText(text) {
+    if (typeof text !== 'string' || !text.trim()) throw invalid();
+    // UTF-8 byte count without browser-only TextEncoder or Apps Script Utilities.
+    let bytes = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (code < 0x80) bytes++;
+      else if (code < 0x800) bytes += 2;
+      else if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length &&
+          text.charCodeAt(i + 1) >= 0xdc00 && text.charCodeAt(i + 1) <= 0xdfff) {
+        bytes += 4;
+        i++;
+      } else bytes += 3;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        throw failure('RESPONSE_TOO_LARGE', '디테크 한식뷔페 공개 프로필 응답이 너무 커서 표시하지 않았어요.');
+      }
+    }
+    return text;
+  }
+
+  function validSourceURL(value) {
+    return typeof value === 'string' && /^https?:\/\/pf\.kakao\.com\/_nkwxeG\/?$/.test(value);
+  }
+
+  function validImageURL(value) {
+    if (typeof value !== 'string' || !value || value.length > 2048 || /[\s\\<>"']/.test(value)) return false;
+    const match = /^https:\/\/([^/?#]+)(\/[^?#]*)(?:\?([^#]*))?$/i.exec(value);
+    if (!match || match[1].toLowerCase() !== 'k.kakaocdn.net') return false;
+    // Exact CDN authority, generated /dn/ paths and raster image files only.
+    // Credentials, ports, fragments, traversal and arbitrary redirect URLs fail.
+    if (!/^\/dn\/(?:[a-z0-9_-]+\/)+[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(match[2])) return false;
+    return match[3] === undefined || /^[a-z0-9._~!$&()*+,;=:@%/?-]*$/i.test(match[3]);
+  }
+
+  function result(imageUrl) {
+    if (!validImageURL(imageUrl)) {
+      throw failure('INVALID_IMAGE_URL', '디테크 한식뷔페의 공개 이미지 주소를 확인하지 못했어요.');
+    }
+    return { ok: true, sourceUrl: SOURCE_URL, imageUrl: imageUrl };
+  }
+
+  function normalizeProfile(raw) {
+    let payload;
+    if (typeof raw === 'string') {
+      boundedText(raw);
+      try { payload = JSON.parse(raw); } catch (_) { throw invalid(); }
+    } else {
+      let serialized;
+      try { serialized = JSON.stringify(raw); } catch (_) { throw invalid(); }
+      boundedText(serialized);
+      payload = raw;
+    }
+    if (!object(payload) || typeof payload.profile_id !== 'string' || !object(payload.profile) ||
+        typeof payload.profile.profile_id !== 'string') throw invalid();
+    const profile = payload.profile;
+    if (payload.profile_id !== PROFILE_ID || profile.profile_id !== PROFILE_ID) {
+      throw failure('CHANNEL_MISMATCH', '다른 채널의 응답이어서 이미지를 표시하지 않았어요.');
+    }
+    if (profile.permalink !== undefined && !validSourceURL(profile.permalink)) {
+      throw failure('CHANNEL_MISMATCH', '디테크 한식뷔페 채널의 원문 주소가 일치하지 않아요.');
     }
     const image = profile.profile_image;
     if (!object(image) || image.type !== 'image') throw invalid();
@@ -654,7 +844,7 @@ var LunchThreadsMenu = (function (root) {
   return api;
 })(typeof window !== 'undefined' ? window : null);
 
-/* Append after core.js, lunchtime-source.js and threads-menu-source.js to build Code.gs. */
+/* Append after core.js, lunchtime-source.js, dtech-source.js and threads-menu-source.js to build Code.gs. */
 const TEAM_KEY = '__TEAM_KEY__';
 const DATA_PREFIX = 'LUNCH_DAY_';
 const KEEP_DAYS = 90;
@@ -670,6 +860,9 @@ const KAKAO_PROFILE_CACHE_KEY = 'lunch_kakao_profile_v1';
 const KAKAO_PROFILE_TTL = 5 * 60000;
 const KAKAO_PROFILE_MIN_INTERVAL = 60000;
 const KAKAO_PROFILE_ERROR = '카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 잠시 후 다시 확인하거나 카카오 원문을 열어 주세요.';
+const DTECH_PROFILE_KEY = 'LUNCH_DTECH_PROFILE';
+const DTECH_PROFILE_CACHE_KEY = 'lunch_dtech_profile_v1';
+const DTECH_PROFILE_ERROR = '디테크 한식뷔페 카카오 채널의 최신 프로필 사진을 가져오지 못했어요. 카카오 원문을 열어 확인해 주세요.';
 // Slack secrets are NEVER embedded in GitHub Pages files or generated Code.gs.
 // Set these in Apps Script > Project settings > Script properties.
 const SLACK_TOKEN_PROPERTY = 'LUNCH_SLACK_BOT_TOKEN';
@@ -700,7 +893,7 @@ function initializeLunchClub() {
     menuImageFolder_(properties, properties.getProperties(), true);
     properties.setProperty('LUNCH_INSTALLED', new Date().toISOString());
   } finally { lock.releaseLock(); }
-  console.log('점심판 준비 완료. 메가존 식단은 웰스토리 로그인 없이 팀 공유 Drive 사진으로 운영합니다.');
+  console.log('점심판 준비 완료. 런치타임·디테크 한식뷔페의 카카오 프로필을 독립적으로 조회합니다. 이전 메가존 사진 저장소는 기록 보존용으로 유지합니다.');
 }
 
 function output_(body, callback) {
@@ -710,12 +903,12 @@ function output_(body, callback) {
 }
 
 function authorized_(key) { return /^[a-f0-9]{48,64}$/.test(TEAM_KEY) && typeof key === 'string' && key === TEAM_KEY; }
-function kakaoProfileRecord_(text) {
+function kakaoProfileRecord_(text, source) {
   let value = {}; try { value = JSON.parse(text || '{}') || {}; } catch (_) {}
   let profile = null;
   const p = value.profile, checked = p && typeof p.checkedAt === 'string' ? Date.parse(p.checkedAt) : NaN;
-  if (typeof LunchKakaoSource !== 'undefined' && p && p.sourceUrl === LunchKakaoSource.SOURCE_URL && LunchKakaoSource.validImageURL(p.imageUrl) && Number.isFinite(checked) && checked <= Date.now() + 60000) {
-    profile = { ok: true, sourceUrl: LunchKakaoSource.SOURCE_URL, imageUrl: p.imageUrl, checkedAt: new Date(checked).toISOString() };
+  if (source && p && p.sourceUrl === source.SOURCE_URL && source.validImageURL(p.imageUrl) && Number.isFinite(checked) && checked <= Date.now() + 60000) {
+    profile = { ok: true, sourceUrl: source.SOURCE_URL, imageUrl: p.imageUrl, checkedAt: new Date(checked).toISOString() };
   }
   const attempted = typeof value.attemptedAt === 'string' ? Date.parse(value.attemptedAt) : NaN;
   return { profile: profile, attemptedAt: Number.isFinite(attempted) && attempted <= Date.now() + 60000 ? new Date(attempted).toISOString() : null, requestId: typeof value.requestId === 'string' && MENU_IMAGE_UUID.test(value.requestId) ? value.requestId : '', pending: value.pending === true, error: typeof value.error === 'string' ? value.error.slice(0, 160) : '' };
@@ -732,60 +925,66 @@ function kakaoProfileResult_(record) {
   if (record.error) profile.error = true;
   return { ok: true, profile: profile };
 }
-function cacheKakaoProfile_(record) {
-  try { CacheService.getScriptCache().put(KAKAO_PROFILE_CACHE_KEY, JSON.stringify(record), record.error || record.pending ? 60 : 300); } catch (_) {}
+function cacheKakaoProfile_(record, cacheKey) {
+  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(record), record.error || record.pending ? 60 : 300); } catch (_) {}
 }
-function kakaoProfileResponse_(force) {
-  if (typeof LunchKakaoSource === 'undefined') return { ok: false, error: '카카오 자동 식단 기능을 사용하려면 공유 서버 코드를 최신 버전으로 업데이트해 주세요.' };
+function kakaoProfileResponse_(force, channel) {
+  const dtech = channel === 'dtech';
+  const source = dtech ? (typeof LunchDtechSource !== 'undefined' ? LunchDtechSource : null)
+    : (typeof LunchKakaoSource !== 'undefined' ? LunchKakaoSource : null);
+  const propertyKey = dtech ? DTECH_PROFILE_KEY : KAKAO_PROFILE_KEY;
+  const cacheKey = dtech ? DTECH_PROFILE_CACHE_KEY : KAKAO_PROFILE_CACHE_KEY;
+  const errorText = dtech ? DTECH_PROFILE_ERROR : KAKAO_PROFILE_ERROR;
+  if (!source) return { ok: false, error: '카카오 자동 식단 기능을 사용하려면 공유 서버 코드를 최신 버전으로 업데이트해 주세요.' };
   if (!force) {
     try {
-      const cached = kakaoProfileRecord_(CacheService.getScriptCache().get(KAKAO_PROFILE_CACHE_KEY));
+      const cached = kakaoProfileRecord_(CacheService.getScriptCache().get(cacheKey), source);
       if (kakaoProfileReusable_(cached, false)) return kakaoProfileResult_(cached);
     } catch (_) {}
   }
   const properties = PropertiesService.getScriptProperties(), lock = LockService.getScriptLock();
-  let record = kakaoProfileRecord_(properties.getProperties()[KAKAO_PROFILE_KEY]), requestId;
+  let record = kakaoProfileRecord_(properties.getProperties()[propertyKey], source), requestId;
   if (kakaoProfileReusable_(record, force)) return kakaoProfileResult_(record);
   try {
     // Reserve a request briefly; external network I/O must not hold up attendance writes.
     lock.waitLock(1000);
     try {
-      record = kakaoProfileRecord_(properties.getProperties()[KAKAO_PROFILE_KEY]);
+      record = kakaoProfileRecord_(properties.getProperties()[propertyKey], source);
       if (kakaoProfileReusable_(record, force)) return kakaoProfileResult_(record);
       requestId = Utilities.getUuid();
       record.attemptedAt = new Date().toISOString(); record.requestId = requestId; record.pending = true;
-      properties.setProperty(KAKAO_PROFILE_KEY, JSON.stringify(record));
+      properties.setProperty(propertyKey, JSON.stringify(record));
     } finally { lock.releaseLock(); }
     let profile = null, error = '';
     try {
-      const response = UrlFetchApp.fetch(LunchKakaoSource.HOME_ENDPOINT, { headers: LunchKakaoSource.REQUEST_HEADERS, muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 12 });
+      const response = UrlFetchApp.fetch(source.HOME_ENDPOINT, { headers: source.REQUEST_HEADERS, muteHttpExceptions: true, followRedirects: false, timeoutSeconds: 12 });
       if (response.getResponseCode() !== 200) throw new Error('source status');
       const headers = response.getAllHeaders(), header = name => {
         const key = Object.keys(headers).find(k => k.toLowerCase() === name);
         const value = key ? headers[key] : ''; return String(Array.isArray(value) ? value[0] : value);
       };
       if (header('content-type').split(';')[0].trim().toLowerCase() !== 'application/json') throw new Error('source content type');
-      const maxBytes = Math.min(LunchKakaoSource.MAX_RESPONSE_BYTES, 512 * 1024), length = Number(header('content-length'));
+      const maxBytes = Math.min(source.MAX_RESPONSE_BYTES, 512 * 1024), length = Number(header('content-length'));
       if (Number.isFinite(length) && length > maxBytes) throw new Error('source size');
       const raw = response.getContentText();
       if (typeof raw !== 'string' || raw.length > maxBytes || Utilities.newBlob(raw).getBytes().length > maxBytes) throw new Error('source size');
-      const normalized = LunchKakaoSource.normalizeProfile(raw);
+      const normalized = source.normalizeProfile(raw);
       profile = { ok: true, sourceUrl: normalized.sourceUrl, imageUrl: normalized.imageUrl, checkedAt: new Date().toISOString() };
-    } catch (_) { error = KAKAO_PROFILE_ERROR; }
+    } catch (_) { error = errorText; }
     lock.waitLock(1000);
     try {
-      const latest = kakaoProfileRecord_(properties.getProperties()[KAKAO_PROFILE_KEY]);
+      const latest = kakaoProfileRecord_(properties.getProperties()[propertyKey], source);
       // If an execution outlives the minimum interval, its late result cannot replace a newer request.
       if (latest.requestId !== requestId) return kakaoProfileResult_(latest);
       record = latest;
       if (profile) record.profile = profile;
       record.pending = false; record.error = error;
-      properties.setProperty(KAKAO_PROFILE_KEY, JSON.stringify(record));
-      cacheKakaoProfile_(record);
+      properties.setProperty(propertyKey, JSON.stringify(record));
+      cacheKakaoProfile_(record, cacheKey);
       return kakaoProfileResult_(record);
     } finally { lock.releaseLock(); }
   } catch (_) {
-    return kakaoProfileResult_({ profile: record.profile, pending: false, error: KAKAO_PROFILE_ERROR });
+    return kakaoProfileResult_({ profile: record.profile, pending: false, error: errorText });
   }
 }
 // Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
@@ -1333,14 +1532,15 @@ function stateResponse_(date, receiptId) {
   if (!dates.includes(date)) dates.push(date);
   const days = {}; dates.forEach(d => { days[d] = getRecord_(all, d).data; });
   const receipt = receiptId ? getRecord_(all, date).receipts[receiptId] || null : null;
-  return { ok: true, serverVersion: 7, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true, gangnamManualPick: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
+  return { ok: true, serverVersion: 8, features: { menuImages: true, menuImageDelete: true, megaPhotos: true, dtechProfile: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, gangnamMenu: true, gangnamManualPick: true }, days: days, menuImages: menuImageState_(all, date, dates), settings: cfg.settings, configRevision: cfg.revision, receipt: receipt, serverTime: new Date().toISOString() };
 }
 function doGet(e) {
   const p = (e || {}).parameter || {}, callback = p.callback || '';
   try {
     if (callback && !/^lunchReply_[a-f0-9]{24}$/.test(callback)) return output_({ ok: false, error: '콜백 형식이 올바르지 않습니다.' });
     if (!authorized_(p.key)) return output_({ ok: false, error: '팀 키가 맞지 않아요. 초대 링크 또는 연결 설정을 확인해 주세요.' }, callback);
-    if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1'), callback);
+    if (p.action === 'kakaoProfile') return output_(kakaoProfileResponse_(p.force === '1', 'lunchtime'), callback);
+    if (p.action === 'dtechProfile') return output_(kakaoProfileResponse_(p.force === '1', 'dtech'), callback);
     if (!LunchCore.validDate(p.date)) return output_({ ok: false, error: '날짜 형식이 올바르지 않습니다.' }, callback);
     if (p.action === 'gangnamMenu') return output_(gangnamMenuResponse_(p.date, p.force === '1'), callback);
     if (p.action === 'menuImage') return output_(menuImageResponse_(p.date, p.scope, p.imageId), callback);

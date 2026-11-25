@@ -17,6 +17,7 @@ jobs:
           node --check core.js
           node --check backend/server.js
           node --check lunchtime-source.js
+          node --check dtech-source.js
           node --check threads-menu-source.js
       - name: Regression tests
         run: node --test tests/*.test.cjs

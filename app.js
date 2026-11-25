@@ -4,8 +4,9 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v6' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', dtech: 'sandsLunch.dtechProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v6' };
   const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
+  const DTECH_CHANNEL = 'https://pf.kakao.com/_nkwxeG';
   const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
   const esc = text => String(text == null ? '' : text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +28,8 @@
   let megaDraft = null;
   let kakaoProfile = cleanKakaoProfile(read(KEYS.kakao, null));
   let kakaoLoading = false, kakaoWaiting = false, kakaoError = '', kakaoPhotoError = '', kakaoRequest = null, lastKakaoAttempt = 0;
+  let dtechProfile = cleanDtechProfile(read(KEYS.dtech, null));
+  let dtechLoading = false, dtechWaiting = false, dtechError = '', dtechPhotoError = '', dtechRequest = null, lastDtechAttempt = 0;
   let gangnamMenus = read(KEYS.gangnam, {});
   if (!gangnamMenus || typeof gangnamMenus !== 'object') gangnamMenus = {};
   let gangnamLoading = false, gangnamAttempt = {}, gangnamRequests = {}, gangnamPhotoErrors = new Set();
@@ -44,7 +47,7 @@
   const ceoMembers = (d = date) => MEMBERS.filter(m => C.memberStatus(m.id, d, day(d), config()).kind === 'ceo').sort(compareMembers);
   const uid = () => { const a = new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a, n => n.toString(16).padStart(2, '0')).join(''); };
   const icon = name => {
-    const paths = name === 'megazone' ? '<path d="M3 10h18M4 10c1 7 4 10 8 10s7-3 8-10M8 6c-2-2 2-3 0-5m4 5c-2-2 2-3 0-5m4 5c-2-2 2-3 0-5"/>' : name === 'lunchtime' ? '<path d="M4 5h16v15H4zM3 5l2-3h14l2 3M8 10h8M8 14h3m3 0h2M8 18h8"/>' : '<path d="M4 4v6c0 3 5 3 5 0V4M6.5 4v17M17 4c-3 3-3 8 0 8h2M19 4v17"/>';
+    const paths = name === 'dtech' ? '<path d="M3 10h18M4 10c1 7 4 10 8 10s7-3 8-10M8 6c-2-2 2-3 0-5m4 5c-2-2 2-3 0-5m4 5c-2-2 2-3 0-5"/>' : name === 'lunchtime' ? '<path d="M4 5h16v15H4zM3 5l2-3h14l2 3M8 10h8M8 14h3m3 0h2M8 18h8"/>' : '<path d="M4 4v6c0 3 5 3 5 0V4M6.5 4v17M17 4c-3 3-3 8 0 8h2M19 4v17"/>';
     return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
   };
   function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false; toastTimer = setTimeout(() => { $('toast').hidden = true; }, 4300); }
@@ -125,7 +128,7 @@
     $('ceoCancelLabel').textContent = `${isToday ? '오늘' : '이날'} 대표님 점심 전체 취소${d.ceoCancelled ? '됨' : ''}`;
     $('ceoCancelled').setAttribute('aria-label', dateText(date) + ' 기본 대표님과 점심 전체 취소');
     $('ceoControlHint').textContent = d.ceoCancelled ? '기본 대표님 일정이 미선택으로 바뀌었어요. 각자 점심 여부를 선택해 주세요.' : '전체 일정이 취소된 날에 체크해 주세요. 내 일정만 취소할 때는 위의 개인 취소 버튼을 이용하세요.';
-    $('availabilityHint').textContent = !ready ? '선택한 날짜의 공유 현황을 확인하고 있어요.' : date > s.scheduleEnd ? '대표님 기본 일정의 적용 기간이 지났어요. 기본 요일 설정을 확인해 주세요.' : '일반 점심은 메가존·런치타임·강남밥상 중 하나를, 대표님 점심은 아래 과천 맛집에서 따로 확정해요.';
+    $('availabilityHint').textContent = !ready ? '선택한 날짜의 공유 현황을 확인하고 있어요.' : date > s.scheduleEnd ? '대표님 기본 일정의 적용 기간이 지났어요. 기본 요일 설정을 확인해 주세요.' : '일반 점심은 런치타임·디테크 한식뷔페·강남밥상 중 하나를, 대표님 점심은 아래 과천 맛집에서 따로 확정해요.';
     $('dailySaveNote').textContent = connection ? !ready ? '공유 현황 확인 중…' : busy ? '팀에 저장 중…' : `총 ${MEMBERS.length}명 · 팀 공유` : `총 ${MEMBERS.length}명 · 이 기기에 저장`;
     const members = MEMBERS.map(m => ({ ...m, status: dailyStatus(m, date) }));
     const groups = [['in', '함께 점심'], ['ceo', '대표님과 점심'], ['out', isToday ? '오늘 안 먹음' : '이날 안 먹음'], ['pending', '미선택']];
@@ -263,10 +266,40 @@
     content += `<div class="kakao-auto-actions">${!isToday && profile ? '<button class="secondary-button" data-action="viewKakaoProfile">카카오 최신 사진 보기 ↗</button>' : ''}<button class="text-button" data-action="refreshKakaoProfile" ${kakaoLoading || !available ? 'disabled' : ''}>${kakaoLoading ? '사진 확인 중…' : '사진 다시 불러오기 ↻'}</button><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 원문 ↗</a></div>`;
     return `<div class="kakao-auto-panel" aria-label="런치타임 카카오 프로필 자동 조회">${content}</div>`;
   }
+  // 디테크는 런치타임과 분리된 카카오 프로필·캐시를 사용합니다.
+  function cleanDtechProfile(value) {
+    if (!value || value.sourceUrl !== DTECH_CHANNEL || typeof window.LunchDtechSource?.validImageURL !== 'function' || !window.LunchDtechSource.validImageURL(value.imageUrl)) return null;
+    const checked = Date.parse(value.checkedAt);
+    if (!Number.isFinite(checked) || checked > Date.now() + 60000) return null;
+    return { ok: true, sourceUrl: DTECH_CHANNEL, imageUrl: value.imageUrl, checkedAt: new Date(checked).toISOString() };
+  }
+  function renderDtechProfile() {
+    const profile = dtechProfile, isToday = date === C.today();
+    const available = !!connection && connectedReady && !!shared.features.dtechProfile;
+    let content = '<div class="kakao-auto-heading"><strong>카카오 프로필 식단</strong><span class="auto-menu-badge">자동</span></div>';
+    if (!isToday) {
+      content += '<p class="kakao-auto-meta">선택한 날짜의 식단이 아니에요. 카카오 프로필은 현재 올라온 사진만 확인할 수 있어요.</p>';
+    } else if (profile && !dtechPhotoError) {
+      content += `<button class="menu-photo-button" data-action="viewDtechProfile" aria-label="카카오 프로필 식단 사진 크게 보기"><img id="dtechProfilePhoto" class="menu-photo" src="${esc(profile.imageUrl)}" alt="디테크 한식뷔페 카카오 채널의 현재 프로필 사진. 사진에 적힌 식단 날짜를 확인해 주세요." loading="lazy" referrerpolicy="no-referrer"><span>식단 사진 크게 보기 ↗</span></button>`;
+    } else {
+      content += `<div class="image-empty"><strong>${dtechPhotoError ? '사진을 표시하지 못했어요' : !connection ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요' : !connectedReady ? '공유 연결을 확인하고 있어요…' : !shared.features.dtechProfile ? '자동 식단 조회를 준비해 주세요' : dtechLoading || dtechWaiting || !lastDtechAttempt ? '카카오에서 식단 사진을 가져오고 있어요…' : '자동으로 가져오지 못했어요'}</strong><p>${dtechPhotoError ? '카카오 원문에서 확인하거나 다시 불러와 주세요.' : '카카오 채널 원문에서 확인하거나 사진을 다시 불러와 주세요.'}</p></div>`;
+    }
+    if (!connection) content += `<p class="kakao-auto-meta">${profile ? '자동 조회는 팀 공유 연결 후 사용할 수 있어요. 현재는 마지막으로 가져온 사진입니다.<br>' : ''}<a href="setup.html">팀 공유 연결 안내 ↗</a></p>`;
+    else if (connectedReady && !shared.features.dtechProfile) content += '<p class="inline-warning">식단 사진을 자동으로 보려면 <a href="setup.html#update">공유 서버를 한 번 업데이트해 주세요 ↗</a></p>';
+    if (dtechLoading) content += '<p class="kakao-auto-meta" role="status">채널에서 최신 사진 확인 중…</p>';
+    else if (dtechWaiting) content += '<p class="kakao-auto-meta" role="status">먼저 시작한 식단 조회가 진행 중이에요. 잠시 후 자동으로 다시 확인합니다.</p>';
+    if (dtechError) content += `<p class="inline-warning" role="status">${profile ? '다시 확인하지 못했어요. 마지막으로 가져온 사진이므로 날짜를 확인해 주세요.' : '채널 연결을 확인하지 못했어요. 잠시 후 다시 불러와 주세요.'}</p>`;
+    if (profile) content += `<p class="kakao-auto-meta">마지막 확인 ${esc(timeText(profile.checkedAt))}<br>확인 시각과 식단 날짜는 달라요. 사진에 적힌 날짜를 확인해 주세요.</p>`;
+    content += `<div class="kakao-auto-actions">${!isToday && profile ? '<button class="secondary-button" data-action="viewDtechProfile">카카오 최신 사진 보기 ↗</button>' : ''}<button class="text-button" data-action="refreshDtechProfile" ${dtechLoading || !available ? 'disabled' : ''}>${dtechLoading ? '사진 확인 중…' : '사진 다시 불러오기 ↻'}</button><a href="${DTECH_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 원문 ↗</a></div>`;
+    return `<div class="kakao-auto-panel" aria-label="디테크 한식뷔페 카카오 프로필 자동 조회">${content}</div>`;
+  }
   // 런치타임은 공식 카카오 채널의 자동 식단만 표시합니다.
   // 기존 공유 서버의 업로드 파일은 삭제하지 않으며, 화면에서는 노출하지 않습니다.
   function renderLunchImage() {
     return `<div class="lunch-image-panel">${renderKakaoProfile()}</div>`;
+  }
+  function renderDtechImage() {
+    return `<div class="lunch-image-panel">${renderDtechProfile()}</div>`;
   }
   function gangnamMediaHTML(item, suffix = '') {
     const valid = window.LunchThreadsMenu;
@@ -449,18 +482,18 @@
   function renderMenuCards() {
     const d = day(), meStatus = identity && C.memberStatus(identity, date, d, config());
     $('menuTitle').textContent = date === C.today() ? '오늘 구내식당 식단' : '선택한 날의 구내식당 식단';
-    $('refreshMenu').disabled = kakaoLoading || gangnamLoading; $('refreshMenu').textContent = kakaoLoading || gangnamLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
+    $('refreshMenu').disabled = kakaoLoading || dtechLoading || gangnamLoading; $('refreshMenu').textContent = kakaoLoading || dtechLoading || gangnamLoading ? '식단 확인 중…' : '↻ 식단 새로고침';
     $('restaurantCards').innerHTML = C.PLACES.map((p, i) => {
       const chosen = d.votes[identity] === p.id, note = d.notes[p.id]; let content = '';
-      if (p.id === 'megazone') {
-        content = renderMegaDay();
+      if (p.id === 'dtech') {
+        content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>디테크 한식뷔페 카카오 채널</strong><p>점심판을 열 때 자동 조회 · 열어 두면 5분마다 확인</p></div><span class="arrow">↗</span></a>${renderDtechImage()}`;
       } else if (p.id === 'lunchtime') {
         content = `<a class="channel-preview" href="${esc(p.menuUrl)}" target="_blank" rel="noopener noreferrer"><span class="channel-mark">TALK</span><div><strong>런치타임 카카오 채널</strong><p>점심판을 열 때 자동 조회 · 열어 두면 5분마다 확인</p></div><span class="arrow">↗</span></a>${renderLunchImage()}`;
       } else if (p.id === 'gangnambab') {
         content = renderGangnamMenu();
       } else content = `<p class="channel-info">${esc(p.subtitle || '동료가 제안한 오늘의 다른 식당이에요.')}</p>`;
       if (note) content += `<div class="menu-note"><strong>${esc(dateText(date))} · 함께 적은 메뉴 메모</strong>${esc(note)}</div>`;
-      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : i > 1 ? 'other' : ''}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'lunchtime' ? '우리의 기본 픽' : p.id === 'megazone' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
+      return `<article class="restaurant-card${chosen ? ' selected' : ''}"><div class="restaurant-head"><div class="restaurant-title"><span class="restaurant-icon ${p.id === 'lunchtime' ? 'lunchtime' : p.id === 'dtech' ? 'dtech' : 'other'}">${icon(p.id)}</span><div><h3>${esc(p.name)}</h3><p class="restaurant-subtitle">${esc(p.subtitle || '오늘의 다른 식당')}</p></div></div><span class="restaurant-tag">${p.id === 'lunchtime' ? '우리의 기본 픽' : p.id === 'dtech' ? '기분 좋은 대안' : 'NEW PICK'}</span></div>${content}<div class="restaurant-bottom"><div class="restaurant-tools">${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${p.id === 'gangnambab' ? 'Threads 원문 ↗' : '지도 ↗'}</a>` : ''}<button data-action="note" data-id="${esc(p.id)}">${note ? '메모 수정' : '메뉴 메모'}</button></div><button class="vote-button${chosen ? ' chosen' : ''}" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${chosen}" aria-disabled="${!identity || !meStatus?.in}" ${busy || !dayReady() || needsServerUpdate() ? 'disabled' : ''}>${chosen ? '✓ 선택 완료' : '이곳 선택하기'}</button></div></article>`;
     }).join('');
   }
   function renderDecision() {
@@ -469,7 +502,7 @@
     const total = Object.values(votes).reduce((count, list) => count + list.length, 0);
     $('decisionTitle').textContent = '일반 점심 장소 선택 현황';
     $('voteSummary').textContent = attending.length
-      ? `함께 점심 ${attending.length}명 중 ${total}명 장소 선택 · 메가존 / 런치타임 / 강남밥상 중 택 1`
+      ? `함께 점심 ${attending.length}명 중 ${total}명 장소 선택 · 런치타임 / 디테크 한식뷔페 / 강남밥상 중 택 1`
       : '일반 점심 참석자가 아직 없어요. 함께 먹기를 선택하면 세 곳 중 고를 수 있어요.';
     $('voteResults').innerHTML = C.PLACES.map(p => `<div class="result-row"><div class="result-heading"><span>${esc(p.name)}</span><b>${votes[p.id].length}명</b></div><div class="result-track"><div class="result-bar" style="width:${attending.length ? votes[p.id].length / attending.length * 100 : 0}%"></div></div><div class="voter-names">${votes[p.id].length ? MEMBERS.filter(m => votes[p.id].includes(m.id)).map(m => esc(m.name)).join(' · ') : '아직 선택한 사람이 없어요'}</div></div>`).join('');
     const undecided = attending.filter(m => !C.PLACES.some(p => p.id === d.votes[m.id]));
@@ -627,8 +660,7 @@
       const before = JSON.stringify(shared);
       const res = await jsonp({ action: 'state', date: requestDate }, target); if (target !== connection) return;
       mergeResponse(res); if (before !== JSON.stringify(shared)) render(); else renderConnection();
-      loadKakaoProfile(!lastKakaoAttempt); loadGangnamMenu(requestDate);
-      loadMegaPhoto();
+      loadKakaoProfile(!lastKakaoAttempt); loadDtechProfile(!lastDtechAttempt); loadGangnamMenu(requestDate);
     }
     catch (e) { if (target === connection) { syncError = e.message; renderConnection(); } }
     finally { syncing = false; renderConnection(); if (requestDate !== date && target === connection) sync(); }
@@ -669,6 +701,42 @@
     });
     return request.promise;
   }
+  function loadDtechProfile(force = false) {
+    const target = connection;
+    if (!target || !connectedReady || !shared.features.dtechProfile) return Promise.resolve();
+    if (dtechRequest?.target === target) return dtechRequest.promise;
+    if (!force && lastDtechAttempt && Date.now() - lastDtechAttempt < KAKAO_REFRESH_MS) return Promise.resolve();
+    lastDtechAttempt = Date.now(); dtechLoading = true; dtechWaiting = false;
+    const request = { target, promise: null }; dtechRequest = request;
+    renderMenuCards();
+    request.promise = Promise.resolve().then(async () => {
+      try {
+        const result = await jsonp({ action: 'dtechProfile', force: force ? '1' : '0' }, target);
+        if (target !== connection || dtechRequest !== request) return;
+        if (result?.pending === true) {
+          dtechWaiting = true; dtechError = '';
+          // Another member started the shared fetch. Retry on the next normal
+          // sync after ten seconds, instead of waiting a full five minutes.
+          lastDtechAttempt = Date.now() - KAKAO_REFRESH_MS + 10000;
+          return;
+        }
+        const profile = result?.ok && cleanDtechProfile(result.profile);
+        if (!profile) throw new Error('카카오 프로필 사진을 확인하지 못했어요.');
+        // Fetch time belongs to the channel metadata, never to a menu date.
+        if (!dtechProfile || Date.parse(profile.checkedAt) >= Date.parse(dtechProfile.checkedAt)) {
+          dtechProfile = profile;
+          try { write(KEYS.dtech, profile); } catch (_) { /* A full cache must not block the menu. */ }
+        }
+        dtechError = result.profile.error ? '최근 조회 실패' : '';
+        if (!result.profile.error) dtechPhotoError = '';
+      } catch (_) {
+        if (target === connection && dtechRequest === request) dtechError = '최근 조회 실패';
+      } finally {
+        if (dtechRequest === request) { dtechLoading = false; dtechRequest = null; renderMenuCards(); }
+      }
+    });
+    return request.promise;
+  }
   function loadGangnamMenu(when = date, force = false) {
     const target = connection;
     if (!target || !connectedReady || !shared.features.gangnamMenu || !C.validDate(when)) return Promise.resolve();
@@ -702,6 +770,10 @@
   function viewKakaoProfile() {
     if (!kakaoProfile) return;
     openDialog('런치타임 · 카카오 최신 프로필 사진', `<p class="dialog-copy">마지막 확인 ${esc(timeText(kakaoProfile.checkedAt))}<br>${date !== C.today() ? '선택한 날짜의 식단이 아니에요. ' : ''}사진에 적힌 식단 날짜를 확인해 주세요.${kakaoError ? '<br>다시 확인하지 못해 마지막으로 가져온 사진입니다.' : ''}</p><div class="full-menu-image"><img id="kakaoProfileFull" src="${esc(kakaoProfile.imageUrl)}" alt="런치타임 카카오 프로필 식단. 이미지 속 날짜 확인이 필요합니다." referrerpolicy="no-referrer"></div><p id="kakaoFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 아래 카카오 원문에서 확인해 주세요.</p><p class="dialog-copy"><a href="${KAKAO_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 채널 원문 열기 ↗</a></p>`, true);
+  }
+  function viewDtechProfile() {
+    if (!dtechProfile) return;
+    openDialog('디테크 한식뷔페 · 카카오 최신 프로필 사진', `<p class="dialog-copy">마지막 확인 ${esc(timeText(dtechProfile.checkedAt))}<br>${date !== C.today() ? '선택한 날짜의 식단이 아니에요. ' : ''}사진에 적힌 식단 날짜를 확인해 주세요.${dtechError ? '<br>다시 확인하지 못해 마지막으로 가져온 사진입니다.' : ''}</p><div class="full-menu-image"><img id="dtechProfileFull" src="${esc(dtechProfile.imageUrl)}" alt="디테크 한식뷔페 카카오 프로필 식단. 이미지 속 날짜 확인이 필요합니다." referrerpolicy="no-referrer"></div><p id="kakaoFullError" class="inline-warning" role="status" hidden>사진을 표시하지 못했어요. 아래 카카오 원문에서 확인해 주세요.</p><p class="dialog-copy"><a href="${DTECH_CHANNEL}" target="_blank" rel="noopener noreferrer">카카오 채널 원문 열기 ↗</a></p>`, true);
   }
   async function mutate(type, payload, requestedDate = date) {
     if (busy) return false;
@@ -738,7 +810,7 @@
   }
   function changeDate(next) {
     if (!C.validDate(next)) { toast('올바른 날짜를 선택해 주세요.'); return; }
-    date = next; followsToday = date === C.today(); selectedDecision = ''; draftTime = ''; render(); sync(); loadMegaPhoto(); loadGangnamMenu(date);
+    date = next; followsToday = date === C.today(); selectedDecision = ''; draftTime = ''; render(); sync(); loadGangnamMenu(date);
   }
   function setIdentity(id) {
     if (!MEMBERS.some(m => m.id === id)) return;
@@ -750,7 +822,7 @@
     if (!C.validDate(targetDate)) return;
     const member = MEMBERS.find(m => m.id === identity), current = dailyStatus(member, targetDate).kind;
     const selectedDay = targetDate === C.today() ? '오늘' : '이날';
-    const options = [['in', selectedDay + ' 함께 먹어요', '일반 점심으로 메가존·런치타임·강남밥상 중 골라요'], ['separate', selectedDay + ' 따로 먹어요', '동료와 따로 먹거나 개별 식사해요'], ['out', selectedDay + ' 점심 안 먹어요', '연차·반차·외근·출장 등 사유는 선택사항'], ['pending', '선택 취소 · 미선택으로', '내 대표님 점심 취소도 미선택으로 바꿔요'], ['ceo', selectedDay + '은 대표님과 점심', '대표님과 점심으로 직접 지정해요'], ['auto', '기본 일정 따르기', '기본 대표님 일정이 없으면 미선택이 됩니다']];
+    const options = [['in', selectedDay + ' 함께 먹어요', '일반 점심으로 런치타임·디테크 한식뷔페·강남밥상 중 골라요'], ['separate', selectedDay + ' 따로 먹어요', '동료와 따로 먹거나 개별 식사해요'], ['out', selectedDay + ' 점심 안 먹어요', '연차·반차·외근·출장 등 사유는 선택사항'], ['pending', '선택 취소 · 미선택으로', '내 대표님 점심 취소도 미선택으로 바꿔요'], ['ceo', selectedDay + '은 대표님과 점심', '대표님과 점심으로 직접 지정해요'], ['auto', '기본 일정 따르기', '기본 대표님 일정이 없으면 미선택이 됩니다']];
     openDialog(nameOf(identity) + '님의 ' + dateText(targetDate), `<p class="dialog-copy">${esc(dateText(targetDate))}의 일정만 바꿉니다.</p><div class="availability-options">${options.map(([id, title, sub]) => `<button data-action="${id === 'out' ? 'absence' : id === 'separate' ? 'separate' : 'setAvailability'}" data-id="${id}" data-date="${targetDate}" data-member="${identity}" class="${current === id ? 'active' : ''}">${title}<small>${sub}</small></button>`).join('')}</div>`);
   }
   function showAbsence(targetDate = date, actor = identity) {
@@ -901,6 +973,8 @@
     else if (action === 'megaDelete') deleteMega(id);
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
+    else if (action === 'viewDtechProfile') viewDtechProfile();
+    else if (action === 'refreshDtechProfile') loadDtechProfile(true);
     else if (action === 'refreshGangnamMenu') { loadGangnamMenu(date,true); loadGangnamOcr(true); }
     else if (action === 'gangnamMark') await markGangnam(id);
     else if (action === 'gangnamUnpick') await unmarkGangnam();
@@ -909,7 +983,7 @@
     else if (action === 'note') showNote(id);
     else if (action === 'remove') { if (confirm('이 식당과 연결된 선택을 오늘 후보에서 삭제할까요?')) await mutate('removePlace', { placeId: id }); }
     else if (action === 'settings') showSettings();
-    else if (action === 'retry') { syncError = ''; sync(); loadMegaPhoto(true); }
+    else if (action === 'retry') { syncError = ''; sync(); loadDtechProfile(true); }
     else if (action === 'invite') shareLink();
     else if (action === 'date') changeDate(id);
     else if (action === 'dailyMember') showDailyMember(id, b.dataset.date);
@@ -920,7 +994,7 @@
     }
     else if (action === 'disconnect') {
       if (busy) return toast('저장이 끝난 뒤 연결을 해제해 주세요.');
-      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; gangnamRequests = {}; gangnamLoading = false; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
+      if (confirm('이 기기의 공유 연결을 해제할까요? 팀 공유 데이터는 삭제되지 않습니다.')) { connection = null; connectedReady = false; syncError = ''; gangnamRequests = {}; gangnamLoading = false; kakaoRequest = null; kakaoLoading = false; kakaoWaiting = false; kakaoError = ''; lastKakaoAttempt = 0; dtechRequest = null; dtechLoading = false; dtechWaiting = false; dtechError = ''; lastDtechAttempt = 0; try { localStorage.removeItem(KEYS.connection); } catch (_) {} closeDialog(); render(); }
     }
     else if (action === 'random') {
       const counts = C.tally(date, day(), config()), max = Math.max(0, ...Object.values(counts).map(a => a.length));
@@ -945,7 +1019,7 @@
       if (result) { closeDialog(); toast(`${members.length}명에게 따로 먹기 초대를 보냈어요. 각자 수락하면 모임에 합류합니다.`); }
       else submit.disabled = false;
     }
-    else if (form.id === 'decisionForm') { toast('일반 점심은 메가존·런치타임·강남밥상 중 선택해 주세요.'); }
+    else if (form.id === 'decisionForm') { toast('일반 점심은 런치타임·디테크 한식뷔페·강남밥상 중 선택해 주세요.'); }
     else if (form.id === 'absenceForm') {
       if (form.dataset.member !== identity) return toast('내 이름을 다시 선택한 뒤 일정을 바꿔 주세요.');
       const targetDate = form.dataset.date, reason = f.get('reason') === 'custom' ? f.get('customReason') : f.get('reason'), submit = form.querySelector('button');
@@ -973,7 +1047,7 @@
   $('guideSearch').addEventListener('input', e => { guideQuery = e.target.value; guideLimit = 6; renderGuide(); });
   $('dateInput').addEventListener('change', e => changeDate(e.target.value));
   $('prevDate').onclick = () => changeDate(C.shiftDate(date, -1)); $('nextDate').onclick = () => changeDate(C.shiftDate(date, 1)); $('todayBtn').onclick = () => changeDate(C.today());
-  $('settingsBtn').onclick = showSettings; $('refreshMenu').onclick = () => { sync(); loadMegaPhoto(true); loadKakaoProfile(true); loadGangnamMenu(date, true); };
+  $('settingsBtn').onclick = showSettings; $('refreshMenu').onclick = () => { sync(); loadKakaoProfile(true); loadDtechProfile(true); loadGangnamMenu(date, true); };
   $('ceoCancelled').onchange = async e => {
     const checked = e.target.checked, targetDate = date;
     if (e.target.disabled) return;
@@ -989,7 +1063,10 @@
     if(e.target.id==='megaPhotoFull'){e.target.hidden=true;if($('megaPhotoError'))$('megaPhotoError').hidden=false;}
     else if (e.target.id === 'kakaoProfilePhoto' && kakaoProfile && e.target.getAttribute('src') === kakaoProfile.imageUrl) {
       kakaoPhotoError = kakaoProfile.imageUrl; renderMenuCards();
+    } else if (e.target.id === 'dtechProfilePhoto' && dtechProfile && e.target.getAttribute('src') === dtechProfile.imageUrl) {
+      dtechPhotoError = dtechProfile.imageUrl; renderMenuCards();
     } else if (e.target.id === 'kakaoProfileFull') { e.target.hidden = true; if ($('kakaoFullError')) $('kakaoFullError').hidden = false; }
+    else if (e.target.id === 'dtechProfileFull') { e.target.hidden = true; if ($('dtechFullError')) $('dtechFullError').hidden = false; }
     else if (e.target.id === 'gangnamMenuPhoto') { gangnamPhotoErrors.add(e.target.getAttribute('src')); renderMenuCards(); }
     else if (e.target.id === 'gangnamMenuFull') { e.target.hidden = true; if ($('gangnamFullError')) $('gangnamFullError').hidden = false; }
     else if (e.target.classList?.contains('gangnam-menu-video')) {
@@ -1008,9 +1085,9 @@
     if (!Number.isFinite(video.duration) || video.duration <= 0) return;
     try { video.currentTime = Math.min(Math.max(0.8, video.duration * .10), Math.max(0, video.duration - .2)); video.pause(); } catch (_) {}
   }, true);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMegaPhoto(); loadKakaoProfile(); loadGangnamMenu(date); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadKakaoProfile(); loadDtechProfile(); loadGangnamMenu(date); } });
   function checkMidnight() { const now = C.today(); if (now !== lastToday) { lastToday = now; if (followsToday) changeDate(now); else renderMembers(); } }
   setInterval(() => { checkMidnight(); sync(); }, 30000);
-  setInterval(() => { if (!document.hidden) { loadMegaPhoto(); loadKakaoProfile(); loadGangnamMenu(date); } }, 5 * 60000);
+  setInterval(() => { if (!document.hidden) { loadKakaoProfile(); loadDtechProfile(); loadGangnamMenu(date); } }, 5 * 60000);
   render(); handleFragment(); sync();
 })();

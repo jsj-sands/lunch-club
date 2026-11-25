@@ -15,10 +15,13 @@ const fixedTime = '2026-10-19T03:26:00.000Z';
 const localKey = 'sandsLunch.local.v1';
 const imageKey = 'sandsLunch.menuImages.v1';
 const kakaoKey = 'sandsLunch.kakaoProfile.v1';
+const dtechKey = 'sandsLunch.dtechProfile.v1';
+const dtechChannel = 'https://pf.kakao.com/_nkwxeG';
+const dtechImage = 'https://k.kakaocdn.net/dn/dtech/fixture/menu_xl.jpg';
 const kakaoChannel = 'https://pf.kakao.com/_xbbMPn';
 const kakaoImage = 'https://k.kakaocdn.net/dn/lunch-profile/fixture/img_m.jpg';
 const connection = { url: 'https://script.google.com/macros/s/test_deployment/exec', key: 'a'.repeat(64) };
-const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, megaPhotos: true };
+const sharedFeatures = { menuImages: true, menuImageDelete: true, explicitAttendance: true, lunchPairs: true, kakaoProfile: true, dtechProfile: true, ceoVenue: true, separateGroups: true, separateVenues: true, joinRequests: true, megaPhotos: true };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNQAAAABJRU5ErkJggg==';
 // A valid 2 x 2 JPEG returned by the canvas fixture. Pixel rendering is not tested.
 const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7CooorID/2Q==';
@@ -48,6 +51,7 @@ function basicSharedState(request, extra = {}) {
 }
 
 const profileData = (imageUrl = kakaoImage, checkedAt = fixedTime) => ({ ok: true, sourceUrl: kakaoChannel, imageUrl, checkedAt });
+const dtechProfileData = (imageUrl = dtechImage, checkedAt = fixedTime) => ({ ok: true, sourceUrl: dtechChannel, imageUrl, checkedAt });
 
 const orderedTeams = [
   ['경영지원팀', ['yunchul', 'jihye', 'seongeun', 'yunseok']],
@@ -101,7 +105,7 @@ function assertDailyBoard(ui, date, expected) {
 async function boot(options = {}) {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const elements = new Map(), handlers = new Map(), storage = new Map();
-  const requests = [], publicRequests = [], kakaoRequests = [], errors = [], posted = [];
+  const requests = [], publicRequests = [], kakaoRequests = [], dtechRequests = [], errors = [], posted = [];
   const imageWork = { created: [], revoked: [], draws: [], encoded: [] };
   let context, timerId = 0, now = Date.parse(fixedTime);
   const intervals = new Map();
@@ -224,6 +228,11 @@ async function boot(options = {}) {
             result = options.kakaoRequest ? await options.kakaoRequest(request)
               : options.kakaoError ? { ok: false, error: 'Fixture channel unavailable' }
               : options.kakaoResponse || { ok: true, profile: { ok: true, sourceUrl: kakaoChannel, imageUrl: kakaoImage, checkedAt: new Date(now).toISOString() } };
+          } else if (request.action === 'dtechProfile') {
+            dtechRequests.push(request);
+            result = options.dtechRequest ? await options.dtechRequest(request)
+              : options.dtechError ? { ok: false, error: 'Fixture DTech channel unavailable' }
+              : options.dtechResponse || { ok: true, profile: { ok: true, sourceUrl: dtechChannel, imageUrl: dtechImage, checkedAt: new Date(now).toISOString() } };
           } else {
             if (!options.server) throw new Error('Unexpected shared-server request: ' + request.action);
             result = await options.server(request);
@@ -280,6 +289,7 @@ async function boot(options = {}) {
   vm.runInContext(fs.readFileSync(path.join(root, 'core.js'), 'utf8'), context, { filename: 'core.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'restaurant-guide.js'), 'utf8'), context, { filename: 'restaurant-guide.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'lunchtime-source.js'), 'utf8'), context, { filename: 'lunchtime-source.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'dtech-source.js'), 'utf8'), context, { filename: 'dtech-source.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'threads-menu-source.js'), 'utf8'), context, { filename: 'threads-menu-source.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'ocr-choice.js'), 'utf8'), context, { filename: 'ocr-choice.js' });
   if (options.omitKakaoSource) {
@@ -335,7 +345,7 @@ async function boot(options = {}) {
     assert.equal(element('uploadMenuImageButton').disabled, false);
   }
   await settle();
-  return { html, element, action, press, dispatch, settle, selectImage, findControl, chooseDate, selectIdentity, toggleCancelled, requests, publicRequests, kakaoRequests, posted, imageWork,
+  return { html, element, action, press, dispatch, settle, selectImage, findControl, chooseDate, selectIdentity, toggleCancelled, requests, publicRequests, kakaoRequests, dtechRequests, posted, imageWork,
     visibilityChange: (hidden = false) => { document.hidden = hidden; return dispatch('visibilitychange', document); },
     advanceTime: ms => { now += ms; },
     async runIntervals(delay) {
@@ -398,7 +408,7 @@ test('함께 먹기를 직접 선택해야 녹색 그룹과 투표에 반영되�
   assert.match(ui.element('voteResults').innerHTML, /천진기/);
   await ui.chooseDate('2026-10-20');
   assert.equal(ui.element('heroCount').textContent, '이날 함께 0명');
-  await ui.action('vote', 'megazone');
+  await ui.action('vote', 'dtech');
   assert.match(ui.element('dialogContent').innerHTML, /대표님과 점심/);
   assert.equal(ui.saved(localKey).days['2026-10-20'], undefined);
 });
@@ -1547,8 +1557,8 @@ test('대표님 점심 확정 후 다른 식당으로 변경하고 취소하며 
  assert.match(ui.element('ceoDecisionPanel').innerHTML,/아직 장소를 확정하지 않았어요/);
  await ui.press('choiceIn');
  assert.match(ui.element('myResponseContent').innerHTML,/일반 점심 장소/);
- await ui.action('vote','megazone');
- assert.equal(ui.saved(localKey).days[date].votes.jingi,'megazone');
+ await ui.action('vote','dtech');
+ assert.equal(ui.saved(localKey).days[date].votes.jingi,'dtech');
  assert.equal(ui.findControl({'data-action':'guideConfirm','data-id':first.id}).disabled,false);
  await ui.action('vote','lunchtime');
  assert.equal(ui.saved(localKey).days[date].votes.jingi,'lunchtime');
@@ -1624,7 +1634,7 @@ test('일반 점심 인원도 맛집 카드에서 따로 먹기로 전환하여 
   const ui=await boot(),target='2026-10-20',place=G.restaurants[0];
   await ui.chooseDate(target);
   await ui.press('choiceIn');
-  await ui.action('vote','megazone');
+  await ui.action('vote','dtech');
   await ui.action('guideSeparate',place.id);
   assert.match(ui.element('dialogContent').innerHTML,/따로 먹기로 변경하고 식당 등록/);
   assert.equal(ui.saved(localKey).days[target].separateVenues.jingi,undefined);
@@ -1632,7 +1642,7 @@ test('일반 점심 인원도 맛집 카드에서 따로 먹기로 전환하여 
   const d=ui.saved(localKey).days[target];
   assert.equal(d.overrides.jingi,'separate');
   assert.equal(d.separateVenues.jingi.placeId,place.id);
-  assert.equal(d.votes.jingi,'megazone'); // Older cafeteria choice is preserved, not counted.
+  assert.equal(d.votes.jingi,'dtech'); // Older cafeteria choice is preserved, not counted.
   assert.deepEqual(C.tally(target,d,C.settings()).megazone,[]);
   assert.equal(ui.element('appDialog').open,false);
   assert.match(ui.element('pairBoard').innerHTML,new RegExp(place.name));
@@ -1646,7 +1656,7 @@ test('다른 동료가 모임에 참여 요청하면 생성자에게 처리 알�
  assert.match(ui.element('pairBoard').innerHTML,/조성준/);
  await ui.selectIdentity('juri');
  await ui.action('setAvailability','in',{'data-date':target});
- await ui.action('vote','megazone');
+ await ui.action('vote','dtech');
  assert.deepEqual(dailyMembers(ui,'in'),['juri']);
  assert.match(ui.element('pairBoard').innerHTML,/이 모임에 참여 요청/);
  await ui.action('joinRequest','seongjun',{'data-date':target});
@@ -1711,64 +1721,44 @@ test('합류 요청 거절·요청 취소는 함께 점심 선택을 바꾸지 �
  assert.deepEqual(ui.saved(localKey).days[target].joinRequests,[]);
 });
 
-test('메가존은 웰스토리 API를 전혀 호출하지 않고 사진 업로드 버튼과 연결 안내를 표시한다',async()=>{
- const local=await boot();
- assert.match(visibleText(local.element('restaurantCards').innerHTML),/팀 공유에 연결/);
- assert.equal(local.requests.length,0);
- const connected=await boot({connected:true,server:basicSharedState,identity:'seongjun'});
- assert.match(connected.element('restaurantCards').innerHTML,/data-action="megaUpload"/);
- assert.equal(connected.requests.some(r=>r.action==='menu'),false);
- await connected.action('megaUpload');
- assert.equal(connected.element('megaUploadForm').dataset.date,monday);
- assert.doesNotMatch(connected.element('dialogContent').innerHTML,/id="megaScope"/);
- assert.doesNotMatch(connected.element('restaurantCards').innerHTML,/data-action="menuView"|이번 주 식단/);
- assert.doesNotMatch(connected.element('dialogContent').innerHTML,/megaWeek|주 전체|사진 적용 기간/);
- assert.match(connected.element('dialogContent').innerHTML,/웰스토리플러스 앱에서 메뉴만 캡처/);
-});
-test('메가존 캡처는 하루별 Drive 슬롯에 압축 업로드하고 팀원의 화면에 같은 이미지를 표시한다',async()=>{
- const stored={},receipts={},bodies=[];
- const getImages=()=>Object.fromEntries(Object.values(stored).map(m=>[m.scope+':'+(m.scope==='megaWeek'?m.week:m.date),{...m,dataUrl:undefined}]));
- const server=request=>{
-  if(request.action==='menuImage'){
-   const photo=Object.values(stored).find(m=>m.id===request.imageId);
-   return photo?{ok:true,image:photo}:{ok:false,error:'not found'};
-  }
-  return basicSharedState(request,{menuImages:getImages(),receipt:receipts[request.receipt]});
- };
- const post=async(url,init)=>{
-  const body=JSON.parse(init.body);bodies.push(body);
-  if(body.op.type==='menuImageUpload'){
-   const p=body.op.payload,id='a'.repeat(8)+'-'+'a'.repeat(4)+'-'+'a'.repeat(4)+'-'+'a'.repeat(4)+'-'+'a'.repeat(12);
-   stored[p.scope]={id,scope:p.scope,date:body.date,week:monday,startDate:body.date,endDate:body.date,uploadedBy:body.op.actor,uploadedAt:fixedTime,dataUrl:p.dataUrl};
-  }
-  receipts[body.op.id]={ok:true};return {type:'opaque',status:0};
- };
- const uploader=await boot({connected:true,server,post,identity:'seongjun'});
- await uploader.action('megaUpload');
- uploader.element('megaFile').files=[imageFile];await uploader.dispatch('change',uploader.element('megaFile'));
- assert.equal(uploader.element('megaSave').disabled,false);
- await uploader.dispatch('submit',uploader.element('megaUploadForm'));
- assert.equal(bodies.length,1);
- assert.equal(bodies[0].op.type,'menuImageUpload');
- assert.equal(bodies[0].op.payload.scope,'megaDay');
- assert.ok(stored.megaDay.dataUrl.startsWith('data:image/jpeg;base64,'));
- assert.match(uploader.element('restaurantCards').innerHTML,/mega-uploaded-photo/);
- const teammate=await boot({connected:true,server,identity:'yunseok'});
- assert.match(teammate.element('restaurantCards').innerHTML,/mega-uploaded-photo/);
- assert.match(teammate.element('restaurantCards').innerHTML,/조성준/);
- assert.equal(teammate.requests.some(x=>x.action==='menu'),false);
-});
-
-test('런치타임을 첫 번째 기본 픽으로 표시하고 메가존은 두 번째 대안으로 표시한다',async()=>{
- const ui=await boot({identity:'seongjun'});
+test('런치타임이 첫 번째, 디테크 한식뷔페가 두 번째, 강남밥상이 세 번째다',async()=>{
+ const ui=await boot({identity:'seongjun',connected:true,server:basicSharedState});
  const html=ui.element('restaurantCards').innerHTML;
- const first=html.indexOf('<h3>런치타임</h3>'),second=html.indexOf('<h3>메가존</h3>');
- assert.ok(first>=0&&second>first,'런치타임이 메가존보다 앞에 표시돼야 합니다.');
- assert.match(html.slice(first,second),/우리의 기본 픽/);
- assert.match(html.slice(second),/기분 좋은 대안/);
- assert.deepEqual(C.PLACES.map(p=>p.id),['lunchtime','megazone','gangnambab']);
+ assert.ok(html.indexOf('<h3>런치타임</h3>')<html.indexOf('<h3>디테크 한식뷔페</h3>'));
+ assert.ok(html.indexOf('<h3>디테크 한식뷔페</h3>')<html.indexOf('<h3>강남밥상</h3>'));
+ assert.doesNotMatch(html,/<h3>메가존<\/h3>|data-action="megaUpload"/);
+ assert.match(html,/href="https:\/\/pf\.kakao\.com\/_nkwxeG"/);
+ assert.match(html,/기분 좋은 대안/);
 });
-
+test('디테크·런치타임은 독립적으로 카카오 사진을 조회하고 각각 확대·새로고침한다',async()=>{
+ const ui=await boot({identity:'seongjun',connected:true,server:basicSharedState});
+ assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'),kakaoImage);
+ assert.equal(ui.element('dtechProfilePhoto').getAttribute('src'),dtechImage);
+ assert.equal(ui.kakaoRequests.length,1);
+ assert.equal(ui.dtechRequests.length,1);
+ assert.deepEqual(ui.saved(kakaoKey),profileData());
+ assert.deepEqual(ui.saved(dtechKey),dtechProfileData());
+ await ui.action('viewDtechProfile');
+ assert.equal(ui.element('dtechProfileFull').getAttribute('src'),dtechImage);
+ await ui.action('refreshDtechProfile');
+ assert.equal(ui.dtechRequests.length,2);
+ assert.equal(ui.kakaoRequests.length,1,'디테크 새로고침이 런치타임 채널을 조회하지 않아야 합니다');
+});
+test('디테크 채널 조회 실패는 런치타임 사진과 투표를 막지 않는다',async()=>{
+ const ui=await boot({identity:'seongjun',connected:true,server:basicSharedState,dtechError:true});
+ assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'),kakaoImage);
+ assert.doesNotMatch(ui.element('restaurantCards').innerHTML,/id="dtechProfilePhoto"/);
+ assert.match(ui.element('restaurantCards').innerHTML,/https:\/\/pf\.kakao\.com\/_nkwxeG/);
+ await ui.action('setAvailability','in');
+ await ui.action('vote','dtech');
+ assert.equal(ui.element('voteSummary').textContent.includes('디테크'),true);
+});
+test('구 서버에는 디테크 자동 사진 업데이트를 안내하고 신규 선택을 금지한다',async()=>{
+ const server=req=>basicSharedState(req,{features:{...sharedFeatures,dtechProfile:false}});
+ const ui=await boot({identity:'seongjun',connected:true,server});
+ assert.match(ui.element('restaurantCards').innerHTML,/공유 서버를 한 번 업데이트/);
+ assert.equal(ui.dtechRequests.length,0);
+});
 test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데이트 안내를 표시하지 않는다',async()=>{
  const target='2026-10-19',post='https://www.threads.com/@gangnambab/post/ABC123x';
  const result={ok:true,date:target,kind:'image',imageUrl:'https://img.cdninstagram.com/menus/test-1019.jpg',

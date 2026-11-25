@@ -44,7 +44,7 @@ function server() {
     ContentService: { MimeType: { JSON: 'json', JAVASCRIPT: 'js' }, createTextOutput: text => ({ text, setMimeType(type) { this.mime = type; return this; } }) },
     UrlFetchApp: { fetch(url, options) { assert.equal(locked, false, 'Network reads must not hold the attendance lock'); requests.push({ url, options }); return handler(url, options); } }
   });
-  const files = ['core.js', 'lunchtime-source.js', 'backend/server.js'];
+  const files = ['core.js', 'lunchtime-source.js', 'dtech-source.js', 'backend/server.js'];
   const source = files.map(file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
   vm.runInContext(source.replace("'__TEAM_KEY__'", `'${KEY}'`), context);
   const rawGet = params => context.doGet({ parameter: { key: KEY, action: 'kakaoProfile', ...params } });
@@ -68,7 +68,7 @@ test('카카오 조회는 팀 키와 JSONP 콜백을 검증하고 날짜·본인
   assert.ok(reply.text.startsWith(callback + '('));
   const payload = JSON.parse(reply.text.slice(callback.length + 1, -2));
   assert.equal(payload.profile.imageUrl, IMAGE);
-  assert.equal(s.state().serverVersion, 7); assert.equal(s.state().features.kakaoProfile, true);
+  assert.equal(s.state().serverVersion, 8); assert.equal(s.state().features.kakaoProfile, true);
   assert.equal(s.get({ action: 'state' }).ok, false);
 });
 
@@ -172,7 +172,7 @@ test('느린 이전 실행이 나중에 도착해도 새로운 요청의 사진�
 
 test('캐시 장애·손상에도 일일 기록·설정·공유 이미지 메타데이터를 건드리지 않는다', () => {
   const s = server();
-  s.post('availability', 'seongjun', { value: 'in' }); s.post('vote', 'seongjun', { placeId: 'megazone' });
+  s.post('availability', 'seongjun', { value: 'in' }); s.post('vote', 'seongjun', { placeId: 'dtech' });
   s.store.LUNCH_CONFIG = JSON.stringify({ revision: 7, settings: { meetingTime: '12:20', scheduleEnd: '2027-01-31', ceoDays: { jingi: [4] } } });
   s.store.LUNCH_MENU_IMAGE_week_2026 = 'unrelated image metadata remains untouched';
   const before = { ...s.store };
@@ -182,6 +182,51 @@ test('캐시 장애·손상에도 일일 기록·설정·공유 이미지 메타
   s.advance(300001); s.setHandler(() => { throw new Error('offline'); });
   assert.equal(s.get().profile.error, true);
   assert.deepEqual(Object.fromEntries(Object.entries(s.store).filter(([key]) => key !== PROPERTY)), before);
-  assert.equal(s.state().days[DATE].votes.seongjun, 'megazone');
+  assert.equal(s.state().days[DATE].votes.seongjun, 'dtech');
   assert.equal(s.state().settings.meetingTime, '12:20'); assert.equal(s.state().configRevision, 7);
+});
+
+test('두 카카오 채널을 별도 프로필·캐시·속성으로 저장하고 서로 섞지 않는다',()=>{
+ const s=server();
+ const lunch=Source;
+ const D=require('../dtech-source.js');
+ const dtechUrl='https://k.kakaocdn.net/dn/dtech/test/daily_xl.jpg';
+ const makeDtech=()=>JSON.stringify({
+   profile_id:D.PROFILE_ID, profile:{ profile_id:D.PROFILE_ID, permalink:D.SOURCE_URL,
+     profile_image:{type:'image',mimetype:'image/jpeg',xlarge_url:dtechUrl}}});
+ s.setHandler(url=>{
+  if(url===lunch.HOME_ENDPOINT)return response(sourceBody(IMAGE));
+  if(url===D.HOME_ENDPOINT)return response(makeDtech());
+  throw Error('Unexpected channel '+url);
+ });
+ const first=s.get(), second=s.get({action:'dtechProfile'});
+ assert.equal(first.profile.sourceUrl,lunch.SOURCE_URL);
+ assert.equal(first.profile.imageUrl,IMAGE);
+ assert.equal(second.profile.sourceUrl,D.SOURCE_URL);
+ assert.equal(second.profile.imageUrl,dtechUrl);
+ assert.deepEqual(s.requests.map(x=>x.url),[lunch.HOME_ENDPOINT,D.HOME_ENDPOINT]);
+ assert.ok(s.store.LUNCH_KAKAO_PROFILE);
+ assert.ok(s.store.LUNCH_DTECH_PROFILE);
+ assert.equal(s.state().features.kakaoProfile,true);
+ assert.equal(s.state().features.dtechProfile,true);
+ s.get();s.get({action:'dtechProfile'});
+ assert.equal(s.requests.length,2,'two independent 5-minute caches should suppress duplicate fetches');
+ s.advance(61000);
+ s.get({action:'dtechProfile',force:'1'});
+ assert.equal(s.requests.length,3);
+ assert.equal(s.requests[2].url,D.HOME_ENDPOINT);
+ assert.equal(s.get().profile.imageUrl,IMAGE,'DTech refresh never overwrites Lunchtime');
+});
+test('다른 카카오 채널 응답은 디테크 사진으로 위장할 수 없다',()=>{
+ const s=server(),D=require('../dtech-source.js');
+ s.setHandler(url=>{
+  if(url===D.HOME_ENDPOINT)return response(sourceBody(IMAGE));
+  return response(sourceBody(IMAGE));
+ });
+ const invalid=s.get({action:'dtechProfile'});
+ assert.equal(invalid.ok,false);
+ assert.equal(s.store.LUNCH_DTECH_PROFILE!==undefined,true);
+ assert.equal(s.get().profile.sourceUrl,Source.SOURCE_URL);
+ assert.equal(s.requests[0].url,D.HOME_ENDPOINT);
+ assert.equal(s.requests[1].url,Source.HOME_ENDPOINT);
 });
