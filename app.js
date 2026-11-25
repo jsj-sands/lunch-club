@@ -301,7 +301,8 @@
       (entry.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(entry.videoUrl) : window.LunchThreadsMenu.validImageURL(entry.imageUrl)) &&
       window.LunchThreadsMenu.seoulDate(entry.publishedAt) === date;
     const oldServer = !!entry && !!entry.version && entry.version !== VERIFIED_GANGNAM_VERSION;
-    const badge = gangnamLoading ? '확인 중' : ready ? '게시물 확인' : '조회 확인 필요';
+    const needsReview = ['ambiguous', 'unverified_menu'].includes(entry?.reason) && Array.isArray(entry.alternatives) && entry.alternatives.length > 0;
+    const badge = gangnamLoading ? '확인 중' : ready ? '메뉴 공유됨' : needsReview ? '영상 ' + entry.alternatives.length + '개 확인 필요' : '조회 확인 필요';
     let content = '<div class="gangnam-menu-panel"><div class="gangnam-menu-heading"><span class="gangnam-menu-badge">THREADS</span><strong>강남밥상 메뉴 공지</strong><span class="auto-menu-badge">' + badge + '</span></div>';
     if (ready && !(entry.kind === 'image' && gangnamPhotoErrors.has(entry.imageUrl))) {
       content += gangnamMediaHTML(entry);
@@ -309,29 +310,39 @@
       if (entry.confidence === 'manual') content += '<div class="gangnam-pick-confirmed"><strong>팀원이 메뉴로 확인한 영상</strong><span>' + esc(nameOf(entry.selectedBy) || '팀원') + '님이 선택 · ' + esc(dateText(date)) +
         '</span><button class="text-button" data-action="gangnamUnpick">메뉴 지정 취소·다시 선택</button></div>';
       if (entry.refreshFailure) content += '<p class="inline-warning">새로 조회하지 못해 이전에 확인한 메뉴 게시물을 표시합니다. 아래 진단을 확인해 주세요.</p>';
-    } else if (['ambiguous', 'unverified_menu'].includes(entry?.reason) && Array.isArray(entry.alternatives) && entry.alternatives.length) {
-      const ambiguous = entry.reason === 'ambiguous';
-      content += '<div class="image-empty"><strong>' + (ambiguous ? '메뉴 공지 후보가 여러 개예요' : '오늘 메뉴 공지인지 확인되지 않았어요') +
-        '</strong><p>짧은 홍보 영상도 식단으로 잘못 표시될 수 있어 자동 선택하지 않습니다. 아래에서 해당 날짜의 게시물을 직접 확인해 주세요.</p></div>';
-      content += '<div class="gangnam-review-list">' + entry.alternatives.slice(0,4).map((p,i) => {
+    } else if (needsReview) {
+      const candidates = entry.alternatives.slice(0, 4);
+      content += '<div class="gangnam-review-lead"><strong>게시물 ' + candidates.length + '개를 가져왔어요</strong>' +
+        '<p>Threads에서 메뉴라고 구별할 설명을 제공하지 않아 어느 영상이 식단인지 확정할 수 없어요. ' +
+        '<b>아래 영상을 바로 재생</b>한 뒤, 실제 메뉴표가 보이는 영상 하나만 선택하면 팀원 모두에게 표시됩니다.</p></div>';
+      content += '<div class="gangnam-review-list">' + candidates.map((p,i) => {
         if (!window.LunchThreadsMenu?.validPostURL(p.postUrl)) return '';
+        const video = p.kind === 'video' && window.LunchThreadsMenu.validMediaURL(p.videoUrl);
+        const photo = p.kind === 'image' && window.LunchThreadsMenu.validImageURL(p.imageUrl);
+        if (!video && !photo) return '';
+        const rawCaption = String(p.caption || '').replace(/\s+/g, ' ').trim();
+        const meaningfulCaption = rawCaption.replace(/@gangnambab\s*:?\s*/gi,'').replace(/[\s:·|]/g,'').trim();
+        const title = meaningfulCaption ? rawCaption.slice(0, 65) : '영상·사진 ' + (i + 1);
         const time = p.publishedAt ? timeText(p.publishedAt) : '등록 시각 미상';
-        const label = (p.caption || '').trim().toLowerCase().replace(/[^@a-z]/g, '') === '@gangnambab' || !(p.caption || '').trim() ?
-          '게시물 ' + (i + 1) : p.caption.slice(0, 70);
-        const validVideo = p.kind === 'video' && window.LunchThreadsMenu.validMediaURL(p.videoUrl);
-        const validImage = p.kind === 'image' && window.LunchThreadsMenu.validImageURL(p.imageUrl);
-        if (!validVideo && !validImage) return '';
-        const media = validVideo ?
-          '<video controls playsinline muted preload="none" referrerpolicy="no-referrer" class="gangnam-review-video"><source src="' + esc(p.videoUrl) +
-          '" type="video/mp4">이 브라우저에서는 영상을 표시하지 못해요.</video>' :
-          '<img src="' + esc(p.imageUrl) + '" referrerpolicy="no-referrer" loading="lazy" alt="게시물 ' + (i+1) + ' 사진">';
-        return '<div class="gangnam-review-item"><strong>' + esc(label) + '</strong><span>' + esc(time) + '</span>' +
-          '<details><summary>영상·사진 직접 확인하기</summary>' + media + '</details><div class="gangnam-review-actions">' +
-          '<a href="' + esc(p.postUrl) + '" target="_blank" rel="noopener noreferrer">Threads 원문 ↗</a>' +
-          (shared.features.gangnamManualPick ? '<button class="secondary-button" data-action="gangnamMark" data-id="' + i +
-          '">이 게시물이 오늘 메뉴표예요</button>' : '') + '</div></div>';
-      }).join('') + '</div>' + (!shared.features.gangnamManualPick ?
-        '<p class="inline-warning">팀원에게 메뉴 선택을 공유하려면 최신 공유 서버 코드로 업데이트해 주세요. <a href="setup.html#update">업데이트 안내 ↗</a></p>' : '');
+        const poster = video && window.LunchThreadsMenu.validImageURL(p.posterUrl) ? ' poster="' + esc(p.posterUrl) + '"' : '';
+        const media = video
+          ? '<video class="gangnam-review-video" controls playsinline muted preload="metadata" referrerpolicy="no-referrer"' + poster +
+              ' aria-label="' + esc(title) + ' 미리보기"><source src="' + esc(p.videoUrl) +
+              '" type="video/mp4">이 브라우저에서는 동영상을 재생하지 못해요.</video>'
+          : '<img class="gangnam-review-photo" src="' + esc(p.imageUrl) + '" referrerpolicy="no-referrer" loading="lazy" alt="' + esc(title) + ' 사진">';
+        return '<article class="gangnam-review-item"><div class="gangnam-review-heading">' +
+          '<strong>' + esc(title) + '</strong><span>' + esc(time) + ' 게시</span></div>' +
+          '<div class="gangnam-review-player">' + media + '</div>' +
+          '<div class="gangnam-review-actions">' +
+          (shared.features.gangnamManualPick
+            ? '<button class="primary-button" data-action="gangnamMark" data-id="' + i +
+              '">이 영상이 메뉴표예요 · 팀 공유</button>' : '') +
+          '<a href="' + esc(p.postUrl) + '" target="_blank" rel="noopener noreferrer">Threads에서 보기 ↗</a>' +
+          '</div></article>';
+      }).join('') + '</div>' +
+        (shared.features.gangnamManualPick
+          ? '<p class="gangnam-review-footnote">※ 메뉴표가 아닌 행사는 선택하지 마세요. 지정한 메뉴는 같은 날짜의 팀원에게 공유되며 언제든 취소할 수 있습니다. 재생이 안 되면 Threads에서 보기를 이용해 주세요.</p>'
+          : '<p class="inline-warning">팀원에게 메뉴를 지정하려면 공유 서버 업데이트가 필요해요. <a href="setup.html#update">업데이트 안내 ↗</a></p>');
     } else {
       let title = '아직 게시물을 조회하지 않았어요', detail = '게시물 조회가 완료되면 이곳에 표시됩니다.';
       if (!connection) { title = '팀 공유 연결 후 조회할 수 있어요'; detail = '기존 팀 공유 연결을 사용해 주세요.'; }
@@ -369,7 +380,7 @@
         !(candidate.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(candidate.videoUrl) :
           candidate.kind === 'image' && window.LunchThreadsMenu.validImageURL(candidate.imageUrl)))
       return toast('게시물 정보를 다시 확인해 주세요.');
-    if (!confirm('영상을 직접 확인하고 오늘 메뉴표가 맞는지 확인하셨나요? 팀원 모두에게 이 영상이 식단으로 표시됩니다.')) return;
+    if (!confirm('영상을 확인했고 이 게시물이 오늘 메뉴표가 맞나요? 확인하면 팀원 모두에게 공유되며 취소할 수 있습니다.')) return;
     const selectedDate = date, payload = { kind: candidate.kind, postUrl: candidate.postUrl,
       publishedAt: candidate.publishedAt, videoUrl: candidate.videoUrl || '',
       imageUrl: candidate.imageUrl || '', posterUrl: candidate.posterUrl || '' };

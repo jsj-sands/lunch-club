@@ -1825,8 +1825,8 @@ test('강남밥상 후보 영상이 여러 개여도 자동 재생하지 않고 
  const html=ui.element('restaurantCards').innerHTML;
  assert.match(visibleText(html),/오늘 메뉴 공지인지 확인되지 않았어요/);
  assert.match(html,/href="https:\/\/www\.threads\.com\/@gangnambab\/post\/UnconfirmedA"/);
- assert.match(html,/<details><summary>영상·사진 직접 확인하기<\/summary>/);
- assert.match(html,/preload="none"/);
+ assert.doesNotMatch(html,/<details><summary>영상·사진 직접 확인하기<\/summary>/);
+ assert.match(html,/preload="metadata"/);
  assert.doesNotMatch(html,/<video[^>]*autoplay/);
 });
 test('검증 전 서버의 성공 응답이라도 메뉴로 표시하지 않고 새 배포를 안내한다',async()=>{
@@ -1868,9 +1868,9 @@ test('Threads 설명이 @gangnambab뿐이어도 영상 후보를 번호·시각�
  };
  const ui=await boot({connected:true,server,post,identity:'seongjun'});
  const initial=ui.element('restaurantCards').innerHTML;
- assert.match(initial,/게시물 1/);
+ assert.match(initial,/영상·사진 1/);
  assert.match(initial,/data-action="gangnamMark"/);
- assert.match(initial,/preload="none"/);
+ assert.match(initial,/preload="metadata"/);
  await ui.action('gangnamMark','0');
  assert.equal(calls[0].op.type,'gangnamPick');
  assert.equal(calls[0].op.payload.postUrl,link);
@@ -1880,5 +1880,33 @@ test('Threads 설명이 @gangnambab뿐이어도 영상 후보를 번호·시각�
  assert.match(other.element('restaurantCards').innerHTML,/팀원이 메뉴로 확인한 영상/);
  await ui.action('gangnamUnpick');
  assert.equal(calls[1].op.type,'gangnamClear');
- assert.match(ui.element('restaurantCards').innerHTML,/게시물 1/);
+ assert.match(ui.element('restaurantCards').innerHTML,/영상·사진 1/);
+});
+
+test('강남밥상 같은 날짜에 제목 없는 영상 3개가 오면 영상이 바로 보이고 번호·시각·팀 공유 선택이 표시된다',async()=>{
+ const clips=['ClipA','ClipB','ClipC'].map((id,i)=>({
+   kind:'video',postUrl:'https://www.threads.com/@gangnambab/post/'+id,
+   videoUrl:'https://video.cdninstagram.com/test/'+id+'.mp4',
+   publishedAt:['2026-10-19T01:05:00Z','2026-10-19T01:04:00Z','2026-10-18T23:49:00Z'][i],
+   caption:'@gangnambab: @gangnambab',promotion:false
+ }));
+ const server=req=>{
+   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true,gangnamManualPick:true}});
+   if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',reason:'unverified_menu',
+     alternatives:clips,version:'20261125-gangnam-review',diagnostics:{matchingDatePosts:3,unverifiedPosts:3}};
+   throw Error('Unexpected '+req.action);
+ };
+ const ui=await boot({connected:true,server,identity:'seongjun'});
+ const html=ui.element('restaurantCards').innerHTML;
+ assert.match(html,/영상 3개 확인 필요/);
+ assert.match(html,/영상·사진 1/);
+ assert.match(html,/영상·사진 2/);
+ assert.match(html,/영상·사진 3/);
+ assert.doesNotMatch(html,/@gangnambab: @gangnambab/);
+ assert.equal((html.match(/class="gangnam-review-video"/g)||[]).length,3);
+ assert.equal((html.match(/preload="metadata"/g)||[]).length,3);
+ assert.equal((html.match(/data-action="gangnamMark"/g)||[]).length,3);
+ assert.equal((html.match(/Threads에서 보기/g)||[]).length,3);
+ assert.doesNotMatch(html,/<details><summary>영상·사진/);
+ assert.doesNotMatch(html,/<video[^>]*autoplay/);
 });
