@@ -1920,7 +1920,7 @@ test('강남밥상 같은 날짜에 제목 없는 영상 3개가 오면 영상�
 test('자동 OCR 결과가 서버의 식단 미확인 후보와 정확히 일치할 때만 메뉴 영상 한 개가 선택된다',async()=>{
  const post='https://www.threads.com/@gangnambab/post/AutoMenu1',url='https://video.cdninstagram.com/clip/auto.mp4';
  const server=req=>{
-  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true,gangnamManualPick:true}});
   if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',version:'20261125-gangnam-review',
     reason:'unverified_menu',alternatives:[{postUrl:post,kind:'video',videoUrl:url,
       publishedAt:'2026-10-19T02:00:00Z',promotion:false}],
