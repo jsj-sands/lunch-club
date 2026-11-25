@@ -1823,7 +1823,7 @@ test('강남밥상 후보 영상이 여러 개여도 자동 재생하지 않고 
  };
  const ui=await boot({connected:true,server,identity:'seongjun'});
  const html=ui.element('restaurantCards').innerHTML;
- assert.match(visibleText(html),/오늘 메뉴 공지인지 확인되지 않았어요/);
+ assert.match(visibleText(html),/게시물 1개를 가져왔어요/);
  assert.match(html,/href="https:\/\/www\.threads\.com\/@gangnambab\/post\/UnconfirmedA"/);
  assert.doesNotMatch(html,/<details><summary>영상·사진 직접 확인하기<\/summary>/);
  assert.match(html,/preload="metadata"/);
@@ -1906,7 +1906,7 @@ test('강남밥상 같은 날짜에 제목 없는 영상 3개가 오면 영상�
  assert.equal((html.match(/class="gangnam-review-video"/g)||[]).length,3);
  assert.equal((html.match(/preload="metadata"/g)||[]).length,3);
  assert.equal((html.match(/data-action="gangnamMark"/g)||[]).length,3);
- assert.equal((html.match(/Threads에서 보기/g)||[]).length,3);
+ assert.equal((html.match(/Threads에서 보기 ↗<\/a>/g)||[]).length,3);
  assert.doesNotMatch(html,/<details><summary>영상·사진/);
  assert.doesNotMatch(html,/<video[^>]*autoplay/);
 });
