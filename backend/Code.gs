@@ -577,18 +577,23 @@ var LunchThreadsMenu = (function (root) {
         media_url: media.length ? media[0].videoUrl : imgUrl, thumbnail_url: media.length ? media[0].posterUrl : '', is_quote_post: false };
     }) };
   }
-  const MENU_HINT = /메뉴표|식단표|메뉴판|차림표|메뉴\s*공지|오늘의\s*메뉴|오늘\s*메뉴|금일\s*메뉴|점심\s*메뉴|daily\s*menu|menu\s*board/i;
-  const FOOD_HINT = /음식\s*사진|food\s*photo|실제\s*음식|메뉴\s*사진\s*아님|먹방/i;
-  function publicCandidate(post) {
-    const kind = post.media_type === 'VIDEO' ? 'video' : 'image';
-    const candidate = { kind, date: seoulDate(post.timestamp), postUrl: post.permalink, publishedAt: post.timestamp,
-      videoUrl: kind === 'video' ? post.media_url : '', imageUrl: kind === 'image' ? post.media_url : '',
-      posterUrl: validImageURL(post.thumbnail_url) ? post.thumbnail_url : '' };
-    const text = String(post.text || '') + ' ' + String(post.alt_text || '');
-    candidate.menuHint = MENU_HINT.test(text) && !FOOD_HINT.test(text);
-    return candidate;
+  const MENU_HINT = /메뉴표|식단표|메뉴판|차림표|메뉴\s*공지|오늘의\s*메뉴|오늘\s*메뉴|금일\s*메뉴|점심\s*메뉴|오늘의\s*식단|금일\s*식단|daily\s*menu|menu\s*board/i;
+  // Promotion clips can be five seconds long too. Reject them regardless of duration,
+  // even when the description mentions the word "menu".
+  const PROMOTION_HINT = /오픈|개업|[0-9]+\s*주년|기념\s*(?:행사|이벤트|할인)|이벤트|행사|할인|식권|상품권|쿠폰|사은품|증정|특가|경품|프로모션|(?:10|1)\s*\+\s*1|(?:grand\s*opening|promotion|discount|sale|voucher|coupon)/i;
+  const NON_MENU_HINT = /음식\s*사진|food\s*photo|실제\s*음식|메뉴\s*사진\s*아님|먹방/i;
+  function captionText(post) {
+    return (String(post.text || '') + ' ' + String(post.alt_text || ''))
+      .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180);
   }
-  // Aggregate diagnostics only: no credentials, raw feed bodies or signed URLs.
+  function publicCandidate(post) {
+    const kind = post.media_type === 'VIDEO' ? 'video' : 'image', caption = captionText(post);
+    return { kind, date: seoulDate(post.timestamp), postUrl: post.permalink, publishedAt: post.timestamp,
+      videoUrl: kind === 'video' ? post.media_url : '', imageUrl: kind === 'image' ? post.media_url : '',
+      posterUrl: validImageURL(post.thumbnail_url) ? post.thumbnail_url : '',
+      caption: caption.slice(0, 100), promotion: PROMOTION_HINT.test(caption),
+      menuHint: MENU_HINT.test(caption) && !PROMOTION_HINT.test(caption) && !NON_MENU_HINT.test(caption) };
+  }
   function inspectPosts(json, date) {
     const all = json && Array.isArray(json.data) ? json.data : [];
     const posts = all.filter(p => p && String(p.username || '').toLowerCase() === ACCOUNT &&
@@ -597,9 +602,13 @@ var LunchThreadsMenu = (function (root) {
     const matching = dated.filter(p => seoulDate(p.timestamp) === date);
     const media = matching.filter(p => ['VIDEO', 'IMAGE'].includes(p.media_type));
     const valid = media.filter(p => validMediaURL(p.media_url) && validPostURL(p.permalink));
+    const classified = valid.map(publicCandidate);
     const d = {
       totalPosts: all.length, accountPosts: posts.length, datedPosts: dated.length,
       matchingDatePosts: matching.length, mediaPosts: media.length, validMediaPosts: valid.length,
+      identifiedMenuPosts: classified.filter(p => p.menuHint).length,
+      promotionPosts: classified.filter(p => p.promotion).length,
+      unverifiedPosts: classified.filter(p => !p.menuHint && !p.promotion).length,
       invalidMediaURLs: media.filter(p => !validMediaURL(p.media_url)).length,
       invalidPostURLs: media.filter(p => !validPostURL(p.permalink)).length,
       latestPostDate: dated.map(p => seoulDate(p.timestamp)).sort().pop() || '',
@@ -620,19 +629,21 @@ var LunchThreadsMenu = (function (root) {
     const candidates = json.data.filter(post => post && String(post.username || '').toLowerCase() === ACCOUNT && seoulDate(post.timestamp) === date &&
       ['VIDEO', 'IMAGE'].includes(post.media_type) && validMediaURL(post.media_url) && validPostURL(post.permalink) && !post.is_quote_post && !post.reposted_post)
       .map(publicCandidate).sort((a,b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-    const videos = candidates.filter(c => c.kind === 'video');
-    // Menu notices are normally video slideshows. Prefer explicit menu text when present.
-    const hinted = candidates.filter(c => c.menuHint);
-    let selected = null;
-    if (hinted.length === 1) selected = hinted[0];
-    else if (hinted.length > 1) return { ok: false, reason: 'ambiguous', alternatives: hinted.slice(0, 3), diagnostics };
-    else if (videos.length === 1) selected = videos[0];
-    else if (candidates.length === 1) selected = candidates[0];
-    if (selected) return { ok: true, date, kind: selected.kind, imageUrl: selected.imageUrl, videoUrl: selected.videoUrl,
-      posterUrl: selected.posterUrl, postUrl: selected.postUrl, publishedAt: selected.publishedAt, confidence: selected.menuHint ? 'caption' : 'only_media', source: PAGE, diagnostics };
-    return { ok: false, reason: candidates.length > 1 ? 'ambiguous' : 'not_found', alternatives: candidates.slice(0, 3), diagnostics };
+    const verified = candidates.filter(c => c.menuHint);
+    const unverified = candidates.filter(c => !c.promotion);
+    if (verified.length === 1) {
+      const selected = verified[0];
+      return { ok: true, date, kind: selected.kind, imageUrl: selected.imageUrl, videoUrl: selected.videoUrl,
+        posterUrl: selected.posterUrl, postUrl: selected.postUrl, publishedAt: selected.publishedAt,
+        confidence: 'caption', source: PAGE, diagnostics };
+    }
+    // Never infer "today's menu" from one post, short video duration, or upload time.
+    if (verified.length > 1) return { ok: false, reason: 'ambiguous', alternatives: verified.slice(0, 4), diagnostics };
+    if (unverified.length) return { ok: false, reason: 'unverified_menu', alternatives: unverified.slice(0, 4), diagnostics };
+    if (candidates.length) return { ok: false, reason: 'promotion_only', diagnostics };
+    return { ok: false, reason: 'not_found', diagnostics };
   }
-  const api = { ACCOUNT, PAGE, validImageURL, validMediaURL, validPostURL, seoulDate, parseRss, chooseMenu, inspectPosts, VERSION: '20261020-gas-url-fix' };
+  const api = { ACCOUNT, PAGE, validImageURL, validMediaURL, validPostURL, seoulDate, parseRss, chooseMenu, inspectPosts, VERSION: '20261125-menu-screening' };
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.LunchThreadsMenu = api;
   return api;
@@ -774,8 +785,8 @@ function kakaoProfileResponse_(force) {
 }
 // Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
 // feeds. No Welstory session, Threads login, cookies or end-user credentials.
-const GANGNAM_MENU_VERSION = '20261124-threads-rss-restored';
-const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v2_';
+const GANGNAM_MENU_VERSION = '20261125-menu-screening';
+const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v3_';
 const GANGNAM_MENU_MIN_REFRESH_MS = 60000;
 const GANGNAM_MENU_CACHE_TTL = 180;
 const GANGNAM_MENU_RSS_DEFAULTS = [
@@ -833,7 +844,9 @@ function gangnamMenuResponse_(date, force) {
         return result;
       }
       // Do not treat a stale RSS feed or posts without a date as proof that no menu exists.
-      if (!candidate || (result.diagnostics?.matchingDatePosts || 0) > (candidate.diagnostics?.matchingDatePosts || 0)) candidate = result;
+      if (!candidate || (result.diagnostics?.identifiedMenuPosts || 0) > (candidate.diagnostics?.identifiedMenuPosts || 0) ||
+          ((result.diagnostics?.identifiedMenuPosts || 0) === (candidate.diagnostics?.identifiedMenuPosts || 0) &&
+          (result.diagnostics?.matchingDatePosts || 0) > (candidate.diagnostics?.matchingDatePosts || 0))) candidate = result;
       attempts.push({ source: item.source, code: result.reason || 'no_menu' });
     } catch (_) { attempts.push({ source: item.source, code: 'fetch_or_parse_error' }); }
   }

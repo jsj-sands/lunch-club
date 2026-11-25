@@ -1766,8 +1766,8 @@ test('런치타임을 첫 번째 기본 픽으로 표시하고 메가존은 두 
 test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데이트 안내를 표시하지 않는다',async()=>{
  const target='2026-10-19',post='https://www.threads.com/@gangnambab/post/ABC123x';
  const result={ok:true,date:target,kind:'image',imageUrl:'https://img.cdninstagram.com/menus/test-1019.jpg',
-  postUrl:post,publishedAt:'2026-10-19T03:00:00.000Z',checkedAt:fixedTime,
-  version:'20261124-threads-rss-restored',diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1}};
+  postUrl:post,publishedAt:'2026-10-19T03:00:00.000Z',checkedAt:fixedTime,confidence:'caption',
+  version:'20261125-menu-screening',diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1}};
  const server=req=>{
   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
   if(req.action==='gangnamMenu')return result;
@@ -1783,7 +1783,7 @@ test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데�
 test('강남밥상 RSSHub 장애는 서버 업데이트 오류가 아니라 피드 접속 오류로 표시한다',async()=>{
  const server=req=>{
   if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
-  if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',reason:'feed_unavailable',version:'20261124-threads-rss-restored',
+  if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',reason:'feed_unavailable',version:'20261125-menu-screening',
     diagnostics:{failure:'feed_unavailable',attempts:[{source:'rsshub.gneko.io',code:'http_403'}]}};
   throw Error('Unexpected '+req.action);
  };
@@ -1792,4 +1792,53 @@ test('강남밥상 RSSHub 장애는 서버 업데이트 오류가 아니라 피�
  assert.match(text,/게시물 연결에 실패했어요/);
  assert.match(text,/rsshub.gneko.io: http_403/);
  assert.doesNotMatch(text,/공유 서버 수정본을 적용해 주세요/);
+});
+
+test('강남밥상 조회에서 단일 5초 홍보물은 화면에 노출하지 않는다',async()=>{
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='gangnamMenu')return {
+   ok:false,date:'2026-10-19',reason:'promotion_only',version:'20261125-menu-screening',
+   diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1,promotionPosts:1,identifiedMenuPosts:0}
+  };
+  throw Error('Unexpected '+req.action);
+ };
+ const ui=await boot({connected:true,server,identity:'seongjun'});
+ const html=ui.element('restaurantCards').innerHTML;
+ assert.match(visibleText(html),/메뉴 대신 행사·홍보 게시물이 확인됐어요/);
+ assert.doesNotMatch(html,/<video\b|gangnam-short-candidate|data-menu-short-picker/);
+ assert.match(html,/href="https:\/\/www\.threads\.com\/@gangnambab"/);
+});
+test('강남밥상 후보 영상이 여러 개여도 자동 재생하지 않고 게시물 원문만 제공한다',async()=>{
+ const source='https://www.threads.com/@gangnambab/post/UnconfirmedA';
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='gangnamMenu')return {
+   ok:false,date:'2026-10-19',reason:'unverified_menu',version:'20261125-menu-screening',
+   alternatives:[{kind:'video',postUrl:source,videoUrl:'https://video.cdninstagram.com/streams/video.mp4',
+     date:'2026-10-19',publishedAt:'2026-10-19T03:00:00.000Z',caption:'게시물 설명 없음'}],
+   diagnostics:{totalPosts:1,matchingDatePosts:1,validMediaPosts:1,identifiedMenuPosts:0,promotionPosts:0}
+  };
+  throw Error('Unexpected '+req.action);
+ };
+ const ui=await boot({connected:true,server,identity:'seongjun'});
+ const html=ui.element('restaurantCards').innerHTML;
+ assert.match(visibleText(html),/오늘 메뉴 공지인지 확인되지 않았어요/);
+ assert.match(html,/href="https:\/\/www\.threads\.com\/@gangnambab\/post\/UnconfirmedA"/);
+ assert.doesNotMatch(html,/<video\b|<source\b|gangnam-menu-video/);
+});
+test('검증 전 서버의 성공 응답이라도 메뉴로 표시하지 않고 새 배포를 안내한다',async()=>{
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='gangnamMenu')return {
+   ok:true,date:'2026-10-19',kind:'video',postUrl:'https://www.threads.com/@gangnambab/post/OldVideo',
+   videoUrl:'https://video.cdninstagram.com/streams/old.mp4',publishedAt:'2026-10-19T03:00:00.000Z',
+   confidence:'only_media',version:'20261124-threads-rss-restored'
+  };
+  throw Error('Unexpected '+req.action);
+ };
+ const ui=await boot({connected:true,server,identity:'seongjun'});
+ const html=ui.element('restaurantCards').innerHTML;
+ assert.doesNotMatch(html,/<video\b/);
+ assert.match(visibleText(html),/공유 서버 수정본을 적용해 주세요/);
 });

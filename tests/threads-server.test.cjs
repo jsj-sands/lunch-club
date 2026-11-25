@@ -111,3 +111,60 @@ test('스크립트 속성에 등록한 승인된 RSSHub 주소만 사용한다',
  assert.equal(s.get().ok,true);
  assert.equal(s.requests[0].url,'https://rsshub.uocat.com/threads/gangnambab');
 });
+
+function post({title='',date=NOW,kind='video',id='promoa',image=PHOTO}={}){
+ const link='https://www.threads.com/@gangnambab/post/'+id;
+ const video='https://video.cdninstagram.com/streams/'+id+'.mp4';
+ const html=kind==='video'?'<video><source src="'+video+'"></video>':'<img src="'+image+'">';
+ return '<item><title>'+title+'</title><link>'+link+'</link><pubDate>'+new Date(date).toUTCString()+'</pubDate>'+
+  '<description><![CDATA['+html+']]></description></item>';
+}
+const feed=items=>'<rss version="2.0"><channel>'+items.join('')+'</channel></rss>';
+test('5초짜리 오픈 2주년 행사·식권 증정 영상은 단독 게시물이어도 식단으로 선택하지 않는다',()=>{
+ const s=harness();
+ s.setHandler(()=>response(feed([post({title:'오픈 2주년 행사! 식권 10+1',id:'Anniversary1'})])));
+ const v=s.get();
+ assert.equal(v.ok,false);assert.equal(v.reason,'promotion_only');
+ assert.equal(v.diagnostics.promotionPosts,1);
+ assert.equal(v.diagnostics.identifiedMenuPosts,0);
+ assert.equal(v.alternatives,undefined);
+});
+test('메뉴라는 단어가 들어간 식권 할인 홍보도 메뉴라고 판단하지 않는다',()=>{
+ const s=harness();
+ s.setHandler(()=>response(feed([post({title:'오늘 메뉴 기념 행사, 식권 할인 이벤트!',id:'PromoMenu'})])));
+ assert.equal(s.get().reason,'promotion_only');
+});
+test('홍보 영상이 더 최신이어도 메뉴표가 명시된 게시물만 선택한다',()=>{
+ const s=harness();
+ s.setHandler(()=>response(feed([
+  post({title:'11월 24일 오늘의 메뉴표입니다',id:'RealMenu1',date:'2026-11-24T00:01:00.000Z'}),
+  post({title:'오픈 2주년 식권 구매 10+1 이벤트',id:'NewPromo',date:'2026-11-24T03:30:00.000Z'})
+ ])));
+ const v=s.get();
+ assert.equal(v.ok,true);assert.equal(v.confidence,'caption');
+ assert.equal(v.postUrl,'https://www.threads.com/@gangnambab/post/RealMenu1');
+ assert.equal(v.diagnostics.promotionPosts,1);
+ assert.equal(v.diagnostics.identifiedMenuPosts,1);
+});
+test('설명 없는 5초 영상 하나는 조회돼도 메뉴 여부가 불명확하다고 표시한다',()=>{
+ const s=harness();
+ s.setHandler(()=>response(feed([post({title:'',id:'ShortClip1'})])));
+ const v=s.get();
+ assert.equal(v.ok,false);assert.equal(v.reason,'unverified_menu');
+ assert.equal(v.alternatives.length,1);assert.equal(v.alternatives[0].postUrl,'https://www.threads.com/@gangnambab/post/ShortClip1');
+});
+test('설명 없는 영상 여러 개는 임의의 짧은 영상을 선택하지 않고 원문 확인을 안내한다',()=>{
+ const s=harness();
+ s.setHandler(()=>response(feed([post({id:'ClipA'}),post({id:'ClipB'})])));
+ const v=s.get();
+ assert.equal(v.ok,false);assert.equal(v.reason,'unverified_menu');
+ assert.equal(v.alternatives.length,2);
+ assert.equal(v.alternatives.some(x=>x.menuHint),false);
+});
+test('메뉴 공지가 여러 건이면 영상 길이로 하나를 선택하지 않는다',()=>{
+ const s=harness();
+ s.setHandler(()=>response(feed([post({id:'MenuA',title:'오늘 점심 메뉴'}),post({id:'MenuB',title:'오늘의 식단'})])));
+ const v=s.get();
+ assert.equal(v.ok,false);assert.equal(v.reason,'ambiguous');
+ assert.equal(v.alternatives.length,2);
+});

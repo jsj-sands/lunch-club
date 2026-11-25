@@ -134,8 +134,8 @@ function kakaoProfileResponse_(force) {
 }
 // Gangnambab: best-effort lookup of PUBLIC Threads posts through trusted RSSHub
 // feeds. No Welstory session, Threads login, cookies or end-user credentials.
-const GANGNAM_MENU_VERSION = '20261124-threads-rss-restored';
-const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v2_';
+const GANGNAM_MENU_VERSION = '20261125-menu-screening';
+const GANGNAM_MENU_CACHE_PREFIX = 'lunch_gangnam_menu_v3_';
 const GANGNAM_MENU_MIN_REFRESH_MS = 60000;
 const GANGNAM_MENU_CACHE_TTL = 180;
 const GANGNAM_MENU_RSS_DEFAULTS = [
@@ -193,7 +193,9 @@ function gangnamMenuResponse_(date, force) {
         return result;
       }
       // Do not treat a stale RSS feed or posts without a date as proof that no menu exists.
-      if (!candidate || (result.diagnostics?.matchingDatePosts || 0) > (candidate.diagnostics?.matchingDatePosts || 0)) candidate = result;
+      if (!candidate || (result.diagnostics?.identifiedMenuPosts || 0) > (candidate.diagnostics?.identifiedMenuPosts || 0) ||
+          ((result.diagnostics?.identifiedMenuPosts || 0) === (candidate.diagnostics?.identifiedMenuPosts || 0) &&
+          (result.diagnostics?.matchingDatePosts || 0) > (candidate.diagnostics?.matchingDatePosts || 0))) candidate = result;
       attempts.push({ source: item.source, code: result.reason || 'no_menu' });
     } catch (_) { attempts.push({ source: item.source, code: 'fetch_or_parse_error' }); }
   }

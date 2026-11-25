@@ -4,7 +4,7 @@
   const compareMembers = (a, b) => a.team.localeCompare(b.team, 'ko') || a.name.localeCompare(b.name, 'ko');
   const MEMBERS = C.MEMBERS.slice().sort(compareMembers);
   const teamGroups = members => [...new Set(members.map(m => m.team))].map(team => ({ team, members: members.filter(m => m.team === team) }));
-  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v4' };
+  const KEYS = { local: 'sandsLunch.local.v1', identity: 'sandsLunch.identity.v1', connection: 'sandsLunch.connection.v1', pending: 'sandsLunch.pendingKey.v1', kakao: 'sandsLunch.kakaoProfile.v1', gangnam: 'sandsLunch.gangnamMenu.v5' };
   const KAKAO_CHANNEL = 'https://pf.kakao.com/_xbbMPn';
   const KAKAO_REFRESH_MS = 5 * 60000;
   const $ = id => document.getElementById(id);
@@ -287,30 +287,33 @@
       '선택한 날짜: ' + date,
       '받은 게시물: ' + num(d.totalPosts) + '개 / 같은 날짜: ' + num(d.matchingDatePosts) + '개',
       '표시 가능한 사진·영상: ' + num(d.validMediaPosts) + '개',
+      '메뉴 공지로 확인된 게시물: ' + num(d.identifiedMenuPosts) + '개 / 홍보 게시물: ' + num(d.promotionPosts) + '개',
       '받은 목록의 최신 게시일: ' + (C.validDate(d.latestPostDate) ? d.latestPostDate : '확인 못 함'),
       '상태: ' + (entry.ok ? 'ok' : entry.reason || 'unavailable') + (d.failure ? ' / ' + d.failure : '')
     ];
     for (const a of attempts) lines.push(String(a.source || 'feed').slice(0, 30) + ': ' + String(a.code || 'unknown').slice(0, 40));
     return '<details class="gangnam-diagnostics"><summary>조회 진단 보기</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:14px;line-height:1.6">' + esc(lines.join('\n')) + '</pre></details>';
   }
+  const VERIFIED_GANGNAM_VERSION = '20261125-menu-screening';
   function renderGangnamMenu() {
     const entry = gangnamMenus[date], supported = !!connection && connectedReady && shared.features.gangnamMenu;
-    const ready = entry?.ok && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
+    const ready = entry?.ok && entry.version === VERIFIED_GANGNAM_VERSION && entry.confidence === 'caption' && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
       (entry.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(entry.videoUrl) : window.LunchThreadsMenu.validImageURL(entry.imageUrl)) &&
       window.LunchThreadsMenu.seoulDate(entry.publishedAt) === date;
-    const oldServer = !!entry && !entry.version && !['unavailable', 'transport_error'].includes(entry.reason);
+    const oldServer = !!entry && !!entry.version && entry.version !== VERIFIED_GANGNAM_VERSION;
     const badge = gangnamLoading ? '확인 중' : ready ? '게시물 확인' : '조회 확인 필요';
     let content = '<div class="gangnam-menu-panel"><div class="gangnam-menu-heading"><span class="gangnam-menu-badge">THREADS</span><strong>강남밥상 메뉴 공지</strong><span class="auto-menu-badge">' + badge + '</span></div>';
     if (ready && !(entry.kind === 'image' && gangnamPhotoErrors.has(entry.imageUrl))) {
       content += gangnamMediaHTML(entry);
       content += `<p class="gangnam-menu-meta">${esc(dateText(date))} 게시 · 마지막 성공 조회 ${esc(timeText(entry.checkedAt || entry.publishedAt))}</p>`;
-      if (entry.refreshFailure) content += '<p class="inline-warning">새로 조회하지 못해 마지막으로 확인한 게시물을 표시합니다. 아래 진단을 확인해 주세요.</p>';
-    } else if (entry?.reason === 'ambiguous' && Array.isArray(entry.alternatives) && entry.alternatives.length) {
-      // Food clips are longer (about 35s); the actual menu notice is a short slideshow (about 5s).
-      // Do not display unverified candidate clips as a "menu". Wait for video metadata
-      // and show only a candidate that is 12 seconds or shorter.
-      content += '<p class="gangnam-menu-meta" id="gangnamShortStatus">메뉴 공지 영상만 확인하고 있어요… 음식 사진 영상은 표시하지 않습니다.</p>';
-      content += `<div class="gangnam-post-choices" data-menu-short-picker="1">${entry.alternatives.filter(p => p.kind === 'video' && window.LunchThreadsMenu?.validPostURL(p.postUrl)).map((p,i) => `<div class="gangnam-short-candidate" hidden data-short-candidate="1">${gangnamMediaHTML(p,'Alt'+i)}</div>`).join('')}</div>`;
+      if (entry.refreshFailure) content += '<p class="inline-warning">새로 조회하지 못해 이전에 확인한 메뉴 게시물을 표시합니다. 아래 진단을 확인해 주세요.</p>';
+    } else if (['ambiguous', 'unverified_menu'].includes(entry?.reason) && Array.isArray(entry.alternatives) && entry.alternatives.length) {
+      const ambiguous = entry.reason === 'ambiguous';
+      content += '<div class="image-empty"><strong>' + (ambiguous ? '메뉴 공지 후보가 여러 개예요' : '오늘 메뉴 공지인지 확인되지 않았어요') +
+        '</strong><p>짧은 홍보 영상도 식단으로 잘못 표시될 수 있어 자동 선택하지 않습니다. 아래에서 해당 날짜의 게시물을 직접 확인해 주세요.</p></div>';
+      content += '<div class="gangnam-post-links">' + entry.alternatives.filter(p => window.LunchThreadsMenu?.validPostURL(p.postUrl))
+        .slice(0,4).map((p,i) => '<a href="' + esc(p.postUrl) + '" target="_blank" rel="noopener noreferrer">' +
+          esc(p.caption || '게시물 ' + (i + 1)) + ' ↗</a>').join('') + '</div>';
     } else {
       let title = '아직 게시물을 조회하지 않았어요', detail = '게시물 조회가 완료되면 이곳에 표시됩니다.';
       if (!connection) { title = '팀 공유 연결 후 조회할 수 있어요'; detail = '기존 팀 공유 연결을 사용해 주세요.'; }
@@ -321,6 +324,8 @@
         const failure = entry.diagnostics?.failure || entry.reason;
         if (entry.reason === 'feed_unavailable') { title = '게시물 연결에 실패했어요'; detail = '오늘 게시물이 없다는 뜻은 아닙니다. 피드 연결 또는 응답 처리에 실패했습니다. 아래 조회 진단을 확인해 주세요.'; }
         else if (failure === 'future_date' || failure === 'outside_range') { title = '자동 조회 범위 밖의 날짜예요'; detail = '오늘부터 최근 7일 이내 날짜를 선택해 주세요.'; }
+        else if (entry.reason === 'promotion_only') { title = '메뉴 대신 행사·홍보 게시물이 확인됐어요'; detail = '홍보 영상은 식단으로 표시하지 않습니다. Threads 원문에서 해당 날짜의 메뉴 공지를 확인해 주세요.'; }
+        else if (entry.reason === 'unverified_menu') { title = '메뉴 공지인지 확인하지 못했어요'; detail = '게시물 설명에 식단을 나타내는 내용이 없어 자동 선택하지 않습니다.'; }
         else if (entry.reason === 'not_found') { title = '선택한 날짜의 게시물을 받지 못했어요'; detail = '피드 반영이 늦거나 게시 날짜가 다를 수 있습니다. 메뉴가 아직 올라오지 않았다고 단정할 수는 없습니다.'; }
         else if (entry.reason === 'date_unknown') { title = '게시 날짜를 읽지 못했어요'; detail = '게시물은 받았지만 날짜 형식을 확인하지 못했습니다.'; }
         else if (['media_unavailable','invalid_post_link','no_supported_media'].includes(entry.reason)) { title = '게시물은 받았지만 사진·영상 주소를 확인하지 못했어요'; detail = '게시물 없음이 아니라 표시 정보 부족입니다. 아래 진단 정보를 확인해 주세요.'; }
@@ -573,16 +578,16 @@
       try {
         const result = await jsonp({ action: 'gangnamMenu', date: when, force: force ? '1' : '0' }, target);
         if (target !== connection) return;
-        if (result?.ok && result.date === when && window.LunchThreadsMenu?.validPostURL(result.postUrl) && window.LunchThreadsMenu?.seoulDate(result.publishedAt) === when &&
+        if (result?.ok && result.version === VERIFIED_GANGNAM_VERSION && result.confidence === 'caption' && result.date === when && window.LunchThreadsMenu?.validPostURL(result.postUrl) && window.LunchThreadsMenu?.seoulDate(result.publishedAt) === when &&
             (result.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(result.videoUrl) : window.LunchThreadsMenu.validImageURL(result.imageUrl))) {
           gangnamMenus[when] = { ...result };
           if (result.kind === 'image') gangnamPhotoErrors.delete(result.imageUrl);
-        } else if (result?.reason === 'ambiguous' && Array.isArray(result.alternatives)) {
+        } else if (['ambiguous', 'unverified_menu'].includes(result?.reason) && Array.isArray(result.alternatives)) {
           const alternatives = result.alternatives.filter(p => window.LunchThreadsMenu?.validPostURL(p.postUrl) && window.LunchThreadsMenu?.seoulDate(p.publishedAt) === when &&
             (p.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(p.videoUrl) : window.LunchThreadsMenu.validImageURL(p.imageUrl))).slice(0,3);
-          gangnamMenus[when] = { ok: false, date: when, reason: 'ambiguous', alternatives, version: result.version, diagnostics: result.diagnostics, checkedAt: result.checkedAt };
+          gangnamMenus[when] = { ok: false, date: when, reason: result.reason, alternatives, version: result.version, diagnostics: result.diagnostics, checkedAt: result.checkedAt };
         } else {
-          const failure = { ok: false, date: when, reason: result?.reason || 'unavailable', version: result?.version, diagnostics: result?.diagnostics, checkedAt: result?.checkedAt };
+          const failure = { ok: false, date: when, reason: result?.ok && result?.version !== VERIFIED_GANGNAM_VERSION ? 'old_server' : result?.reason || 'unavailable', version: result?.version, diagnostics: result?.diagnostics, checkedAt: result?.checkedAt };
           gangnamMenus[when] = gangnamMenus[when]?.ok ? { ...gangnamMenus[when], refreshFailure: failure } : failure;
         }
         try { write(KEYS.gangnam, Object.fromEntries(Object.entries(gangnamMenus).sort(([a],[b]) => b.localeCompare(a)).slice(0, 14))); } catch (_) {}
@@ -889,26 +894,13 @@
       }
     }
   }, true);
-  // In the video slideshow the menu is often visible near the beginning. The
-  // browser may refuse preloading/seeking on mobile, in which case controls remain.
+  // Only an explicitly caption-verified menu is eligible for playback/seek.
+  // A short video duration alone never identifies a menu notice.
   document.addEventListener('loadedmetadata', e => {
     const video = e.target;
     if (!video?.classList?.contains('gangnam-menu-video') || video.dataset.previewAttempted) return;
     video.dataset.previewAttempted = '1';
     if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    const candidate = video.closest('[data-short-candidate]');
-    if (candidate) {
-      const picker = candidate.closest('[data-menu-short-picker]');
-      const status = document.getElementById('gangnamShortStatus');
-      // Only a short slideshow (up to 12 seconds) is expected to be the text notice.
-      // Never expose long food clips, even when they arrived first in the feed.
-      if (video.duration > 12) { candidate.remove(); return; }
-      if (picker?.dataset.selected) { candidate.remove(); return; }
-      if (picker) picker.dataset.selected = '1';
-      candidate.hidden = false;
-      if (status) status.textContent = '오늘의 메뉴 공지 영상입니다. 재생하거나 정지해서 메뉴를 확인하세요.';
-      if (picker) picker.querySelectorAll('[data-short-candidate]').forEach(el => { if (el !== candidate) el.remove(); });
-    }
     try { video.currentTime = Math.min(Math.max(0.8, video.duration * .10), Math.max(0, video.duration - .2)); video.pause(); } catch (_) {}
   }, true);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkMidnight(); sync(); loadMegaPhoto(); loadKakaoProfile(); loadGangnamMenu(date); } });
