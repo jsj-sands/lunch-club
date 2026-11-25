@@ -738,7 +738,7 @@ test('공유 취소와 본인 일정 수정은 선택일로 POST하고 수신 �
   await peer.chooseDate('2026-10-20');
   assert.equal(peer.element('ceoCancelled').checked, false);
   await peer.chooseDate('2026-10-21');
-  assert.deepEqual(dailyMembers(peer, 'ceo'), ['yunchul', 'seongeun', 'yunseok', 'jingi']);
+  assert.deepEqual(dailyMembers(peer, 'ceo'), ['yunchul', 'jihye', 'seongeun', 'yunseok', 'jingi']);
 });
 
 test.skip('저장 응답을 기다리며 토요일로 이동해도 수정 날짜를 보존하고 토요일 공유 식단을 불러온다', async () => {
