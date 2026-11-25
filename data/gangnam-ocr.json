@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "date": "2026-11-25",
+  "status": "unavailable",
+  "checked_at": "2026-11-25T00:00:00Z",
+  "selected_post_url": "",
+  "evidence": {
+    "menu_frames": 0,
+    "sampled_frames": 0,
+    "score": 0
+  },
+  "candidates_checked": 0
+}

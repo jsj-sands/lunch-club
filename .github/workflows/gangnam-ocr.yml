@@ -1,0 +1,50 @@
+name: Auto-detect Gangnambab menu from video (Korean OCR)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/gangnam_ocr.py'
+      - 'tests/test_gangnam_ocr.py'
+      - '.github/workflows/gangnam-ocr.yml'
+  workflow_dispatch:
+  schedule:
+    # Every 30 minutes during weekday breakfast/lunch preparation, Korea time.
+    # GitHub scheduled workflows are best-effort and can be delayed.
+    - cron: '13,43 8-13 * * 1-5'
+      timezone: 'Asia/Seoul'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 'gangnam-menu-ocr'
+  cancel-in-progress: false
+
+jobs:
+  recognize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Korean OCR and video tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-kor tesseract-ocr-eng
+      - name: OCR logic unit tests
+        run: python3 -m unittest discover -s tests -p 'test_gangnam_ocr.py' -v
+      - name: Analyze public Threads videos and update daily verdict
+        run: python3 scripts/gangnam_ocr.py --output data/gangnam-ocr.json
+      - name: Commit OCR verdict for website to read
+        run: |
+          git config user.name 'sands-lunch-ocr[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/gangnam-ocr.json
+          if git diff --cached --quiet; then
+            echo 'No changed verdict.'
+          else
+            git commit -m 'chore: refresh Gangnambab OCR verdict [skip ci]'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi

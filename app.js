@@ -30,6 +30,7 @@
   let gangnamMenus = read(KEYS.gangnam, {});
   if (!gangnamMenus || typeof gangnamMenus !== 'object') gangnamMenus = {};
   let gangnamLoading = false, gangnamAttempt = {}, gangnamRequests = {}, gangnamPhotoErrors = new Set();
+  let gangnamOcrVerdict = null, gangnamOcrCheckedAt = 0, gangnamOcrRequest = null;
   let connectedReady = false, dialogReturnFocus = null, selectedDecision = '', draftTime = '';
   const state = () => connection ? shared : local;
   const config = () => C.settings(state().settings);
@@ -295,9 +296,45 @@
     return '<details class="gangnam-diagnostics"><summary>조회 진단 보기</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:14px;line-height:1.6">' + esc(lines.join('\n')) + '</pre></details>';
   }
   const VERIFIED_GANGNAM_VERSION = '20261125-gangnam-review';
+  const OCR_REPORT_URL = 'https://raw.githubusercontent.com/jsj-sands/lunch-club/main/data/gangnam-ocr.json';
+  function autoGangnamChoice(entry, forDate) {
+    const choice = window.LunchOcrChoice?.pick?.(entry, gangnamOcrVerdict, forDate, Date.now());
+    return choice && window.LunchThreadsMenu?.validPostURL(choice.postUrl) &&
+      window.LunchThreadsMenu?.validMediaURL(choice.videoUrl) &&
+      window.LunchThreadsMenu?.seoulDate(choice.publishedAt) === forDate ? choice : null;
+  }
+  async function loadGangnamOcr(force = false) {
+    const currentDate = C.today();
+    if (!connection || !connectedReady || !shared.features.gangnamMenu || date !== currentDate) return;
+    if (gangnamOcrRequest) return gangnamOcrRequest;
+    if (!force && Date.now() - gangnamOcrCheckedAt < 3 * 60000) return;
+    gangnamOcrCheckedAt = Date.now();
+    const activeConnection = connection;
+    const timestamp = Math.floor(Date.now() / (3 * 60000));
+    const request = (async () => {
+      for (const address of [OCR_REPORT_URL, 'data/gangnam-ocr.json']) {
+        try {
+          const join = address.includes('?') ? '&' : '?';
+          const response = await fetch(address + join + 'v=' + timestamp, {mode:'cors', cache:'no-store'});
+          if (!response?.ok) continue;
+          const payload = await response.json();
+          if (activeConnection === connection && payload && typeof payload === 'object' &&
+              payload.version === 1 && payload.date === currentDate) {
+            gangnamOcrVerdict = payload;
+            renderMenuCards();
+            return;
+          }
+        } catch (_) { /* Network/OCR unavailable: keep review candidates. */ }
+      }
+      if (activeConnection === connection) { gangnamOcrVerdict = null; renderMenuCards(); }
+    })();
+    gangnamOcrRequest = request;
+    try { await request; } finally { if (gangnamOcrRequest === request) gangnamOcrRequest = null; }
+  }
   function renderGangnamMenu() {
-    const entry = gangnamMenus[date], supported = !!connection && connectedReady && shared.features.gangnamMenu;
-    const ready = entry?.ok && entry.version === VERIFIED_GANGNAM_VERSION && ['caption','manual'].includes(entry.confidence) && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
+    const baseEntry = gangnamMenus[date], autoChoice = autoGangnamChoice(baseEntry, date);
+    const entry = autoChoice || baseEntry, supported = !!connection && connectedReady && shared.features.gangnamMenu;
+    const ready = entry?.ok && entry.version === VERIFIED_GANGNAM_VERSION && ['caption','manual','ocr'].includes(entry.confidence) && entry.date === date && window.LunchThreadsMenu?.validPostURL(entry.postUrl) &&
       (entry.kind === 'video' ? window.LunchThreadsMenu.validMediaURL(entry.videoUrl) : window.LunchThreadsMenu.validImageURL(entry.imageUrl)) &&
       window.LunchThreadsMenu.seoulDate(entry.publishedAt) === date;
     const oldServer = !!entry && !!entry.version && entry.version !== VERIFIED_GANGNAM_VERSION;
@@ -307,6 +344,7 @@
     if (ready && !(entry.kind === 'image' && gangnamPhotoErrors.has(entry.imageUrl))) {
       content += gangnamMediaHTML(entry);
       content += `<p class="gangnam-menu-meta">${esc(dateText(date))} 게시 · 마지막 성공 조회 ${esc(timeText(entry.checkedAt || entry.publishedAt))}</p>`;
+      if (entry.confidence === 'ocr') content += '<div class="gangnam-pick-confirmed"><strong>영상 글자 자동 분석으로 메뉴표 추정</strong><span>' + esc(String(entry.ocrFrames)) + '개 장면에서 식단 단서를 확인했어요. 실제 메뉴 날짜를 확인해 주세요.</span></div>';
       if (entry.confidence === 'manual') content += '<div class="gangnam-pick-confirmed"><strong>팀원이 메뉴로 확인한 영상</strong><span>' + esc(nameOf(entry.selectedBy) || '팀원') + '님이 선택 · ' + esc(dateText(date)) +
         '</span><button class="text-button" data-action="gangnamUnpick">메뉴 지정 취소·다시 선택</button></div>';
       if (entry.refreshFailure) content += '<p class="inline-warning">새로 조회하지 못해 이전에 확인한 메뉴 게시물을 표시합니다. 아래 진단을 확인해 주세요.</p>';
@@ -653,7 +691,8 @@
         }
         try { write(KEYS.gangnam, Object.fromEntries(Object.entries(gangnamMenus).sort(([a],[b]) => b.localeCompare(a)).slice(0, 14))); } catch (_) {}
       } catch (_) { if (target === connection) { const failure = { ok: false, date: when, reason: 'transport_error' }; gangnamMenus[when] = gangnamMenus[when]?.ok ? { ...gangnamMenus[when], refreshFailure: failure } : failure; } }
-      finally { if (gangnamRequests[when] === task) delete gangnamRequests[when]; gangnamLoading = Object.keys(gangnamRequests).length > 0; renderMenuCards(); }
+      finally { if (gangnamRequests[when] === task) delete gangnamRequests[when]; gangnamLoading = Object.keys(gangnamRequests).length > 0; renderMenuCards();
+        if (target === connection && when === C.today() && gangnamMenus[when]?.alternatives?.length) loadGangnamOcr(force); }
     });
     gangnamRequests[when] = task;
     return task;
@@ -860,7 +899,7 @@
     else if (action === 'megaDelete') deleteMega(id);
     else if (action === 'viewKakaoProfile') viewKakaoProfile();
     else if (action === 'refreshKakaoProfile') loadKakaoProfile(true);
-    else if (action === 'refreshGangnamMenu') loadGangnamMenu(date, true);
+    else if (action === 'refreshGangnamMenu') { loadGangnamMenu(date,true); loadGangnamOcr(true); }
     else if (action === 'gangnamMark') await markGangnam(id);
     else if (action === 'gangnamUnpick') await unmarkGangnam();
     else if (action === 'viewGangnamMenu') viewGangnamMenu();

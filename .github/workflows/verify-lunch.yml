@@ -20,3 +20,5 @@ jobs:
           node --check threads-menu-source.js
       - name: Regression tests
         run: node --test tests/*.test.cjs
+      - name: OCR scoring tests (no network)
+        run: python3 -m unittest discover -s tests -p 'test_gangnam_ocr.py' -v

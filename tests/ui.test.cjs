@@ -256,6 +256,11 @@ async function boot(options = {}) {
     clearInterval(id) { intervals.delete(id); },
     confirm: () => true,
     fetch: async (url, init) => {
+      if (typeof url === 'string' && (url.startsWith('https://raw.githubusercontent.com/jsj-sands/lunch-club/main/data/gangnam-ocr.json') ||
+          url.startsWith('data/gangnam-ocr.json'))) {
+        if (options.ocrFetch) return options.ocrFetch(url, init);
+        return { ok: true, json: async () => ({version:1,date:'1970-01-01',status:'unavailable'}) };
+      }
       posted.push({ url, init });
       if (options.post) return options.post(url, init);
       throw new Error('Unexpected real fetch in UI test');
@@ -276,6 +281,7 @@ async function boot(options = {}) {
   vm.runInContext(fs.readFileSync(path.join(root, 'restaurant-guide.js'), 'utf8'), context, { filename: 'restaurant-guide.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'lunchtime-source.js'), 'utf8'), context, { filename: 'lunchtime-source.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'threads-menu-source.js'), 'utf8'), context, { filename: 'threads-menu-source.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'ocr-choice.js'), 'utf8'), context, { filename: 'ocr-choice.js' });
   if (options.omitKakaoSource) {
     context.LunchKakaoSource = undefined;
     assert.equal(vm.runInContext('window.LunchKakaoSource', context), undefined);
@@ -1909,4 +1915,25 @@ test('강남밥상 같은 날짜에 제목 없는 영상 3개가 오면 영상�
  assert.equal((html.match(/Threads에서 보기 ↗<\/a>/g)||[]).length,3);
  assert.doesNotMatch(html,/<details><summary>영상·사진/);
  assert.doesNotMatch(html,/<video[^>]*autoplay/);
+});
+
+test('자동 OCR 결과가 서버의 식단 미확인 후보와 정확히 일치할 때만 메뉴 영상 한 개가 선택된다',async()=>{
+ const post='https://www.threads.com/@gangnambab/post/AutoMenu1',url='https://video.cdninstagram.com/clip/auto.mp4';
+ const server=req=>{
+  if(req.action==='state')return basicSharedState(req,{features:{...sharedFeatures,gangnamMenu:true}});
+  if(req.action==='gangnamMenu')return {ok:false,date:'2026-10-19',version:'20261125-gangnam-review',
+    reason:'unverified_menu',alternatives:[{postUrl:post,kind:'video',videoUrl:url,
+      publishedAt:'2026-10-19T02:00:00Z',promotion:false}],
+    diagnostics:{matchingDatePosts:1}};
+  throw Error('Unexpected '+req.action);
+ };
+ const ocrFetch=async()=>({ok:true,json:async()=>({
+  version:1,date:'2026-10-19',status:'verified',selected_post_url:post,
+  checked_at:fixedTime,evidence:{menu_frames:4,sampled_frames:7,score:37}
+ })});
+ const ui=await boot({connected:true,server,identity:'seongjun',ocrFetch});
+ await ui.press('refreshGangnamMenu');
+ assert.match(ui.element('restaurantCards').innerHTML,/영상 글자 자동 분석으로 메뉴표 추정/);
+ assert.match(ui.element('restaurantCards').innerHTML,/gangnamMenuVideo/);
+ assert.doesNotMatch(ui.element('restaurantCards').innerHTML,/data-action="gangnamMark"/);
 });
