@@ -1643,7 +1643,7 @@ test('일반 점심 인원도 맛집 카드에서 따로 먹기로 전환하여 
   assert.equal(d.overrides.jingi,'separate');
   assert.equal(d.separateVenues.jingi.placeId,place.id);
   assert.equal(d.votes.jingi,'dtech'); // Older cafeteria choice is preserved, not counted.
-  assert.deepEqual(C.tally(target,d,C.settings()).megazone,[]);
+  assert.deepEqual(C.tally(target,d,C.settings()).dtech,[]);
   assert.equal(ui.element('appDialog').open,false);
   assert.match(ui.element('pairBoard').innerHTML,new RegExp(place.name));
 });
@@ -1740,6 +1740,7 @@ test('디테크·런치타임은 독립적으로 카카오 사진을 조회하�
  assert.deepEqual(ui.saved(dtechKey),dtechProfileData());
  await ui.action('viewDtechProfile');
  assert.equal(ui.element('dtechProfileFull').getAttribute('src'),dtechImage);
+ await ui.press('closeDialog');
  await ui.action('refreshDtechProfile');
  assert.equal(ui.dtechRequests.length,2);
  assert.equal(ui.kakaoRequests.length,1,'디테크 새로고침이 런치타임 채널을 조회하지 않아야 합니다');
@@ -1749,15 +1750,16 @@ test('디테크 채널 조회 실패는 런치타임 사진과 투표를 막지 
  assert.equal(ui.element('kakaoProfilePhoto').getAttribute('src'),kakaoImage);
  assert.doesNotMatch(ui.element('restaurantCards').innerHTML,/id="dtechProfilePhoto"/);
  assert.match(ui.element('restaurantCards').innerHTML,/https:\/\/pf\.kakao\.com\/_nkwxeG/);
- await ui.action('setAvailability','in');
- await ui.action('vote','dtech');
- assert.equal(ui.element('voteSummary').textContent.includes('디테크'),true);
+ const vote=ui.findControl({'data-action':'vote','data-id':'dtech'});
+ assert.equal(vote.disabled,false,'디테크 채널 조회 실패만으로는 점심 선택 자체를 막지 않아야 합니다');
+ assert.match(ui.element('voteSummary').textContent,/디테크/);
 });
 test('구 서버에는 디테크 자동 사진 업데이트를 안내하고 신규 선택을 금지한다',async()=>{
  const server=req=>basicSharedState(req,{features:{...sharedFeatures,dtechProfile:false}});
  const ui=await boot({identity:'seongjun',connected:true,server});
  assert.match(ui.element('restaurantCards').innerHTML,/공유 서버를 한 번 업데이트/);
  assert.equal(ui.dtechRequests.length,0);
+ assert.equal(ui.findControl({'data-action':'vote','data-id':'dtech'}).disabled,true);
 });
 test('강남밥상 최신 서버는 메뉴 조회를 시작하고 서버 업데이트 안내를 표시하지 않는다',async()=>{
  const target='2026-10-19',post='https://www.threads.com/@gangnambab/post/ABC123x';

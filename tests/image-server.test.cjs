@@ -33,7 +33,7 @@ function removeImage(c,meta,extra={},payload={}){
 }
 
 test('초기화는 비공개 식단 폴더 한 개를 만들고 새 서버 기능을 알린다',()=>{
- const c=client();assert.deepEqual(c.get().menuImages,{});assert.equal(c.get().serverVersion,7);assert.deepEqual(c.get().features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true,gangnamMenu:true,gangnamManualPick:true});
+ const c=client();assert.deepEqual(c.get().menuImages,{});assert.equal(c.get().serverVersion,8);assert.deepEqual(c.get().features,{menuImages:true,menuImageDelete:true,explicitAttendance:true,lunchPairs:true,kakaoProfile:true,ceoVenue:true,separateGroups:true,separateVenues:true,joinRequests:true,megaPhotos:true,gangnamMenu:true,gangnamManualPick:true,dtechProfile:true});
  c.context.initializeLunchClub();c.context.initializeLunchClub();assert.equal(c.shared.folders.size,1);
  const folder=[...c.shared.folders.values()][0];assert.equal(folder.name,'SANDS Lunch Club · 공유 식단 사진');assert.equal(folder.access,'PRIVATE');assert.equal(c.shared.locked(),false);
 });
@@ -111,7 +111,7 @@ test('이미지 저장 뒤 영수증 저장이 실패해도 같은 요청 재전
 test('Drive 권한 오류는 재승인 안내를 남기며 기존 투표는 계속 저장할 수 있다',()=>{
  const c=client();c.shared.disableDrive(true);const p=c.post();assert.equal(receipt(c,p).ok,false);assert.match(receipt(c,p).error,/initializeLunchClub.*Drive 권한.*새 버전/);
  const attending=c.post({}, {op:{type:'availability',actor:'seongjun',id:'d'.repeat(24),payload:{value:'in'}}});assert.equal(receipt(c,attending).ok,true);
- const vote=c.post({}, {op:{type:'vote',actor:'seongjun',id:'c'.repeat(24),payload:{placeId:'megazone'}}});assert.equal(receipt(c,vote).ok,true);assert.equal(c.shared.locked(),false);
+ const vote=c.post({}, {op:{type:'vote',actor:'seongjun',id:'c'.repeat(24),payload:{placeId:'dtech'}}});assert.equal(receipt(c,vote).ok,true);assert.equal(c.shared.locked(),false);
 });
 test('90일 지난 전용 식단 파일과 슬롯을 정리하고 같은 폴더의 무관한 파일은 보존한다',()=>{
  const c=client();c.post({}, {date:'2026-06-01'});const old=[...c.shared.files.values()][0];old.createdAt=new Date('2026-06-01T12:00:00Z');
