@@ -1,22 +1,31 @@
 {
   "version": 1,
-  "date": "2026-11-26",
+  "date": "2026-11-27",
   "status": "verified",
-  "checked_at": "2026-11-26T01:04:24Z",
-  "selected_post_url": "https://www.threads.com/@gangnambab/post/DgLnHWBkvru",
+  "checked_at": "2026-11-27T05:04:01Z",
+  "selected_post_url": "https://www.threads.com/@gangnambab/post/DgONEOMkqnC",
   "evidence": {
-    "menu_frames": 5,
+    "menu_frames": 7,
     "sampled_frames": 7,
-    "score": 82
+    "score": 105
   },
-  "candidates_checked": 1,
+  "candidates_checked": 2,
   "diagnostics": [
     {
       "index": 1,
       "kind": "video",
+      "status": "unavailable",
+      "frames": 0,
+      "menu_frames": 0,
+      "promotion_frames": 0,
+      "reason": "no_video_frames"
+    },
+    {
+      "index": 2,
+      "kind": "video",
       "status": "verified",
       "frames": 7,
-      "menu_frames": 5,
+      "menu_frames": 7,
       "promotion_frames": 0,
       "reason": "ocr_verified"
     }
